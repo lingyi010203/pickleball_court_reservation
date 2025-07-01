@@ -5,7 +5,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './components/profile/ProfilePage';
 import RewardsPage from './components/profile/RewardsPage';
-import FeedbackPage from './components/feedback/FeedbackPage';
+import FeedbackPage from './components/feedback/FeedbackPage'; // Feedback form page
+import MyFeedbackPage from './components/feedback/MyFeedbackPage'; // New import for user's feedback list
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
 import MainLayout from './components/layout/MainLayout';
@@ -20,7 +21,7 @@ import CourtDetailPage from './components/court/CourtDetailPage';
 import BookingPage from './components/court/BookingPage'; 
 import BookingHistory from './components/court/BookingHistory';
 import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
-import PaymentPage from './components/court/PaymentPage'; // Make sure this is imported
+import PaymentPage from './components/court/PaymentPage';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -68,6 +69,20 @@ function App() {
           </ProtectedRoute>
         } />
 
+        {/* Feedback routes - CORRECTED */}
+        <Route path="profile/my-feedback" element={
+          <ProtectedRoute>
+            <MyFeedbackPage /> {/* Changed to MyFeedbackPage */}
+          </ProtectedRoute>
+        } />
+
+        {/* Feedback form page */}
+        <Route path="feedback" element={
+          <ProtectedRoute>
+            <FeedbackPage /> {/* Feedback form page */}
+          </ProtectedRoute>
+        } />
+
         {/* Court listing */}
         <Route path="courts" element={
           <ProtectedRoute>
@@ -100,13 +115,6 @@ function App() {
         <Route path="booking/confirmation" element={
           <ProtectedRoute>
             <BookingConfirmationPage />
-          </ProtectedRoute>
-        } />
-
-        {/* Feedback routes */}
-        <Route path="feedback" element={
-          <ProtectedRoute>
-            <FeedbackPage />
           </ProtectedRoute>
         } />
       </Route>
