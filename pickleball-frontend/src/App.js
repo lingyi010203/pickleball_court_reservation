@@ -1,0 +1,202 @@
+import React, { useState, useEffect } from 'react'; // Added useState and useEffect imports
+import { Routes, Route, Navigate } from 'react-router-dom';
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ProfilePage from './components/profile/ProfilePage';
+import RewardsPage from './components/profile/RewardsPage';
+import FeedbackPage from './components/feedback/FeedbackPage';
+import MyFeedbackPage from './components/feedback/MyFeedbackPage';
+import AdminLogin from './components/admin/AdminLogin';
+import AdminDashboard from './components/admin/AdminDashboard';
+import MainLayout from './components/layout/MainLayout';
+import UserService from './service/UserService';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import ResetPasswordEmailSent from './pages/ResetPasswordEmailSent';
+import ResetPasswordSuccess from './pages/ResetPasswordSuccess';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import CourtListPage from './components/court/CourtListPage';
+import CourtDetailPage from './components/court/CourtDetailPage'; 
+import BookingPage from './components/court/BookingPage'; 
+import BookingHistory from './components/court/BookingHistory';
+import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
+import PaymentPage from './components/court/PaymentPage';
+import EventPage from './components/event/EventPage';
+import EventCreatePage from './components/event/EventCreatePage';
+import EventEditPage from './components/event/EventEditPage';
+import FriendlyMatchPage from './components/event/FriendlyMatchPage';
+import MessagingPage from './components/messaging/MessagingPage';
+import HelpdeskPage from './components/helpdesk/HelpdeskPage';
+import { SocketProvider } from './context/SocketContext';
+
+const ProtectedRoute = ({ children }) => {
+  const { authToken } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Token verification logic would go here
+      setIsLoading(false);
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  return authToken ? children : <Navigate to="/login" replace />;
+};
+
+const AdminProtectedRoute = ({ children }) => {
+  return UserService.isAdminLoggedIn() ? children : <Navigate to="/admin/login" replace />;
+};
+
+function App() {
+  return (
+    <SocketProvider>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password-email-sent" element={<ResetPasswordEmailSent />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        <Route path="/reset-password-success" element={<ResetPasswordSuccess />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+
+        {/* Protected user routes with layout */}
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+
+          {/* Profile section */}
+          <Route path="profile" element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          } />
+
+          {/* Rewards section */}
+          <Route path="profile/rewards" element={
+            <ProtectedRoute>
+              <RewardsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Booking history */}
+          <Route path="profile/my-bookings" element={
+            <ProtectedRoute>
+              <BookingHistory />
+            </ProtectedRoute>
+          } />
+
+          {/* Feedback routes */}
+          <Route path="profile/my-feedback" element={
+            <ProtectedRoute>
+              <MyFeedbackPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Feedback form page */}
+          <Route path="feedback" element={
+            <ProtectedRoute>
+              <FeedbackPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Court listing */}
+          <Route path="courts" element={
+            <ProtectedRoute>
+              <CourtListPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Court details */}
+          <Route path="courts/:id" element={
+            <ProtectedRoute>
+              <CourtDetailPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Booking flow */}
+          <Route path="booking/:courtId" element={
+            <ProtectedRoute>
+              <BookingPage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Payment page */}
+          <Route path="payment" element={
+            <ProtectedRoute>
+              <PaymentPage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Booking confirmation page */}
+          <Route path="booking/confirmation" element={
+            <ProtectedRoute>
+              <BookingConfirmationPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Event listing */}
+          <Route path="events" element={
+            <ProtectedRoute>
+              <EventPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Event creation */}
+          <Route path="events/create" element={
+            <ProtectedRoute>
+              <EventCreatePage />
+            </ProtectedRoute>
+          } />
+
+          {/* Event editing */}
+          <Route path="events/edit/:eventId" element={
+            <ProtectedRoute>
+              <EventEditPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Friendly Match page */}
+          <Route path="friendly-match" element={
+            <ProtectedRoute>
+              <FriendlyMatchPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Messaging page */}
+          <Route path="messages" element={
+            <ProtectedRoute>
+              <MessagingPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Helpdesk page */}
+          <Route path="helpdesk" element={
+            <ProtectedRoute>
+              <HelpdeskPage />
+            </ProtectedRoute>
+          } />
+        </Route>
+
+        {/* Admin routes */}
+        <Route path="/admin/dashboard" element={
+          <AdminProtectedRoute>
+            <AdminDashboard />
+          </AdminProtectedRoute>
+        } />
+        
+        {/* 404 fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SocketProvider>
+  );
+}
+
+export default App;
