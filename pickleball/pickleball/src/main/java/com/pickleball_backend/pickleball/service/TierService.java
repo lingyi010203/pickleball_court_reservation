@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface TierService {
     MembershipTier createTier(TierDto tierDto);
+    void deleteTier(Integer id);
     MembershipTier addVoucherToTier(String tierName, VoucherDto voucherDto);
     List<MembershipTier> getAllTiers();
     MembershipTier createOrUpdateTier(MembershipTier tier);

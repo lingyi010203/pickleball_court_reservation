@@ -13,9 +13,11 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import UserService from '../service/UserService';
 import Navbar from '../components/common/Navbar';
+import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [credentials, setCredentials] = useState({
     usernameOrEmail: '',
     password: '',
@@ -40,19 +42,11 @@ const handleLogin = async () => {
     });
     
     if (response.data.token) {
-      // Decode token to get role
-      const decodedToken = JSON.parse(atob(response.data.token.split('.')[1]));
-      const role = decodedToken.role || 'User';
-      
-      // Use UserService to save token and user info
-      UserService.login(
-        response.data.token,
-        role,
-        decodedToken.sub || credentials.usernameOrEmail,
-        response.data.profileImage // Add this if your API returns it
-      );
-      
-      navigate('/');
+      // 用 context 的 login 方法同步状态
+      login(response.data.token);
+      // 你可以保留 UserService.login 以兼容旧逻辑（可选）
+      // UserService.login(...)
+      navigate('/home');
     }
   } catch (err) {
     setError(err.response?.data?.message || 'Invalid credentials. Please try again.');

@@ -56,9 +56,6 @@ const AdminManageUsers = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const username = UserService.getUsername();
-  
-
 
   // Tab change handler
   const handleTabChange = (event, newValue) => {
@@ -83,38 +80,6 @@ const AdminManageUsers = () => {
           <Typography variant="body1" sx={{ color: 'text.secondary', mt: 1 }}>
             Manage users and review type change requests
           </Typography>
-        </Box>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar
-              sx={{
-                bgcolor: '#8e44ad',
-                width: 40,
-                height: 40,
-                mr: 1.5,
-                fontSize: '1rem',
-                fontWeight: 'bold'
-              }}
-            >
-              {username ? username.charAt(0).toUpperCase() : '?'}
-            </Avatar>
-            <Box>
-              <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                Hi, {username}
-              </Typography>
-              <Chip
-                label="ADMIN"
-                size="small"
-                sx={{
-                  backgroundColor: '#d5f5e3',
-                  color: '#27ae60',
-                  fontWeight: 'bold',
-                  mt: 0.5
-                }}
-              />
-            </Box>
-          </Box>
         </Box>
       </Box>
 
@@ -1022,7 +987,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirstamation Dialog */}
+      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         open={openDeleteDialog}
         onClose={handleCloseDeleteDialog}

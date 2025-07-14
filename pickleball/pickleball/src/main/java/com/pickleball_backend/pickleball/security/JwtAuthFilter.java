@@ -33,7 +33,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String jwt = authHeader.substring(7);
 
-        // Validate token before processing
         if (!jwtService.isValid(jwt)) {
             filterChain.doFilter(request, response);
             return;
@@ -41,9 +40,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String username = jwtService.extractUsername(jwt);
         String role = jwtService.extractRole(jwt);
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+        if (username != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // 防止重复前缀
+            String authority = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+
             List<GrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority(role)
+                    new SimpleGrantedAuthority(authority)
             );
 
             UsernamePasswordAuthenticationToken authToken =

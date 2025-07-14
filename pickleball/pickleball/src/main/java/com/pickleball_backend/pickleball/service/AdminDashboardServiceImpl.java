@@ -30,6 +30,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     public long getTotalUserCount() {
         return userRepository.count();
     }
+    
 
     @Override
     public List<AdminBookingDto> getAllBookings() {
@@ -59,7 +60,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         if (member != null) {
             dto.setPointBalance(member.getPointBalance());
             if (member.getTier() != null) {
-                dto.setTier(member.getTier().getTierName().name());
+                // 修复这里：直接使用 tierName 字符串值，不需要 .name()
+                dto.setTier(member.getTier().getTierName()); // 移除了 .name()
             }
         }
         return dto;

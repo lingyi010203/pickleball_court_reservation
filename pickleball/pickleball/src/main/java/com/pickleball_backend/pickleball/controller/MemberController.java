@@ -167,4 +167,12 @@ public class MemberController {
                     .body("Error retrieving court pricing");
         }
     }
+
+    @PostMapping("/bookings/{id}/cancel")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> cancelBooking(@PathVariable Integer id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        CancellationResponse response = bookingService.cancelBooking(id, username);
+        return ResponseEntity.ok(response);
+    }
 }

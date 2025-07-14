@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class CourtDto {
+    private Integer venueId;  // 新增字段
     private String name;
     private String location;
     private String status;
@@ -15,5 +16,4 @@ public class CourtDto {
     private Double dailyPrice;
     private String peakStartTime;
     private String peakEndTime;
-    private Integer numberOfCourts = 1;
 }

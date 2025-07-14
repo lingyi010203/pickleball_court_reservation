@@ -1,6 +1,8 @@
 import axios from 'axios';
+import UserService from './UserService';
 
 const API_BASE_URL = 'http://localhost:8081/api/member';
+const ADMIN_API_BASE_URL = 'http://localhost:8081/api/admin/dashboard';
 
 const BookingService = {
   bookCourt: async (bookingRequest) => {
@@ -32,6 +34,24 @@ const BookingService = {
         }
       }
       
+      throw new Error(errorMessage);
+    }
+  },
+
+  getAllAdminBookings: async () => {
+    try {
+      const token = UserService.getAdminToken ? UserService.getAdminToken() : localStorage.getItem('adminToken');
+      const response = await axios.get(`${ADMIN_API_BASE_URL}/bookings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      let errorMessage = 'Failed to fetch admin bookings.';
+      if (error.response) {
+        errorMessage = error.response.data.message || errorMessage;
+      }
       throw new Error(errorMessage);
     }
   }

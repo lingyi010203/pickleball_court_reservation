@@ -15,6 +15,20 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+@ExceptionHandler({ResourceNotFoundException.class, ValidationException.class})
+    public ResponseEntity<Map<String, String>> handleCustomException(RuntimeException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", ex.getMessage());
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleOtherException(Exception ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", "Internal server error: " + ex.getMessage());
+        return ResponseEntity.status(500).body(error);
+    }
+    
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationExceptions(
             MethodArgumentNotValidException ex) {

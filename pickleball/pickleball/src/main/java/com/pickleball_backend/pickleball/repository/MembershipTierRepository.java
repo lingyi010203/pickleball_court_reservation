@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 
 public interface MembershipTierRepository extends JpaRepository<MembershipTier, Integer> {
-    MembershipTier findByTierName(MembershipTier.TierName tierName);
+    MembershipTier findByTierName(String tierName);
 
     // Added custom query
     @Query("SELECT t FROM MembershipTier t ORDER BY t.minPoints ASC")

@@ -75,3 +75,15 @@ export const getAvailableSlotsForRange = async (courtId, startDate, endDate) => 
     throw error;
   }
 };
+
+export const getAllSlotsForCourt = async (courtId) => {
+  try {
+    const response = await api.get('/member/slots/all', {
+      params: { courtId }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch all slots:', error);
+    return [];
+  }
+};

@@ -22,16 +22,18 @@ import {
   CardMembership as TierIcon,
   People as PeopleIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import UserService from '../../service/UserService';
 import AdminManageUsers from './AdminManageUsers';
 import AdminManageCourts from './AdminManageCourts';
 import AdminManageTiers from './AdminManageTiers';
+import AdminManageBookings from './AdminManageBookings';
 import axios from 'axios';
 import { Chart } from 'chart.js/auto';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const bookingChartRef = useRef(null);
   const engagementChartRef = useRef(null);
   const bookingChartInstance = useRef(null);
@@ -81,34 +83,61 @@ const AdminDashboard = () => {
       setLoading(true);
       const token = UserService.getAdminToken();
 
-      // Fetch user statistics
-      const usersResponse = await axios.get('http://localhost:8081/api/admin/dashboard/users/count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // 分别获取用户数据和预订数据
+      const [usersResponse, bookingsResponse] = await Promise.all([
+        axios.get('http://localhost:8081/api/admin/dashboard/users/count', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('http://localhost:8081/api/admin/dashboard/bookings', {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: [] })) // 预订API失败时返回空数组
+      ]);
 
-      // Fetch booking statistics
-      const bookingsResponse = await axios.get('http://localhost:8081/api/admin/dashboard/bookings', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // 处理用户数据
+      const totalUsers = Number(usersResponse.data);
 
-      // Calculate changes (mock data for demo)
-      const totalUsers = usersResponse.data;
-      const totalBookings = bookingsResponse.data.length;
-      const totalRevenue = bookingsResponse.data.reduce((sum, booking) => sum + booking.totalAmount, 0);
+      // 处理预订数据（安全处理）
+      let totalBookings = 0;
+      let totalRevenue = 0;
+
+      if (Array.isArray(bookingsResponse.data)) {
+        totalBookings = bookingsResponse.data.length;
+        totalRevenue = bookingsResponse.data.reduce(
+          (sum, booking) => sum + (booking.totalAmount || 0),
+          0
+        );
+      }
+
+      console.log('Setting dashboard data:', {
+        totalUsers,
+        totalUsersChange: 12,
+        totalBookings,
+        totalBookingsChange: 8,
+        totalRevenue,
+        totalRevenueChange: 15,
+        averageRating: 4.7,
+        averageRatingChange: 0.2
+      });
 
       setDashboardData({
         totalUsers,
-        totalUsersChange: 12, // Mock percentage change
+        totalUsersChange: 12,
         totalBookings,
-        totalBookingsChange: 8, // Mock percentage change
+        totalBookingsChange: 8,
         totalRevenue,
-        totalRevenueChange: 15, // Mock percentage change
-        averageRating: 4.7, // Mock data
-        averageRatingChange: 0.2 // Mock data
+        totalRevenueChange: 15,
+        averageRating: 4.7,
+        averageRatingChange: 0.2
       });
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // 仅重置受影响的部分，保留用户数据
+      setDashboardData(prev => ({
+        ...prev,
+        totalBookings: 0,
+        totalRevenue: 0
+      }));
     } finally {
       setLoading(false);
     }
@@ -233,6 +262,19 @@ const AdminDashboard = () => {
 
   const usernameInitial = adminUsername.charAt(0).toUpperCase();
 
+  console.log('Dashboard data state:', dashboardData);
+
+  // Helper to determine current tab
+  const getCurrentTab = () => {
+    if (location.pathname.startsWith('/admin/users')) return 'users';
+    if (location.pathname.startsWith('/admin/tiers')) return 'tiers';
+    if (location.pathname.startsWith('/admin/courts')) return 'courts';
+    if (location.pathname.startsWith('/admin/dashboard')) return 'dashboard';
+    if (location.pathname.startsWith('/admin/bookings')) return 'bookings';
+    return 'dashboard';
+  };
+  const currentTab = getCurrentTab();
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
       {/* Loading Backdrop */}
@@ -242,7 +284,6 @@ const AdminDashboard = () => {
       >
         <CircularProgress color="inherit" />
       </Backdrop>
-
       {/* Sidebar */}
       <Paper sx={{
         width: 250,
@@ -270,50 +311,36 @@ const AdminDashboard = () => {
             </Typography>
           </Box>
         </Box>
-
         <List sx={{ flexGrow: 1 }}>
           <ListItem
             button
-            onClick={() => setCurrentView('dashboard')}
+            onClick={() => navigate('/admin/dashboard')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentView === 'dashboard' ? '#f0f2f5' : 'inherit'
+              bgcolor: currentTab === 'dashboard' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{
               minWidth: 40,
-              color: currentView === 'dashboard' ? 'primary.main' : 'inherit'
+              color: currentTab === 'dashboard' ? 'primary.main' : 'inherit'
             }}>
               <DashboardIcon />
             </ListItemIcon>
             <ListItemText
               primary="Dashboard"
               primaryTypographyProps={{
-                fontWeight: currentView === 'dashboard' ? 'bold' : 'normal'
+                fontWeight: currentTab === 'dashboard' ? 'bold' : 'normal'
               }}
             />
           </ListItem>
-
           <ListItem
             button
-            onClick={() => setCurrentView('reports')}
-            sx={{ borderRadius: 1, mb: 0.5 }}
-          >
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <ReportsIcon />
-            </ListItemIcon>
-            <ListItemText primary="Reports" />
-          </ListItem>
-
-
-          <ListItem
-            button
-            onClick={() => setCurrentView('users')}
+            onClick={() => navigate('/admin/users')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentView === 'users' ? '#f0f2f5' : 'inherit'
+              bgcolor: currentTab === 'users' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -321,21 +348,13 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="User Management" />
           </ListItem>
-
-          <ListItem button sx={{ borderRadius: 1, mb: 0.5 }}>
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <BookingsIcon />
-            </ListItemIcon>
-            <ListItemText primary="Bookings" />
-          </ListItem>
-
           <ListItem
             button
-            onClick={() => setCurrentView('courts')}
+            onClick={() => navigate('/admin/courts')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentView === 'courts' ? '#f0f2f5' : 'inherit'
+              bgcolor: currentTab === 'courts' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -343,14 +362,13 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Manage Courts" />
           </ListItem>
-
           <ListItem
             button
-            onClick={() => setCurrentView('tiers')}
+            onClick={() => navigate('/admin/tiers')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentView === 'tiers' ? '#f0f2f5' : 'inherit'
+              bgcolor: currentTab === 'tiers' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -358,7 +376,20 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Membership Tiers" />
           </ListItem>
-
+          <ListItem
+            button
+            onClick={() => navigate('/admin/bookings')}
+            sx={{
+              borderRadius: 1,
+              mb: 0.5,
+              bgcolor: currentTab === 'bookings' ? '#f0f2f5' : 'inherit'
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <BookingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Manage Bookings" />
+          </ListItem>
           <ListItem button sx={{ borderRadius: 1 }}>
             <ListItemIcon sx={{ minWidth: 40 }}>
               <SettingsIcon />
@@ -366,7 +397,6 @@ const AdminDashboard = () => {
             <ListItemText primary="Settings" />
           </ListItem>
         </List>
-
         <Box sx={{ mt: 'auto', p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
           <Button
             fullWidth
@@ -386,7 +416,6 @@ const AdminDashboard = () => {
           </Button>
         </Box>
       </Paper>
-
       {/* Main Content */}
       <Box sx={{ flexGrow: 1, ml: '280px', p: 3 }}>
         {/* Top Bar */}
@@ -411,7 +440,6 @@ const AdminDashboard = () => {
               InputProps={{ disableUnderline: true }}
             />
           </Paper>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <IconButton>
               <NotificationsIcon />
@@ -427,7 +455,6 @@ const AdminDashboard = () => {
                 </Avatar>
                 <Typography>{adminUsername}</Typography>
               </Button>
-
               {showUserMenu && (
                 <Paper sx={{
                   position: 'absolute',
@@ -450,8 +477,8 @@ const AdminDashboard = () => {
             </Box>
           </Box>
         </Box>
-
-        {currentView === 'dashboard' ? (
+        {/* Main Content Routing */}
+        {currentTab === 'dashboard' && (location.pathname === '/admin/dashboard' || location.pathname === '/admin') ? (
           <>
             {/* Overview Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -778,44 +805,8 @@ const AdminDashboard = () => {
               </Grid>
             </Grid>
           </>
-        ) : currentView === 'users' ? (
-          <Box>
-            <Button
-              startIcon={<BackIcon />}
-              onClick={() => setCurrentView('dashboard')}
-              sx={{ mb: 2, color: 'primary.main' }}
-            >
-              Back to Dashboard
-            </Button>
-            <AdminManageUsers embedded={true} />
-          </Box>
-        ) : currentView === 'courts' ? (
-          <Box>
-            <Button
-              startIcon={<BackIcon />}
-              onClick={() => setCurrentView('dashboard')}
-              sx={{ mb: 2, color: 'primary.main' }}
-            >
-              Back to Dashboard
-            </Button>
-            <AdminManageCourts />
-          </Box>
-        ) : currentView === 'tiers' ? (
-          <Box>
-            <Button
-              startIcon={<BackIcon />}
-              onClick={() => setCurrentView('dashboard')}
-              sx={{ mb: 2, color: 'primary.main' }}
-            >
-              Back to Dashboard
-            </Button>
-            <AdminManageTiers />
-          </Box>
-        ) : (
-          <Typography variant="h5" sx={{ p: 4, textAlign: 'center' }}>
-            {currentView.charAt(0).toUpperCase() + currentView.slice(1)} View
-          </Typography>
-        )}
+        ) : null}
+        <Outlet />
       </Box>
     </Box>
   );

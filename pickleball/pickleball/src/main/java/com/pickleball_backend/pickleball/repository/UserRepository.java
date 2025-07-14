@@ -15,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
     Optional<User> findByUserAccount_Username(String username);
     List<User> findByRequestedUserTypeIsNotNull(); // New method for pending requests
+    long countByUserAccount_Status(String status);
 
     @Query("SELECT u FROM User u " +
             "JOIN u.userAccount ua " +

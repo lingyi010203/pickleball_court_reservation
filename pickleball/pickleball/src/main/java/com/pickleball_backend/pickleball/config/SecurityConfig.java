@@ -61,70 +61,36 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+
+                        // ✅ Public endpoints
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/verify").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
-
-                        // Tier Management Endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/*/vouchers").hasAuthority("ROLE_ADMIN")
-
-                        // Existing Admin Endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/admin/dashboard/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/courts").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/courts/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/courts/*/pricing").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/courts/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/courts/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/courts").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/courts/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/courts/*/analytics").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/*/vouchers").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/slots").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/cancellation-requests/pending").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/cancellation-requests/*/process").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/cancellation-requests/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/dashboard/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/users").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/admin/register-from-invite").permitAll()
-                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/member/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/member/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/member/bookings").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/bookings").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/bookings/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/member/bookings/*/cancel").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/dashboard").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/tiers").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/dashboard").hasAuthority("ROLE_USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/tiers").hasAuthority("ROLE_USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/courts").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/courts/{id}").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available/grouped").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/redeem-history").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/user/reviewable-items").hasRole("USER")
+                        .requestMatchers("/error").permitAll()
+
+                        // ✅ Feedback endpoints
                         .requestMatchers(HttpMethod.GET, "/api/feedback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/feedback/stats").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/feedback").hasRole("USER")
                         .requestMatchers(HttpMethod.PUT, "/api/feedback/**").hasRole("USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/feedback/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/api/auth/verify").permitAll()
-                        // General Admin Access
-                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
 
-                        // User Endpoints
+                        // ✅ Admin-only endpoints
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // ✅ Member-only endpoints (cleaned & grouped)
+                        .requestMatchers("/api/member/**").hasRole("USER")
+
+                        // ✅ Shared authenticated endpoints
                         .requestMatchers("/api/profile").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/profile/photo").authenticated()
                         .requestMatchers("/api/preferences").authenticated()
-                        .requestMatchers("/error").permitAll()
+
+                        // ✅ Fallback rule: all other requests must be authenticated
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

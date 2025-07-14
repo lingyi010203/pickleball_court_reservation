@@ -1,5 +1,7 @@
 package com.pickleball_backend.pickleball.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -46,6 +48,8 @@ public class Court {
     @Column(name = "peak_end_time")
     private String peakEndTime;
 
-    @Column(name = "number_of_courts")
-    private Integer numberOfCourts = 1;
+    @ManyToOne
+    @JoinColumn(name = "venue_id")
+    @JsonIgnoreProperties("courts")  // 防止 venue 再序列化它的 courts
+    private Venue venue;
 }

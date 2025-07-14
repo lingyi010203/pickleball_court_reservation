@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -22,6 +22,10 @@ import BookingPage from './components/court/BookingPage';
 import BookingHistory from './components/court/BookingHistory';
 import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
 import PaymentPage from './components/court/PaymentPage';
+import AdminManageUsers from './components/admin/AdminManageUsers';
+import AdminManageTiers from './components/admin/AdminManageTiers';
+import AdminManageCourts from './components/admin/AdminManageCourts';
+import AdminManageBookings from './components/admin/AdminManageBookings';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -31,6 +35,10 @@ const ProtectedRoute = ({ children }) => {
 const AdminProtectedRoute = ({ children }) => {
   return UserService.isAdminLoggedIn() ? children : <Navigate to="/admin/login" replace />;
 };
+
+function AdminDashboardLayout() {
+  return <AdminDashboard><Outlet /></AdminDashboard>;
+}
 
 function App() {
   return (
@@ -46,7 +54,12 @@ function App() {
 
       {/* Protected user routes with layout */}
       <Route path="/" element={<MainLayout />}>
-        <Route index element={<HomePage />} />
+        <Route index element={<Navigate to="/home" replace />} />
+        <Route path="home" element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        } />
 
         {/* Profile section */}
         <Route path="profile" element={
@@ -119,12 +132,18 @@ function App() {
         } />
       </Route>
 
-      {/* Admin routes */}
-      <Route path="/admin/dashboard" element={
+      {/* Admin routes with nested structure */}
+      <Route path="/admin" element={
         <AdminProtectedRoute>
-          <AdminDashboard />
+          <AdminDashboardLayout />
         </AdminProtectedRoute>
-      } />
+      }>
+        <Route path="dashboard" element={<div />} /> {/* Dashboard home, content handled in AdminDashboard */}
+        <Route path="users" element={<AdminManageUsers />} />
+        <Route path="tiers" element={<AdminManageTiers />} />
+        <Route path="courts" element={<AdminManageCourts />} />
+        <Route path="bookings" element={<AdminManageBookings />} />
+      </Route>
       
       {/* 404 fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -14,12 +14,10 @@ public class JwtService {
     private final SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(java.util.Base64.getEncoder().encodeToString(SECRET.getBytes())));
 
     public String generateToken(String subject, String role) {
-        String normalizedRole = role.toUpperCase().startsWith("ROLE_") ?
-                role.toUpperCase() :
-                "ROLE_" + role.toUpperCase();
+        String cleanedRole = role.toUpperCase().replace("ROLE_", "");
         return Jwts.builder()
                 .subject(subject)
-                .claim("role", normalizedRole)
+                .claim("role", cleanedRole)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
                 .signWith(key, Jwts.SIG.HS256)
@@ -39,7 +37,6 @@ public class JwtService {
         }
     }
 
-    // Add to JwtService.java
     public String extractRole(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(key)
@@ -47,7 +44,8 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload();
 
-        return claims.get("role", String.class);
+        String role = claims.get("role", String.class);
+        return role != null ? role.toUpperCase() : null;
     }
 
     public Claims extractAllClaims(String token) {

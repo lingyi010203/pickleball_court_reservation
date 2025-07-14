@@ -9,5 +9,5 @@ public interface SlotService {
     List<SlotResponseDto> getSlots(List<Integer> courtIds, LocalDate startDate, LocalDate endDate);
     void createSlots(List<SlotDto> slotDtos);
     List<SlotResponseDto> getAvailableSlotsByCourt(Integer courtId);
-
+    List<SlotResponseDto> getAllSlotsByCourt(Integer courtId, LocalDate startDate, LocalDate endDate);
 }

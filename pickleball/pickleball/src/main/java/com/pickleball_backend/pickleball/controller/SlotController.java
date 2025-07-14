@@ -52,4 +52,16 @@ public class SlotController {
         List<SlotResponseDto> slots = slotService.getAvailableSlotsByCourt(courtId);
         return ResponseEntity.ok(slots);
     }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<SlotResponseDto>> getAllSlots(
+            @RequestParam Integer courtId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        LocalDate start = startDate != null ? startDate : LocalDate.now();
+        LocalDate end = endDate != null ? endDate : start.plusMonths(3);
+        List<SlotResponseDto> slots = slotService.getAllSlotsByCourt(courtId, start, end);
+        return ResponseEntity.ok(slots);
+    }
 }

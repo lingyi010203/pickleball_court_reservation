@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Container, Box, Grid, Typography, 
-  TextField, Button, Chip, Skeleton,
-  Paper, MenuItem, Select, FormControl, InputLabel
+  TextField, Button, Chip, Paper,
+  MenuItem, Select, FormControl, InputLabel
 } from '@mui/material';
 import { FilterList as FilterIcon, Search as SearchIcon, SportsTennis as CourtIcon } from '@mui/icons-material';
 import CourtCard from './CourtCard';
@@ -15,6 +15,7 @@ const CourtListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filteredCourts, setFilteredCourts] = useState([]);
+  const [groupedVenues, setGroupedVenues] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
@@ -29,6 +30,7 @@ const CourtListPage = () => {
         const courtsData = await CourtService.getAllCourts();
         setCourts(courtsData);
         setFilteredCourts(courtsData);
+        setGroupedVenues(groupCourtsByVenue(courtsData));
         setLoading(false);
       } catch (err) {
         setError(err.message || 'Failed to load courts');
@@ -39,6 +41,29 @@ const CourtListPage = () => {
     fetchCourts();
   }, []);
 
+  // Group courts by venue
+  const groupCourtsByVenue = (courts) => {
+    const venueMap = new Map();
+
+    courts.forEach(court => {
+      const venue = court.venue;
+      if (!venue) return;
+
+      if (!venueMap.has(venue.id)) {
+        venueMap.set(venue.id, {
+          venueId: venue.id,
+          name: venue.name,
+          location: venue.location,
+          description: venue.description,
+          courts: []
+        });
+      }
+      venueMap.get(venue.id).courts.push(court);
+    });
+
+    return Array.from(venueMap.values());
+  };
+
   // Apply filters
   useEffect(() => {
     let result = courts;
@@ -46,7 +71,8 @@ const CourtListPage = () => {
     if (searchTerm) {
       result = result.filter(court => 
         court.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        court.location.toLowerCase().includes(searchTerm.toLowerCase())
+        court.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (court.venue?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
       );
     }
     
@@ -57,11 +83,13 @@ const CourtListPage = () => {
     if (locationFilter !== 'all') {
       result = result.filter(court => court.location === locationFilter);
     }
-    
+
     setFilteredCourts(result);
+    setGroupedVenues(groupCourtsByVenue(result));
   }, [courts, searchTerm, statusFilter, locationFilter]);
 
   const handleRetry = () => window.location.reload();
+
   const uniqueLocations = [...new Set(courts.map(court => court.location))];
 
   const handleBookNow = (courtId) => {
@@ -93,7 +121,7 @@ const CourtListPage = () => {
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="Search courts by name or location..."
+              placeholder="Search courts or venues..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -116,14 +144,13 @@ const CourtListPage = () => {
           
           <Grid item xs={6} md={3}>
             <Chip 
-              label={`${filteredCourts.length} courts available`}
+              label={`${filteredCourts.length} courts found`}
               color="primary"
               sx={{ height: 56, borderRadius: 2, fontSize: '1rem', fontWeight: 700 }}
             />
           </Grid>
         </Grid>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #eee' }}>
             <Grid container spacing={2}>
@@ -136,8 +163,8 @@ const CourtListPage = () => {
                     label="Status"
                   >
                     <MenuItem value="all">All Statuses</MenuItem>
-                    <MenuItem value="available">Available</MenuItem>
-                    <MenuItem value="maintenance">Maintenance</MenuItem>
+                    <MenuItem value="ACTIVE">Active</MenuItem>
+                    <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -176,14 +203,39 @@ const CourtListPage = () => {
         </Box>
       ) : (
         <>
-          {filteredCourts.length > 0 ? (
-            <Grid container spacing={4}>
-              {filteredCourts.map(court => (
-                <Grid item key={court.id} xs={12} sm={6} md={4} lg={3}>
-                  <CourtCard court={court} loading={loading} onBookNow={handleBookNow} />
-                </Grid>
+          {groupedVenues.length > 0 ? (
+            <>
+              {groupedVenues.map(venue => (
+                <Box key={venue.venueId} sx={{ mb: 6 }}>
+                  <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 2 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                      {venue.name}
+                    </Typography>
+                    <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
+                      {venue.location}
+                    </Typography>
+                    {venue.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {venue.description}
+                      </Typography>
+                    )}
+                    <Chip 
+                      label={`${venue.courts.length} courts available`}
+                      color="primary"
+                      sx={{ height: 32, borderRadius: 2, fontWeight: 700 }}
+                    />
+                  </Paper>
+                  
+                  <Grid container spacing={4}>
+                    {venue.courts.map(court => (
+                      <Grid item key={court.id} xs={12} sm={6} md={4} lg={3}>
+                        <CourtCard court={court} loading={loading} onBookNow={handleBookNow} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
               ))}
-            </Grid>
+            </>
           ) : (
             <Box sx={{ textAlign: 'center', p: 8 }}>
               <Box sx={{ 

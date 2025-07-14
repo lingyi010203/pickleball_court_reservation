@@ -12,25 +12,20 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 public class MembershipTier {
-    public enum TierName { SILVER, GOLD, PLATINUM }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
-
-    @Enumerated(EnumType.STRING)
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
-    private TierName tierName;
+    private Integer id;
 
     private String benefits;
 
+    @Column(name = "tier_name") // 映射到 tier_name 列
+    private String tierName; // 改为 String 类型
+
+    @Column(name = "min_points")
     private int minPoints;
+
+    @Column(name = "max_points")
     private int maxPoints;
 
-    // Add this new field
-    private boolean active = true;
-
-    @OneToMany(mappedBy = "tier", cascade = CascadeType.ALL)
-    @JsonManagedReference
-    private List<Voucher> vouchers;
+    private boolean active;
 }
