@@ -17,4 +17,8 @@ public class AdminBookingDto {
     private LocalTime endTime;
     private String purpose;
     private Integer numberOfPlayers;
+    private String adminRemark;
+    private String memberPhone;
+    private String memberEmail;
+    private CancellationRequestDto cancellationRequest;
 }

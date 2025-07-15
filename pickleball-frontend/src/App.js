@@ -22,6 +22,7 @@ import BookingPage from './components/court/BookingPage';
 import BookingHistory from './components/court/BookingHistory';
 import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
 import PaymentPage from './components/court/PaymentPage';
+import WalletTopUpPage from './components/profile/WalletTopUpPage';
 import AdminManageUsers from './components/admin/AdminManageUsers';
 import AdminManageTiers from './components/admin/AdminManageTiers';
 import AdminManageCourts from './components/admin/AdminManageCourts';
@@ -121,6 +122,13 @@ function App() {
         <Route path="payment" element={
           <ProtectedRoute>
             <PaymentPage />
+          </ProtectedRoute>
+        } />
+        
+        {/* Wallet top-up page */}
+        <Route path="wallet/topup" element={
+          <ProtectedRoute>
+            <WalletTopUpPage />
           </ProtectedRoute>
         } />
         

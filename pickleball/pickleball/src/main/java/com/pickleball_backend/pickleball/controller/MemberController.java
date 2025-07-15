@@ -170,9 +170,10 @@ public class MemberController {
 
     @PostMapping("/bookings/{id}/cancel")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> cancelBooking(@PathVariable Integer id) {
+    public ResponseEntity<?> cancelBooking(@PathVariable Integer id, @RequestBody(required = false) java.util.Map<String, Object> body) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        CancellationResponse response = bookingService.cancelBooking(id, username);
+        String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : null;
+        CancellationResponse response = bookingService.cancelBooking(id, username, reason);
         return ResponseEntity.ok(response);
     }
 }

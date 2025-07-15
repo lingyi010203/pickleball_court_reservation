@@ -69,8 +69,11 @@ const PaymentPage = () => {
 
       const bookingRequest = {
         slotId: Array.isArray(bookingDetails.slotIds) ? bookingDetails.slotIds[0] : bookingDetails.slotId,
+        slotIds: bookingDetails.slotIds,
         purpose: bookingDetails.purpose,
         numberOfPlayers: bookingDetails.numberOfPlayers,
+        numPaddles: bookingDetails.numPaddles, // 新增
+        buyBallSet: bookingDetails.buyBallSet, // 新增
         durationHours: bookingDetails.durationHours,
         useWallet: paymentMethod === 'wallet'
       };
@@ -86,7 +89,9 @@ const PaymentPage = () => {
             startTime: bookingDetails.startTime,
             endTime: bookingDetails.endTime,
             duration: bookingDetails.durationHours,
-            price: bookingDetails.price
+            price: bookingDetails.price,
+            numPaddles: bookingDetails.numPaddles,
+            buyBallSet: bookingDetails.buyBallSet
           }
         }
       });
@@ -203,6 +208,31 @@ const PaymentPage = () => {
                   {bookingDetails.durationHours} hours
                 </Typography>
               </Grid>
+
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Number of Players:
+                </Typography>
+              </Grid>
+              <Grid item xs={6} textAlign="right">
+                <Typography variant="body2">{bookingDetails.numberOfPlayers}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Paddles to Rent:
+                </Typography>
+              </Grid>
+              <Grid item xs={6} textAlign="right">
+                <Typography variant="body2">{bookingDetails.numPaddles} (RM5 each)</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Buy Ball Set (4 balls, RM12)
+                </Typography>
+              </Grid>
+              <Grid item xs={6} textAlign="right">
+                <Typography variant="body2">{bookingDetails.buyBallSet ? 'Yes' : 'No'}</Typography>
+              </Grid>
             </Grid>
 
             <Divider sx={{ my: 2 }} />
@@ -266,6 +296,21 @@ const PaymentPage = () => {
         {paymentMethod === 'wallet' && walletBalance < bookingDetails.price && !isLoading && (
           <Alert severity="error" sx={{ mb: 3 }}>
             Insufficient wallet balance. Please add RM{(bookingDetails.price - walletBalance).toFixed(2)} or choose another payment method.
+            <Box sx={{ mt: 2 }}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => navigate('/wallet/topup')}
+                sx={{
+                  backgroundColor: '#ff9800',
+                  '&:hover': {
+                    backgroundColor: '#f57c00'
+                  }
+                }}
+              >
+                Top Up Wallet
+              </Button>
+            </Box>
           </Alert>
         )}
 

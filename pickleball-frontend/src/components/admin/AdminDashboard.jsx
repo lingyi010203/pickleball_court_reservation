@@ -96,17 +96,14 @@ const AdminDashboard = () => {
       // 处理用户数据
       const totalUsers = Number(usersResponse.data);
 
-      // 处理预订数据（安全处理）
-      let totalBookings = 0;
-      let totalRevenue = 0;
-
-      if (Array.isArray(bookingsResponse.data)) {
-        totalBookings = bookingsResponse.data.length;
-        totalRevenue = bookingsResponse.data.reduce(
-          (sum, booking) => sum + (booking.totalAmount || 0),
-          0
-        );
-      }
+      // 处理预订数据（分页对象）
+      const bookingsPage = bookingsResponse.data;
+      const bookings = bookingsPage.content || [];
+      const totalBookings = bookingsPage.totalElements || 0;
+      const totalRevenue = bookings.reduce(
+        (sum, booking) => sum + (booking.totalAmount || 0),
+        0
+      );
 
       console.log('Setting dashboard data:', {
         totalUsers,

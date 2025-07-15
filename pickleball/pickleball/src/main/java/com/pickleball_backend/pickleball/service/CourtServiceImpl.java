@@ -189,18 +189,26 @@ public class CourtServiceImpl implements CourtService {
             throw new IllegalStateException("Court already deleted");
         }
 
-        List<Booking> activeBookings = bookingRepository.findActiveBookingsByCourtId(id);
+        // List<Booking> activeBookings = bookingRepository.findActiveBookingsByCourtId(id);
+        // 替换为通过 BookingSlotRepository 查询所有该 courtId 下的 bookingSlot，且 booking 状态为有效
+        List<BookingSlot> activeBookingSlots = bookingSlotRepository.findActiveByCourtId(id);
+        List<Booking> activeBookings = activeBookingSlots.stream()
+            .map(BookingSlot::getBooking)
+            .filter(Objects::nonNull)
+            .filter(b -> !"CANCELLED".equalsIgnoreCase(b.getStatus()) && !"COMPLETED".equalsIgnoreCase(b.getStatus()) && !"CANCELLED_DUE_TO_COURT_DELETION".equalsIgnoreCase(b.getStatus()))
+            .collect(Collectors.toList());
 
         if (!activeBookings.isEmpty()) {
             for (Booking booking : activeBookings) {
                 try {
                     refundBooking(booking);
-                    Slot slot = booking.getSlot();
+                    // Slot slot = booking.getSlot();
+                    Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
                     emailService.sendCourtDeletionNotification(
                             booking.getMember().getUser().getEmail(),
                             court.getName(),
-                            slot.getDate(),
-                            slot.getStartTime(),
+                            slot != null ? slot.getDate() : null,
+                            slot != null ? slot.getStartTime() : null,
                             booking.getTotalAmount()
                     );
                     updateBookingStatus(booking);
@@ -225,14 +233,19 @@ public class CourtServiceImpl implements CourtService {
         payment.setStatus("REFUNDED");
         paymentRepository.save(payment);
 
-        Slot slot = booking.getSlot();
-        slot.setAvailable(true);
-        slotRepository.save(slot);
+        // Slot slot = booking.getSlot();
+        Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
+        if (slot != null) {
+            slot.setAvailable(true);
+            slotRepository.save(slot);
+        }
 
-
-        BookingSlot bookingSlot = booking.getBookingSlot();
-        bookingSlot.setStatus("CANCELLED");
-        bookingSlotRepository.save(bookingSlot);
+        // BookingSlot bookingSlot = booking.getBookingSlot();
+        BookingSlot bookingSlot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0) : null;
+        if (bookingSlot != null) {
+            bookingSlot.setStatus("CANCELLED");
+            bookingSlotRepository.save(bookingSlot);
+        }
     }
 
     private void updateBookingStatus(Booking booking) {
