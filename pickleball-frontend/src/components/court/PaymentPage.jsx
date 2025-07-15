@@ -17,8 +17,9 @@ import {
   Alert
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { getWalletBalance, initializeWallet  } from '../../service/WalletService';
+import api from '../../api/axiosConfig.js';
+import { getWalletBalance, initializeWallet } from '../../service/WalletService';
+import { useAuth } from '../../context/AuthContext';
 
 const PaymentPage = () => {
   const location = useLocation();
@@ -29,40 +30,34 @@ const PaymentPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { authToken } = useAuth();
 
- useEffect(() => {
-  const fetchWalletBalance = async () => {
-    try {
-      setIsLoading(true);
-      
-      // First try to get balance
-      let balance;
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
       try {
-        balance = await getWalletBalance();
-        console.log('Initial wallet balance:', balance);
-      } catch (getError) {
-        console.warn('Wallet not found, initializing...', getError);
-      }
+        setIsLoading(true);
+        let balance;
 
-      // Initialize wallet if needed
-      if (balance === undefined || balance === null || balance === 0) {
-        console.log('Initializing wallet...');
-        await initializeWallet();
-        balance = await getWalletBalance();
-        console.log('Wallet balance after initialization:', balance);
-      }
+        try {
+          balance = await getWalletBalance(); // 直接调用
+        } catch (getError) {
+          console.warn('Wallet not found, initializing...', getError);
+          await initializeWallet(); // 直接调用
+          balance = await getWalletBalance();
+        }
 
-      setWalletBalance(balance);
-    } catch (err) {
-      console.error('Wallet balance error:', err);
-      setError('Failed to load wallet balance: ' + err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  fetchWalletBalance();
-}, []);
+        setWalletBalance(balance);
+      } catch (err) {
+        console.error('Wallet balance error:', err);
+        setError('Failed to load wallet balance: ' + err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWalletBalance();
+  }, []);
+
   const handlePayment = async () => {
     if (!bookingDetails) {
       setError('Booking details missing');
@@ -71,19 +66,17 @@ const PaymentPage = () => {
 
     try {
       setIsProcessing(true);
-      const token = localStorage.getItem('token');
 
       const bookingRequest = {
-        slotId: bookingDetails.slotId,
+        slotId: Array.isArray(bookingDetails.slotIds) ? bookingDetails.slotIds[0] : bookingDetails.slotId,
         purpose: bookingDetails.purpose,
         numberOfPlayers: bookingDetails.numberOfPlayers,
         durationHours: bookingDetails.durationHours,
         useWallet: paymentMethod === 'wallet'
       };
 
-      const response = await axios.post('/api/member/bookings', bookingRequest, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // 使用配置好的api实例代替axios
+      const response = await api.post('/member/bookings', bookingRequest);
 
       navigate('/booking/confirmation', {
         state: {
@@ -98,7 +91,14 @@ const PaymentPage = () => {
         }
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Payment failed. Please try again.');
+      const errorMessage = err.response?.data?.message || 'Payment failed. Please try again.';
+
+      if (errorMessage.includes('Insufficient wallet balance')) {
+        setError('Your wallet balance is too low. Please top up and try again.');
+      } else {
+        setError(errorMessage);
+      }
+
       setIsProcessing(false);
     }
   };
@@ -250,7 +250,7 @@ const PaymentPage = () => {
                 }
                 sx={{ p: 2, width: '100%' }}
               />
-            </Card> 
+            </Card>
 
             <Card variant="outlined" sx={{ borderRadius: '8px' }}>
               <FormControlLabel

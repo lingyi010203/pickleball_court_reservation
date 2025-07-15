@@ -1,27 +1,27 @@
 const AuthService = {
   // Save tokens to localStorage
   setTokens: (token) => {
-    localStorage.setItem('accessToken', token);
+    localStorage.setItem('authToken', token);
   },
 
   // Get access token from localStorage
   getToken: () => {
-    return localStorage.getItem('accessToken');
+    return localStorage.getItem('authToken');
   },
 
   // Remove tokens from localStorage (logout)
   removeTokens: () => {
-    localStorage.removeItem('accessToken');
+    localStorage.removeItem('authToken');
   },
 
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!localStorage.getItem('accessToken');
+    return !!localStorage.getItem('authToken');
   },
 
   // Get user role from token (if needed)
   getUserRole: () => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('authToken');
     if (!token) return null;
     
     try {

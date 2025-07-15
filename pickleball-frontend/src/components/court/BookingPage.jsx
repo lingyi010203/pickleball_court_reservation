@@ -26,7 +26,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatTime } from '../../components/court/DateUtils';
 import CourtService from '../../service/CourtService';
-import { getAvailableSlotsForCourt } from '../../service/SlotService';
+import { getAllSlotsForCourt } from '../../service/SlotService';
 import BookingService from '../../service/BookingService';
 import dayjs from 'dayjs';
 
@@ -38,10 +38,9 @@ const BookingPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedDuration, setSelectedDuration] = useState(1);
   const [availableDates, setAvailableDates] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedSlots, setSelectedSlots] = useState([]); // 替换 selectedSlot
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [error, setError] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -53,10 +52,10 @@ const BookingPage = () => {
         const courtData = await CourtService.getCourtById(courtId);
         setCourt(courtData);
 
-        const slotsData = await getAvailableSlotsForCourt(courtId);
+        const slotsData = await getAllSlotsForCourt(courtId); // 获取所有slot
         setSlots(slotsData);
 
-        // Extract available dates
+        // Extract available dates (所有slot的日期)
         const dates = [...new Set(slotsData.map(slot => slot.date))];
         setAvailableDates(dates);
       } catch (error) {
@@ -71,68 +70,105 @@ const BookingPage = () => {
   }, [courtId]);
 
   useEffect(() => {
-    if (selectedDate && selectedDuration) {
-      const filtered = slots.filter(slot =>
-        slot.date === selectedDate.format('YYYY-MM-DD') &&
-        slot.durationHours === selectedDuration
+    if (selectedDate) {
+      let filtered = slots.filter(slot =>
+        slot.date === selectedDate.format('YYYY-MM-DD')
       );
+      // 如果是今天，只保留2小时后的slot
+      if (selectedDate.isSame(dayjs(), 'day')) {
+        const nowPlus2h = dayjs().add(2, 'hour');
+        filtered = filtered.filter(slot => {
+          // slot.startTime: 'HH:mm' 字符串
+          const slotDateTime = dayjs(`${slot.date} ${slot.startTime}`, 'YYYY-MM-DD HH:mm');
+          return slotDateTime.isAfter(nowPlus2h);
+        });
+      }
       setAvailableSlots(filtered);
-      setSelectedSlot(null);
+      setSelectedSlots([]);
     }
-  }, [selectedDate, selectedDuration, slots]);
+  }, [selectedDate, slots]);
+
+  const today = dayjs();
+  const maxMonth = today.add(2, 'month').endOf('month'); // 允许切换到本月+2个月（共3个月）
 
   const handlePrevMonth = () => {
-    setCurrentMonth(currentMonth.subtract(1, 'month'));
+    if (currentMonth.isAfter(today, 'month')) {
+      setCurrentMonth(currentMonth.subtract(1, 'month'));
+    }
   };
 
   const handleNextMonth = () => {
-    setCurrentMonth(currentMonth.add(1, 'month'));
+    if (currentMonth.isBefore(maxMonth, 'month')) {
+      setCurrentMonth(currentMonth.add(1, 'month'));
+    }
   };
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    setSelectedDuration(1);
   };
 
-  const handleDurationChange = (event) => {
-    setSelectedDuration(event.target.value);
-  };
-
+  // 替换 handleSlotSelect
   const handleSlotSelect = (slot) => {
-    setSelectedSlot(slot);
+    // 如果已选，取消选择
+    if (selectedSlots.some(s => s.id === slot.id)) {
+      setSelectedSlots(selectedSlots.filter(s => s.id !== slot.id));
+      return;
+    }
+    // 只允许同一天
+    if (selectedSlots.length > 0 && slot.date !== selectedSlots[0].date) return;
+    // 只允许连续
+    const allSlots = [...selectedSlots, slot].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    let isConsecutive = true;
+    for (let i = 1; i < allSlots.length; i++) {
+      if (allSlots[i].startTime !== allSlots[i - 1].endTime) {
+        isConsecutive = false;
+        break;
+      }
+    }
+    if (!isConsecutive) return;
+    setSelectedSlots(allSlots);
   };
 
+  // handleBookNow 传所有slotId
   const handleBookNow = () => {
-    if (!selectedSlot) return;
-    
+    if (!selectedSlots.length) return;
     const bookingDetails = {
-      slotId: selectedSlot.id,
+      slotIds: selectedSlots.map(s => s.id),
       courtName: court.name,
       courtLocation: court.location,
       date: selectedDate.format('YYYY-MM-DD'),
-      startTime: selectedSlot.startTime,
-      endTime: selectedSlot.endTime,
-      durationHours: selectedSlot.durationHours,
+      startTime: selectedSlots[0].startTime,
+      endTime: selectedSlots[selectedSlots.length - 1].endTime,
+      durationHours: selectedSlots.length,
       price: calculatePrice(),
-      purpose: "Recreational", // Or get from user input
-      numberOfPlayers: 4 // Or get from user input
+      purpose: "Recreational",
+      numberOfPlayers: 4
     };
-
     navigate('/payment', { state: { bookingDetails } });
   };
 
   const calculatePrice = () => {
-    if (!selectedSlot || !court) return 0;
+    if (!selectedSlots.length || !court) return 0;
 
-    const startTime = dayjs(selectedSlot.startTime, 'HH:mm');
+    const startTime = dayjs(selectedSlots[0].startTime, 'HH:mm');
     const peakStart = dayjs(court.peakStartTime || '16:00', 'HH:mm');
     const peakEnd = dayjs(court.peakEndTime || '20:00', 'HH:mm');
 
     const isPeak = startTime.isAfter(peakStart) && startTime.isBefore(peakEnd);
 
-    return selectedSlot.durationHours *
+    return selectedSlots.length *
       (isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50));
   };
+
+  // 组件作用域定义 totalDuration/totalPrice
+  const totalDuration = selectedSlots.length;
+  const totalPrice = totalDuration * (selectedSlots[0] && court ? (() => {
+    const startTime = dayjs(selectedSlots[0].startTime, 'HH:mm');
+    const peakStart = dayjs(court.peakStartTime || '16:00', 'HH:mm');
+    const peakEnd = dayjs(court.peakEndTime || '20:00', 'HH:mm');
+    const isPeak = startTime.isAfter(peakStart) && startTime.isBefore(peakEnd);
+    return isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50);
+  })() : 0);
 
   const renderCalendar = () => {
     const startOfMonth = currentMonth.startOf('month');
@@ -184,13 +220,13 @@ const BookingPage = () => {
             alignItems: 'center',
             mb: 2
           }}>
-            <IconButton onClick={handlePrevMonth}>
+            <IconButton onClick={handlePrevMonth} disabled={currentMonth.isSame(today, 'month')}>
               <LeftIcon />
             </IconButton>
             <Typography variant="h6" fontWeight="bold">
               {currentMonth.format('MMMM YYYY')}
             </Typography>
-            <IconButton onClick={handleNextMonth}>
+            <IconButton onClick={handleNextMonth} disabled={currentMonth.isSame(maxMonth, 'month')}>
               <RightIcon />
             </IconButton>
           </Box>
@@ -213,41 +249,8 @@ const BookingPage = () => {
     );
   };
 
-  const renderDurationSelector = () => {
-    if (!selectedDate) return null;
-
-    return (
-      <Card sx={{ mb: 4, borderRadius: 3 }}>
-        <CardContent>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Select Duration for {selectedDate.format('MMMM D, YYYY')}
-          </Typography>
-
-          <FormControl fullWidth>
-            <InputLabel id="duration-select-label">Duration (hours)</InputLabel>
-            <Select
-              labelId="duration-select-label"
-              value={selectedDuration}
-              label="Duration (hours)"
-              onChange={handleDurationChange}
-              sx={{ mb: 2 }}
-            >
-              <MenuItem value={1}>1 hour</MenuItem>
-              <MenuItem value={2}>2 hours</MenuItem>
-              <MenuItem value={3}>3 hours</MenuItem>
-            </Select>
-          </FormControl>
-
-          <Typography variant="body2" color="text.secondary">
-            Choose how long you want to book the court
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  };
-
   const renderTimeSlots = () => {
-    if (!selectedDate || !selectedDuration || availableSlots.length === 0) {
+    if (!selectedDate || availableSlots.length === 0) {
       return null;
     }
 
@@ -255,7 +258,7 @@ const BookingPage = () => {
       <Card sx={{ borderRadius: 3 }}>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Available Time Slots - {selectedDate.format('dddd, MMMM D, YYYY')}
+            Time Slots - {selectedDate.format('dddd, MMMM D, YYYY')}
           </Typography>
 
           <Grid container spacing={2}>
@@ -263,17 +266,23 @@ const BookingPage = () => {
               <Grid item xs={12} sm={6} md={4} key={slot.id}>
                 <Button
                   fullWidth
-                  variant={selectedSlot?.id === slot.id ? "contained" : "outlined"}
-                  onClick={() => handleSlotSelect(slot)}
+                  variant={selectedSlots.some(s => s.id === slot.id) ? "contained" : "outlined"}
+                  onClick={slot.status === 'BOOKED' ? undefined : () => handleSlotSelect(slot)}
                   sx={{
                     py: 1.5,
                     borderRadius: '8px',
-                    borderColor: '#1976d2',
-                    color: selectedSlot?.id === slot.id ? '#fff' : '#1976d2',
-                    backgroundColor: selectedSlot?.id === slot.id ? '#1976d2' : 'transparent',
+                    borderColor: slot.status === 'BOOKED' ? '#e53935' : '#1976d2',
+                    color: slot.status === 'BOOKED' ? '#e53935' : (selectedSlots.some(s => s.id === slot.id) ? '#fff' : '#1976d2'),
+                    backgroundColor: slot.status === 'BOOKED'
+                      ? '#fff'
+                      : (selectedSlots.some(s => s.id === slot.id) ? '#1976d2' : 'transparent'),
+                    pointerEvents: slot.status === 'BOOKED' ? 'none' : 'auto',
+                    opacity: 1,
                     '&:hover': {
-                      backgroundColor: selectedSlot?.id === slot.id ? '#1565c0' : '#e3f2fd',
-                      borderColor: '#1565c0'
+                      backgroundColor: slot.status === 'BOOKED'
+                        ? '#fff'
+                        : (selectedSlots.some(s => s.id === slot.id) ? '#1565c0' : '#e3f2fd'),
+                      borderColor: slot.status === 'BOOKED' ? '#e53935' : '#1565c0'
                     }
                   }}
                 >
@@ -289,7 +298,7 @@ const BookingPage = () => {
 
   const renderBookingSummary = () => {
     if (!court) return null;
-
+    // 不要再定义 totalDuration/totalPrice，直接用外部的
     return (
       <Card sx={{
         position: 'sticky',
@@ -320,23 +329,20 @@ const BookingPage = () => {
                 <strong>Date:</strong> {selectedDate.format('dddd, MMMM D, YYYY')}
               </Typography>
 
-              {selectedSlot && (
+              {selectedSlots.length > 0 && (
                 <>
                   <Typography variant="body1">
-                    <strong>Time:</strong> {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+                    <strong>Time:</strong> {formatTime(selectedSlots[0].startTime)} - {formatTime(selectedSlots[selectedSlots.length - 1].endTime)}
                   </Typography>
                   <Typography variant="body1">
-                    <strong>Duration:</strong> {selectedSlot.durationHours} hours
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Court:</strong> #{selectedSlot.courtNumber}
+                    <strong>Duration:</strong> {totalDuration} hours
                   </Typography>
                 </>
               )}
             </Stack>
           )}
 
-          {selectedSlot && (
+          {selectedSlots.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
 
@@ -350,7 +356,7 @@ const BookingPage = () => {
                   Subtotal
                 </Typography>
                 <Typography variant="h6" fontWeight="bold">
-                  RM{calculatePrice().toFixed(2)}
+                  RM{totalPrice.toFixed(2)}
                 </Typography>
               </Box>
 
@@ -364,7 +370,7 @@ const BookingPage = () => {
                   variant="contained"
                   size="large"
                   onClick={handleBookNow}
-                  disabled={!selectedSlot}
+                  disabled={!selectedSlots.length}
                   sx={{
                     py: 1.5,
                     fontWeight: 'bold',
@@ -380,7 +386,7 @@ const BookingPage = () => {
             </>
           )}
 
-          {!selectedSlot && selectedDate && (
+          {!selectedSlots.length && selectedDate && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               Select a time slot to complete your booking
             </Typography>
@@ -461,7 +467,6 @@ const BookingPage = () => {
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
           {renderCalendar()}
-          {renderDurationSelector()}
           {renderTimeSlots()}
         </Grid>
 

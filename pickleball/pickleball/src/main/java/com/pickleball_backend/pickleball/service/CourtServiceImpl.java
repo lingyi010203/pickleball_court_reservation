@@ -6,18 +6,17 @@ import com.pickleball_backend.pickleball.dto.SlotDto;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.ValidationException;
 import com.pickleball_backend.pickleball.repository.*;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.*;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.time.DayOfWeek;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,73 +31,63 @@ public class CourtServiceImpl implements CourtService {
     private final EmailService emailService;
     private final PaymentRepository paymentRepository;
     private final BookingSlotRepository bookingSlotRepository;
-
+    @Autowired
+    private VenueRepository venueRepository;
     @Override
     public Court createCourt(CourtDto courtDto) {
+        Venue venue = venueRepository.findById(courtDto.getVenueId())
+                .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
+
         if (courtRepository.existsByNameAndLocation(courtDto.getName(), courtDto.getLocation())) {
             throw new IllegalArgumentException("Court with the same name and location already exists");
         }
 
-        Court mainCourt = saveOrUpdateCourt(new Court(), courtDto);
-        mainCourt.setNumberOfCourts(courtDto.getNumberOfCourts());
-        courtRepository.save(mainCourt);
+        Court court = new Court();
+        court.setVenue(venue);
+        saveOrUpdateCourt(court, courtDto);
 
-        generateSlotsForNewCourt(mainCourt, courtDto.getNumberOfCourts());
+        generateSlotsForNewCourt(court);
 
-        return mainCourt;
+        return court;
     }
 
-    private void generateSlotsForNewCourt(Court court, int numberOfCourts) {
+
+    private void generateSlotsForNewCourt(Court court) {
         try {
             if (court.getOpeningTime() == null || court.getClosingTime() == null) {
                 throw new ValidationException("Court operating hours not defined");
             }
-
             LocalTime opening = LocalTime.parse(court.getOpeningTime());
             LocalTime closing = LocalTime.parse(court.getClosingTime());
-
             if (opening.isAfter(closing)) {
                 throw new ValidationException("Opening time must be before closing time");
             }
-
             Set<DayOfWeek> operatingDaySet = parseOperatingDays(court.getOperatingDays());
             LocalDate start = LocalDate.now();
             LocalDate end = start.plusMonths(3);
-
-            for (int courtNumber = 1; courtNumber <= numberOfCourts; courtNumber++) {
-                List<SlotDto> slots = new ArrayList<>();
-
-                for (LocalDate date = start; date.isBefore(end); date = date.plusDays(1)) {
-                    if (!operatingDaySet.isEmpty() && !operatingDaySet.contains(date.getDayOfWeek())) {
-                        continue;
-                    }
-                    LocalTime slotStart = opening;
-
-                    while (slotStart.isBefore(closing)) {
-                        // Generate slots for 1, 2, and 3 hours
-                        for (int hours : Arrays.asList(1, 2, 3)) {
-                            LocalTime slotEnd = slotStart.plusHours(hours);
-
-                            if (slotEnd.isAfter(closing)) {
-                                continue; // Skip if exceeds closing time
-                            }
-
-                            SlotDto slot = new SlotDto();
-                            slot.setCourtId(court.getId());
-                            slot.setCourtNumber(courtNumber);
-                            slot.setDate(date);
-                            slot.setStartTime(slotStart);
-                            slot.setEndTime(slotEnd);
-                            slot.setAvailable(true);
-                            slot.setDurationHours(hours); // CRITICAL: Set duration
-
-                            slots.add(slot);
-                        }
-                        slotStart = slotStart.plusHours(1); // Move to next hour
-                    }
+            List<SlotDto> slots = new ArrayList<>();
+            for (LocalDate date = start; date.isBefore(end); date = date.plusDays(1)) {
+                if (!operatingDaySet.isEmpty() && !operatingDaySet.contains(date.getDayOfWeek())) {
+                    continue;
                 }
-                slotService.createSlots(slots);
+                LocalTime slotStart = opening;
+                while (slotStart.isBefore(closing)) {
+                    LocalTime slotEnd = slotStart.plusHours(1);
+                    if (slotEnd.isAfter(closing)) {
+                        break;
+                    }
+                    SlotDto slot = new SlotDto();
+                    slot.setCourtId(court.getId());
+                    slot.setDate(date);
+                    slot.setStartTime(slotStart);
+                    slot.setEndTime(slotEnd);
+                    slot.setAvailable(true);
+                    slot.setDurationHours(1);
+                    slots.add(slot);
+                    slotStart = slotStart.plusHours(1);
+                }
             }
+            slotService.createSlots(slots);
         } catch (DateTimeParseException e) {
             throw new ValidationException("Invalid time format: " + e.getMessage());
         }
@@ -143,10 +132,20 @@ public class CourtServiceImpl implements CourtService {
     private Court saveOrUpdateCourt(Court court, CourtDto courtDto) {
         court.setName(courtDto.getName());
         court.setLocation(courtDto.getLocation());
-        court.setStatus(courtDto.getStatus());
+        court.setStatus(courtDto.getStatus().toUpperCase());
         court.setOpeningTime(courtDto.getOpeningTime());
         court.setClosingTime(courtDto.getClosingTime());
-        court.setOperatingDays(courtDto.getOperatingDays());
+        // operatingDays 统一大写并去重
+        if (courtDto.getOperatingDays() != null && !courtDto.getOperatingDays().isEmpty()) {
+            String normalizedDays = Arrays.stream(courtDto.getOperatingDays().split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .distinct()
+                .collect(Collectors.joining(","));
+            court.setOperatingDays(normalizedDays);
+        } else {
+            court.setOperatingDays(null);
+        }
         court.setPeakHourlyPrice(courtDto.getPeakHourlyPrice());
         court.setOffPeakHourlyPrice(courtDto.getOffPeakHourlyPrice());
         court.setDailyPrice(courtDto.getDailyPrice());

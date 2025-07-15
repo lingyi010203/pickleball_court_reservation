@@ -109,7 +109,7 @@ public class SlotServiceImpl implements SlotService {
     @Override
     public List<SlotResponseDto> getAvailableSlotsByCourt(Integer courtId) {
         LocalDate today = LocalDate.now();
-        LocalDate endDate = today.plusDays(7); // Next 7 days
+        LocalDate endDate = today.plusMonths(3); // Next 3 months
 
         Court court = courtRepository.findById(courtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found with id: " + courtId));
@@ -134,6 +134,27 @@ public class SlotServiceImpl implements SlotService {
         }).collect(Collectors.toList());
     }
 
+    public List<SlotResponseDto> getAllSlotsByCourt(Integer courtId, LocalDate startDate, LocalDate endDate) {
+        Court court = courtRepository.findById(courtId)
+            .orElseThrow(() -> new ResourceNotFoundException("Court not found with id: " + courtId));
+
+        List<Slot> slots = slotRepository.findByCourtIdAndDateBetween(courtId, startDate, endDate);
+
+        return slots.stream().map(slot -> {
+            SlotResponseDto dto = new SlotResponseDto();
+            dto.setId(slot.getId());
+            dto.setCourtId(slot.getCourtId());
+            dto.setCourtNumber(slot.getCourtNumber());
+            dto.setDate(slot.getDate());
+            dto.setStartTime(slot.getStartTime());
+            dto.setEndTime(slot.getEndTime());
+            dto.setDurationHours(slot.getDurationHours());
+            dto.setCourtName(court.getName());
+            dto.setCourtLocation(court.getLocation());
+            dto.setStatus(slot.isAvailable() ? "AVAILABLE" : "BOOKED");
+            return dto;
+        }).collect(Collectors.toList());
+    }
 
     private int calculateDurationHours(Slot slot) {
         if (slot.getDurationHours() != null) {

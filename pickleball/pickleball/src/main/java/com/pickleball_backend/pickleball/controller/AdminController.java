@@ -144,10 +144,26 @@ public class AdminController {
         return ResponseEntity.ok(tierService.createTier(tierDto));
     }
 
+    @DeleteMapping("/tiers/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteTier(@PathVariable Integer id) {
+        tierService.deleteTier(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/tiers")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<MembershipTier>> getAllTiers() {
-        return ResponseEntity.ok(tierService.getAllTiers());
+    public ResponseEntity<List<TierDto>> getAllTiers() {
+        return ResponseEntity.ok(tierService.getAllTiers().stream()
+                .map(tier -> new TierDto(
+                        tier.getId(),
+                        tier.getTierName(),
+                        tier.getBenefits(),
+                        tier.getMinPoints(),
+                        tier.getMaxPoints(),
+                        tier.isActive()
+                ))
+                .collect(Collectors.toList()));
     }
 
     @PostMapping("/{tierName}/vouchers")

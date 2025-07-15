@@ -19,6 +19,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 import com.pickleball_backend.pickleball.dto.BookingHistoryDto;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,11 +68,12 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingDetails(id, memberId));
     }*/
 
-    @PostMapping("/bookings/{bookingId}/cancel")
-    @PreAuthorize("hasRole('USER')")
+    @PostMapping("/member/bookings/{bookingId}/cancel")
     public ResponseEntity<CancellationResponse> cancelBooking(
-            @PathVariable Integer bookingId) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            @PathVariable Integer bookingId,
+            Principal principal) {
+
+        String username = principal.getName();
         CancellationResponse response = bookingService.cancelBooking(bookingId, username);
         return ResponseEntity.ok(response);
     }

@@ -20,10 +20,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     // Fixed: Query through UserAccount relationship
     Optional<User> findByUserAccount_Username(String username);
-
-    List<User> findByRequestedUserTypeIsNotNull();
-
-    // Fixed: Use UserAccount relationship
+    List<User> findByRequestedUserTypeIsNotNull(); // New method for pending requests
+    long countByUserAccount_Status(String status);
     List<User> findByNameContainingIgnoreCaseOrUserAccount_UsernameContainingIgnoreCase(String name, String username);
 
     @Query("SELECT u FROM User u " +

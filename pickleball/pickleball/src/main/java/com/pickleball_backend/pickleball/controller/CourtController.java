@@ -4,6 +4,7 @@ import com.pickleball_backend.pickleball.dto.CourtDto;
 import com.pickleball_backend.pickleball.dto.CourtPricingDto;
 import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.service.CourtService;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,12 +28,15 @@ public class CourtController {
         try {
             Court newCourt = courtService.createCourt(courtDto);
             return new ResponseEntity<>(newCourt, HttpStatus.CREATED);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating court");
         }
     }
+
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")

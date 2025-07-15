@@ -11,8 +11,9 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import UserService from '../service/UserService';
 import Navbar from '../components/common/Navbar';
+import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -32,23 +33,26 @@ const LoginPage = () => {
     }));
   };
 
-  const handleLogin = async () => {
-    try {
-      const response = await axios.post('/api/auth/login', {
-        usernameOrEmail: credentials.usernameOrEmail,
-        password: credentials.password
-      });
-      
-      if (response.data.token) {
-        // Use AuthContext to login
-        login(response.data.token);
-        navigate('/');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
-      console.error('Login error:', err);
+  // Update handleLogin function:
+const handleLogin = async () => {
+  try {
+    const response = await axios.post('http://localhost:8081/api/auth/login', {
+      usernameOrEmail: credentials.usernameOrEmail,
+      password: credentials.password
+    });
+    
+    if (response.data.token) {
+      // 用 context 的 login 方法同步状态
+      login(response.data.token);
+      // 你可以保留 UserService.login 以兼容旧逻辑（可选）
+      // UserService.login(...)
+      navigate('/home');
     }
-  };
+  } catch (err) {
+    setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+    console.error('Login error:', err);
+  }
+};
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>

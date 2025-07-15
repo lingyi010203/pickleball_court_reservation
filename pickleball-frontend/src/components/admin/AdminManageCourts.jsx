@@ -3,7 +3,8 @@ import {
   Box, Container, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Button, IconButton, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
-  CircularProgress, Grid, Chip, MenuItem, FormControl, InputLabel, Select
+  CircularProgress, Grid, Chip, MenuItem, FormControl, InputLabel, Select, InputAdornment,
+  Checkbox, ListItemText, Divider, FormControlLabel, FormGroup
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import axios from 'axios';
@@ -23,34 +24,30 @@ const AdminManageCourts = () => {
   const [formData, setFormData] = useState({
     name: '',
     location: '',
-    status: 'Active',
-    openingTime: '09:00',
-    closingTime: '17:00',
+    status: 'ACTIVE',
+    openingTime: '10:00',
+    closingTime: '00:00',
     operatingDays: '',
     peakHourlyPrice: 0,
     offPeakHourlyPrice: 0,
     dailyPrice: 0,
-    peakStartTime: '17:00',
-    peakEndTime: '20:00'
+    peakStartTime: '18:00',
+    peakEndTime: '00:00'
   });
   const [daysOfWeek, setDaysOfWeek] = useState([]);
-  
+  const [formErrors, setFormErrors] = useState({});
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, courtId: null });
+  const [deleting, setDeleting] = useState(false);
+
   const daysOptions = [
-    'MONDAY', 'TUESDAY', 'WEDNESDAY', 
-    'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'
+    'Mon', 'Tue', 'Wed',
+    'Thu', 'Fri', 'Sat', 'Sun'
   ];
 
   useEffect(() => {
     fetchCourts();
   }, []);
 
-  useEffect(() => {
-    if (formData.operatingDays) {
-      setDaysOfWeek(formData.operatingDays.split(','));
-    } else {
-      setDaysOfWeek([]);
-    }
-  }, [formData.operatingDays]);
 
   const fetchCourts = async () => {
     try {
@@ -71,33 +68,46 @@ const AdminManageCourts = () => {
   const handleOpenDialog = (court = null) => {
     if (court) {
       setCurrentCourt(court);
+      // operatingDays 转为首字母大写数组，并去重
+      const daysArr = Array.from(new Set(
+        (court.operatingDays || '')
+          .split(',')
+          .map(day => {
+            const map = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
+            return map[day.trim().toUpperCase()] || (day.charAt(0).toUpperCase() + day.slice(1).toLowerCase());
+          })
+          .filter(Boolean)
+      ));
+      setDaysOfWeek(daysArr);
       setFormData({
         name: court.name,
         location: court.location,
         status: court.status,
-        openingTime: court.openingTime || '09:00',
-        closingTime: court.closingTime || '17:00',
-        operatingDays: court.operatingDays || '',
+        openingTime: court.openingTime || '10:00',
+        closingTime: court.closingTime || '00:00',
+        // operatingDays 再次去重
+        operatingDays: Array.from(new Set(daysArr.map(d => d.toUpperCase()))).join(','),
         peakHourlyPrice: court.peakHourlyPrice || 0,
         offPeakHourlyPrice: court.offPeakHourlyPrice || 0,
         dailyPrice: court.dailyPrice || 0,
-        peakStartTime: court.peakStartTime || '17:00',
-        peakEndTime: court.peakEndTime || '20:00'
+        peakStartTime: court.peakStartTime || '18:00',
+        peakEndTime: court.peakEndTime || '00:00'
       });
     } else {
       setCurrentCourt(null);
+      setDaysOfWeek([]);
       setFormData({
         name: '',
         location: '',
-        status: 'Active',
-        openingTime: '09:00',
-        closingTime: '17:00',
+        status: 'ACTIVE',
+        openingTime: '10:00',
+        closingTime: '00:00',
         operatingDays: '',
         peakHourlyPrice: 0,
         offPeakHourlyPrice: 0,
         dailyPrice: 0,
-        peakStartTime: '17:00',
-        peakEndTime: '20:00'
+        peakStartTime: '18:00',
+        peakEndTime: '00:00'
       });
     }
     setOpenDialog(true);
@@ -109,12 +119,10 @@ const AdminManageCourts = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'peakHourlyPrice' || name === 'offPeakHourlyPrice' || name === 'dailyPrice' 
-        ? Number(value) 
-        : value
+      [name]: value
     }));
   };
 
@@ -127,19 +135,43 @@ const AdminManageCourts = () => {
     }));
   };
 
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = 'Court name is required';
+    if (!formData.location.trim()) errors.location = 'Location is required';
+    if (!daysOfWeek.length) errors.operatingDays = 'Select at least one day';
+    if (!formData.openingTime) errors.openingTime = 'Opening time required';
+    if (!formData.closingTime) errors.closingTime = 'Closing time required';
+    if (formData.openingTime && formData.closingTime && formData.openingTime >= formData.closingTime) errors.closingTime = 'Closing time must be after opening time';
+    ['peakHourlyPrice', 'offPeakHourlyPrice', 'dailyPrice'].forEach(key => {
+      if (formData[key] < 0) errors[key] = 'Price must be >= 0';
+    });
+    return errors;
+  };
+
   const handleSubmit = async () => {
+    const errors = validateForm();
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     try {
       setLoading(true);
       const token = UserService.getAdminToken();
-      const payload = { ...formData };
-      
+      // operatingDays 用 daysOfWeek 去重后的大写字符串
+      const uniqueDays = Array.from(new Set(daysOfWeek));
+      const payload = {
+        ...formData,
+        operatingDays: uniqueDays.map(d => d.toUpperCase()).join(','),
+        peakHourlyPrice: parseFloat(formData.peakHourlyPrice) || 0,
+        offPeakHourlyPrice: parseFloat(formData.offPeakHourlyPrice) || 0,
+        dailyPrice: parseFloat(formData.dailyPrice) || 0,
+      };
       // Convert empty strings to null for backend
       if (payload.operatingDays === '') payload.operatingDays = null;
-      
+
       if (currentCourt) {
         // Update existing court
         await axios.put(
-          `http://localhost:8081/api/admin/courts/${currentCourt.id}`, 
+          `http://localhost:8081/api/admin/courts/${currentCourt.id}`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -151,7 +183,7 @@ const AdminManageCourts = () => {
       } else {
         // Create new court
         await axios.post(
-          'http://localhost:8081/api/admin/courts', 
+          'http://localhost:8081/api/admin/courts',
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -161,12 +193,12 @@ const AdminManageCourts = () => {
           severity: 'success'
         });
       }
-      
+
       fetchCourts();
       handleCloseDialog();
     } catch (err) {
       let errorMsg = 'Operation failed';
-      
+
       if (err.response) {
         if (err.response.data) {
           errorMsg = err.response.data.message || JSON.stringify(err.response.data);
@@ -176,7 +208,7 @@ const AdminManageCourts = () => {
       } else if (err.message) {
         errorMsg = err.message;
       }
-      
+
       setSnackbar({
         open: true,
         message: `Error: ${errorMsg}`,
@@ -203,7 +235,7 @@ const AdminManageCourts = () => {
       fetchCourts();
     } catch (err) {
       let errorMsg = 'Deletion failed';
-      
+
       if (err.response) {
         if (err.response.data) {
           errorMsg = err.response.data.message || JSON.stringify(err.response.data);
@@ -213,7 +245,7 @@ const AdminManageCourts = () => {
       } else if (err.message) {
         errorMsg = err.message;
       }
-      
+
       setSnackbar({
         open: true,
         message: `Error: ${errorMsg}`,
@@ -226,6 +258,19 @@ const AdminManageCourts = () => {
 
   const handleSnackbarClose = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const handleDeleteClick = (courtId) => {
+    setDeleteDialog({ open: true, courtId });
+  };
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    await handleDelete(deleteDialog.courtId);
+    setDeleting(false);
+    setDeleteDialog({ open: false, courtId: null });
+  };
+  const handleDeleteCancel = () => {
+    setDeleteDialog({ open: false, courtId: null });
   };
 
   if (loading && !courts.length) {
@@ -273,13 +318,12 @@ const AdminManageCourts = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Location</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Court Name</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Venue</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Opening Time</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Closing Time</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Operating Days</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Peak Pricing</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Operating Day(s)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Peak Hourly Price (RM)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Off-Peak Hourly Price (RM)</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -289,26 +333,35 @@ const AdminManageCourts = () => {
                 <TableCell>{court.name}</TableCell>
                 <TableCell>{court.location}</TableCell>
                 <TableCell>
-                  <Chip 
-                    label={court.status} 
-                    sx={{ 
-                      backgroundColor: court.status === 'Active' ? '#d5f5e3' : 
-                                      court.status === 'Maintenance' ? '#fff3cd' : '#f5d5d5',
-                      color: court.status === 'Active' ? '#27ae60' : 
-                            court.status === 'Maintenance' ? '#856404' : '#c0392b',
+                  <Chip
+                    label={court.status}
+                    sx={{
+                      backgroundColor: court.status === 'ACTIVE' ? '#d5f5e3' :
+                        court.status === 'MAINTENANCE' ? '#fff3cd' : '#f5d5d5',
+                      color: court.status === 'ACTIVE' ? '#27ae60' :
+                        court.status === 'MAINTENANCE' ? '#856404' : '#c0392b',
                       fontWeight: 'bold'
-                    }} 
+                    }}
                   />
                 </TableCell>
-                <TableCell>{court.openingTime || 'N/A'}</TableCell>
-                <TableCell>{court.closingTime || 'N/A'}</TableCell>
                 <TableCell>
-                  {court.operatingDays ? 
-                    court.operatingDays.split(',').map(day => day.substring(0, 3)).join(', ') : 
-                    'N/A'}
+                  {court.operatingDays
+                    ? Array.from(new Set(
+                        court.operatingDays.split(',')
+                          .map(day => day.trim().toUpperCase())
+                      ))
+                        .map(day => {
+                          const map = { MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun', MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
+                          return map[day] || (day.charAt(0) + day.slice(1).toLowerCase());
+                        })
+                        .join(', ')
+                    : 'N/A'}
                 </TableCell>
                 <TableCell>
-                  {court.peakHourlyPrice ? `$${court.peakHourlyPrice}` : 'N/A'}
+                  {court.peakHourlyPrice ? `${court.peakHourlyPrice}` : 'N/A'}
+                </TableCell>
+                <TableCell>
+                  {court.offPeakHourlyPrice ? `${court.offPeakHourlyPrice}` : 'N/A'}
                 </TableCell>
                 <TableCell>
                   <Tooltip title="Edit">
@@ -317,7 +370,7 @@ const AdminManageCourts = () => {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Delete">
-                    <IconButton onClick={() => handleDelete(court.id)}>
+                    <IconButton onClick={() => handleDeleteClick(court.id)} disabled={deleting}>
                       <DeleteIcon color="error" />
                     </IconButton>
                   </Tooltip>
@@ -335,161 +388,229 @@ const AdminManageCourts = () => {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}><Typography variant="caption" color="textSecondary">* Indicates Mandatory fields</Typography></Grid>
+            <Divider sx={{ my: 2, width: '100%' }}>Basic Info</Divider>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Court Name"
+                label="Court Name *"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 margin="normal"
                 required
+                error={!!formErrors.name}
+                helperText={formErrors.name}
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Location"
+                label="Location *"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
                 margin="normal"
                 required
+                error={!!formErrors.location}
+                helperText={formErrors.location}
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Status</InputLabel>
+              <FormControl fullWidth margin="normal" error={!!formErrors.status}>
+                <InputLabel>Status *</InputLabel>
                 <Select
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  label="Status"
+                  label="Status *"
                 >
-                  <MenuItem value="Active">Active</MenuItem>
-                  <MenuItem value="Maintenance">Maintenance</MenuItem>
-                  <MenuItem value="Closed">Closed</MenuItem>
+                  <MenuItem value="ACTIVE">Active</MenuItem>
+                  <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
+                  <MenuItem value="CLOSED">Closed</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Operating Days</InputLabel>
-                <Select
-                  multiple
-                  value={daysOfWeek}
-                  onChange={handleDayChange}
-                  label="Operating Days"
-                  renderValue={(selected) => selected.join(', ')}
-                >
+            <Divider sx={{ my: 2, width: '100%' }}>Operating Days</Divider>
+            <Grid item xs={12}>
+              <FormControl component="fieldset" margin="normal" error={!!formErrors.operatingDays}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Operating Days *</Typography>
+                <FormGroup row>
                   {daysOptions.map((day) => (
-                    <MenuItem key={day} value={day}>
-                      {day}
-                    </MenuItem>
+                    <FormControlLabel
+                      key={day}
+                      control={
+                        <Checkbox
+                          checked={daysOfWeek.indexOf(day) > -1}
+                          onChange={e => {
+                            let newDays;
+                            if (e.target.checked) {
+                              // 只加不重复的 day
+                              newDays = Array.from(new Set([...daysOfWeek, day]));
+                            } else {
+                              newDays = daysOfWeek.filter(d => d !== day);
+                            }
+                            setDaysOfWeek(newDays);
+                            setFormData(prev => ({
+                              ...prev,
+                              operatingDays: newDays.map(d => d.toUpperCase()).join(',')
+                            }));
+                          }}
+                          name={day}
+                          color="primary"
+                        />
+                      }
+                      label={day}
+                    />
                   ))}
-                </Select>
+                </FormGroup>
+                {formErrors.operatingDays && <Typography color="error" variant="caption">{formErrors.operatingDays}</Typography>}
               </FormControl>
             </Grid>
-            
+            <Divider sx={{ my: 2, width: '100%' }}>Operating Hours</Divider>
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Opening Time (HH:mm)"
-                name="openingTime"
-                value={formData.openingTime}
-                onChange={handleChange}
-                margin="normal"
-                placeholder="09:00"
-              />
+              <Tooltip title="12小时格式 (HH:mm)">
+                <TextField
+                  fullWidth
+                  label="Opening Time *"
+                  name="openingTime"
+                  type="time"
+                  value={formData.openingTime}
+                  onChange={handleChange}
+                  margin="normal"
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  error={!!formErrors.openingTime}
+                  helperText={formErrors.openingTime}
+                />
+              </Tooltip>
             </Grid>
-            
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Closing Time (HH:mm)"
-                name="closingTime"
-                value={formData.closingTime}
-                onChange={handleChange}
-                margin="normal"
-                placeholder="17:00"
-              />
+              <Tooltip title="12小时格式 (HH:mm)">
+                <TextField
+                  fullWidth
+                  label="Closing Time *"
+                  name="closingTime"
+                  type="time"
+                  value={formData.closingTime}
+                  onChange={handleChange}
+                  margin="normal"
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  error={!!formErrors.closingTime}
+                  helperText={formErrors.closingTime}
+                />
+              </Tooltip>
             </Grid>
-            
+            <Divider sx={{ my: 2, width: '100%' }}>Peak Hours Configuration</Divider>
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Peak Start Time (HH:mm)"
-                name="peakStartTime"
-                value={formData.peakStartTime}
-                onChange={handleChange}
-                margin="normal"
-                placeholder="17:00"
-              />
+              <Tooltip title="24小时格式 (HH:mm)">
+                <TextField
+                  fullWidth
+                  label="Peak Start Time"
+                  name="peakStartTime"
+                  type="time"
+                  value={formData.peakStartTime}
+                  onChange={handleChange}
+                  margin="normal"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Tooltip>
             </Grid>
-            
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Peak End Time (HH:mm)"
-                name="peakEndTime"
-                value={formData.peakEndTime}
-                onChange={handleChange}
-                margin="normal"
-                placeholder="20:00"
-              />
+              <Tooltip title="24小时格式 (HH:mm)">
+                <TextField
+                  fullWidth
+                  label="Peak End Time"
+                  name="peakEndTime"
+                  type="time"
+                  value={formData.peakEndTime}
+                  onChange={handleChange}
+                  margin="normal"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Tooltip>
             </Grid>
-            
+            <Divider sx={{ my: 2, width: '100%' }}>Pricing (RM)</Divider>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 type="number"
-                label="Peak Hourly Price ($)"
+                label="Peak Hourly Price"
                 name="peakHourlyPrice"
                 value={formData.peakHourlyPrice}
                 onChange={handleChange}
                 margin="normal"
-                InputProps={{ inputProps: { min: 0 } }}
+                placeholder="如 50.00"
+                InputProps={{
+                  inputProps: { min: 0, step: 0.01 },
+                  startAdornment: <InputAdornment position="start">RM</InputAdornment>
+                }}
+                error={!!formErrors.peakHourlyPrice}
+                helperText={formErrors.peakHourlyPrice}
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 type="number"
-                label="Off-Peak Hourly Price ($)"
+                label="Off-Peak Hourly Price"
                 name="offPeakHourlyPrice"
                 value={formData.offPeakHourlyPrice}
                 onChange={handleChange}
                 margin="normal"
-                InputProps={{ inputProps: { min: 0 } }}
+                placeholder="如 30.00"
+                InputProps={{
+                  inputProps: { min: 0, step: 0.01 },
+                  startAdornment: <InputAdornment position="start">RM</InputAdornment>
+                }}
+                error={!!formErrors.offPeakHourlyPrice}
+                helperText={formErrors.offPeakHourlyPrice}
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 type="number"
-                label="Daily Price ($)"
+                label="Daily Price"
                 name="dailyPrice"
                 value={formData.dailyPrice}
                 onChange={handleChange}
                 margin="normal"
-                InputProps={{ inputProps: { min: 0 } }}
+                placeholder="如 200.00"
+                InputProps={{
+                  inputProps: { min: 0, step: 0.01 },
+                  startAdornment: <InputAdornment position="start">RM</InputAdornment>
+                }}
+                error={!!formErrors.dailyPrice}
+                helperText={formErrors.dailyPrice}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
             variant="contained"
             disabled={loading}
             sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
           >
             {loading ? <CircularProgress size={24} /> : currentCourt ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
+        <DialogTitle>Delete Court</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete this court? This action cannot be undone.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleting}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
+            {deleting ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -500,8 +621,8 @@ const AdminManageCourts = () => {
         onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleSnackbarClose} 
+        <Alert
+          onClose={handleSnackbarClose}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >

@@ -18,7 +18,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 
 import java.util.Arrays;
 import java.util.List;
@@ -65,7 +64,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
-                        .requestMatchers("/ws/**", "/ws-message/**", "/websocket/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
 
@@ -95,13 +93,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/admin/users").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/users/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/batch-status").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/admin/moderation/feedback/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/moderation/feedback/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/admin/moderation/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/admin/register-from-invite").permitAll()
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/admin/register-from-invite").permitAll()                        
-						.requestMatchers(HttpMethod.GET, "/api/member/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/**").hasRole("USER")
                         .requestMatchers(HttpMethod.POST, "/api/member/**").hasRole("USER")
                         .requestMatchers(HttpMethod.POST, "/api/member/bookings").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/member/bookings").hasRole("USER")
@@ -116,15 +110,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/member/slots/available").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/member/slots/available/grouped").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/member/redeem-history").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/member/wallet/topup").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/wallet/balance").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/wallet").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/member/wallet/init").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/courts/*/pricing").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/user/reviewable-items").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/profile/upload-documents").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/profile/user-type").authenticated()
-                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/feedback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/feedback/stats").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/feedback").hasRole("USER")
@@ -139,55 +125,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/profile/photo").authenticated()
                         .requestMatchers("/api/preferences").authenticated()
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/users/friend-request").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/users/accept-friend").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/users/friend-requests").authenticated()
-                        .requestMatchers("/api/friends/**").authenticated()
-                        .requestMatchers("/api/users/search").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/friends/request").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/friends/accept/{requestId}").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/messages/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/messages/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/messages/history").authenticated()
-                        .requestMatchers("/api/messages/upload").authenticated()
-                        .requestMatchers("/uploads/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/helpdesk/ask").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/helpdesk/escalate/**").hasRole("USER")
-
-                        // Event browsing endpoints - accessible to all authenticated users
-                        .requestMatchers(HttpMethod.GET, "/api/events/browse").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/upcoming").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/friendly-matches").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/tournaments").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/leagues").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/type/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/skill/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/types").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/skill-levels").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/stats").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/*/details").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events/published").authenticated()
-                        
-                        // Event management endpoints - restricted to EVENTORGANIZER
-                        .requestMatchers(HttpMethod.POST, "/api/events").hasRole("EVENTORGANIZER")
-                        .requestMatchers(HttpMethod.PUT, "/api/events/**").hasRole("EVENTORGANIZER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasRole("EVENTORGANIZER")
-                        .requestMatchers(HttpMethod.POST, "/api/events/*/publish").hasRole("EVENTORGANIZER")
-
-                        .requestMatchers(HttpMethod.POST, "/api/event-registration/register").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/event-registration/cancel/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/event-registration/is-registered/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/friendly-matches").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/friendly-matches/*/join").hasRole("USER")
-                        .requestMatchers(HttpMethod.POST, "/api/friendly-matches/*/approve/*").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/friendly-matches/*/cancel").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/friendly-matches/open").permitAll()
-
-                        .requestMatchers(HttpMethod.GET, "/api/coach/schedule").hasRole("COACH")
-                        .requestMatchers(HttpMethod.POST, "/api/coach/schedule").hasRole("COACH")
-                        .requestMatchers(HttpMethod.PUT, "/api/coach/schedule/**").hasRole("COACH")
-                        .requestMatchers(HttpMethod.DELETE, "/api/coach/schedule/**").hasRole("COACH")
-
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -195,5 +132,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 }

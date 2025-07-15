@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Added useState and useEffect imports
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -29,6 +29,10 @@ import FriendlyMatchPage from './components/event/FriendlyMatchPage';
 import MessagingPage from './components/messaging/MessagingPage';
 import HelpdeskPage from './components/helpdesk/HelpdeskPage';
 import { SocketProvider } from './context/SocketContext';
+import AdminManageUsers from './components/admin/AdminManageUsers';
+import AdminManageTiers from './components/admin/AdminManageTiers';
+import AdminManageCourts from './components/admin/AdminManageCourts';
+import AdminManageBookings from './components/admin/AdminManageBookings';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -55,6 +59,10 @@ const AdminProtectedRoute = ({ children }) => {
   return UserService.isAdminLoggedIn() ? children : <Navigate to="/admin/login" replace />;
 };
 
+function AdminDashboardLayout() {
+  return <AdminDashboard><Outlet /></AdminDashboard>;
+}
+
 function App() {
   return (
     <SocketProvider>
@@ -68,9 +76,14 @@ function App() {
         <Route path="/reset-password-success" element={<ResetPasswordSuccess />} />
         <Route path="/admin/login" element={<AdminLogin />} />
 
-        {/* Protected user routes with layout */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
+      {/* Protected user routes with layout */}
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<Navigate to="/home" replace />} />
+        <Route path="home" element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        } />
 
           {/* Profile section */}
           <Route path="profile" element={
@@ -127,14 +140,14 @@ function App() {
               <BookingPage />
             </ProtectedRoute>
           } />
-          
+
           {/* Payment page */}
           <Route path="payment" element={
             <ProtectedRoute>
               <PaymentPage />
             </ProtectedRoute>
           } />
-          
+
           {/* Booking confirmation page */}
           <Route path="booking/confirmation" element={
             <ProtectedRoute>
@@ -185,13 +198,19 @@ function App() {
           } />
         </Route>
 
-        {/* Admin routes */}
-        <Route path="/admin/dashboard" element={
-          <AdminProtectedRoute>
-            <AdminDashboard />
-          </AdminProtectedRoute>
-        } />
-        
+      {/* Admin routes with nested structure */}
+      <Route path="/admin" element={
+        <AdminProtectedRoute>
+          <AdminDashboardLayout />
+        </AdminProtectedRoute>
+      }>
+        <Route path="dashboard" element={<div />} /> {/* Dashboard home, content handled in AdminDashboard */}
+        <Route path="users" element={<AdminManageUsers />} />
+        <Route path="tiers" element={<AdminManageTiers />} />
+        <Route path="courts" element={<AdminManageCourts />} />
+        <Route path="bookings" element={<AdminManageBookings />} />
+      </Route>
+
         {/* 404 fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

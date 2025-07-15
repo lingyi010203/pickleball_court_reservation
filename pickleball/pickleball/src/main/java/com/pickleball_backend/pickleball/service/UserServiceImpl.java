@@ -91,16 +91,17 @@ public class UserServiceImpl implements UserService {
 
     private void assignDefaultMembershipTier(User user) {
         // Use the correct repository: membershipTierRepository
-        MembershipTier silverTier = membershipTierRepository.findByTierName(MembershipTier.TierName.SILVER);
+        MembershipTier silverTier = membershipTierRepository.findByTierName("SILVER");
 
         // Create default tier if not exists
         if (silverTier == null) {
             silverTier = new MembershipTier();
-            silverTier.setTierName(MembershipTier.TierName.SILVER);
+            silverTier.setTierName("SILVER"); // 直接使用字符串值
             silverTier.setMinPoints(0);
             silverTier.setMaxPoints(2000);
             silverTier.setBenefits("10% discount");
             silverTier = membershipTierRepository.save(silverTier);
+            log.info("Created default SILVER tier");
         }
 
         // Create member record

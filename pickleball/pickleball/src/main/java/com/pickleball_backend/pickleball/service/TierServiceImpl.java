@@ -23,7 +23,6 @@ import java.util.List;
 public class TierServiceImpl implements TierService {
 
     private static final Logger logger = LoggerFactory.getLogger(TierServiceImpl.class);
-
     private final MembershipTierRepository tierRepository;
     private final VoucherRepository voucherRepository;
     private final MemberRepository memberRepository;
@@ -35,30 +34,25 @@ public class TierServiceImpl implements TierService {
     @Transactional
     public MembershipTier createTier(TierDto tierDto) {
         MembershipTier tier = new MembershipTier();
-
-        // 在这里处理字符串到枚举的转换
-        try {
-            tier.setTierName(MembershipTier.TierName.valueOf(
-                    tierDto.getTierName().toUpperCase()
-            ));
-        } catch (IllegalArgumentException e) {
-            throw new ValidationException("Invalid tier name: " + tierDto.getTierName());
-        }
-
+        tier.setTierName(tierDto.getTierName().toUpperCase()); // 转换为大写确保一致性
         tier.setBenefits(tierDto.getBenefits());
         tier.setMinPoints(tierDto.getMinPoints());
         tier.setMaxPoints(tierDto.getMaxPoints());
         tier.setActive(tierDto.isActive());
-
         return createOrUpdateTier(tier);
+    }
+
+    @Override
+    public void deleteTier(Integer id) {
+        tierRepository.deleteById(id);
     }
 
     @Override
     @Transactional
     public MembershipTier createOrUpdateTier(MembershipTier tier) {
-        // Handle default tier conflict
-        if (tier.getId() == 0 && tier.getTierName() == MembershipTier.TierName.SILVER) {
-            MembershipTier existingSilver = tierRepository.findByTierName(MembershipTier.TierName.SILVER);
+        // 修改为字符串比较
+        if ((tier.getId() == null || tier.getId() == 0) && "SILVER".equalsIgnoreCase(tier.getTierName())) {
+            MembershipTier existingSilver = tierRepository.findByTierName("SILVER"); // 直接使用字符串查询
             if (existingSilver != null) {
                 existingSilver.setMinPoints(tier.getMinPoints());
                 existingSilver.setMaxPoints(tier.getMaxPoints());
@@ -73,7 +67,7 @@ public class TierServiceImpl implements TierService {
 
         // Validate tier hierarchy after update
         List<MembershipTier> allTiers = tierRepository.findAllOrderedByMinPoints();
-        validateTierHierarchy(allTiers); // Added hierarchy validation
+        validateTierHierarchy(allTiers);
 
         return savedTier;
     }
@@ -83,7 +77,7 @@ public class TierServiceImpl implements TierService {
 
         // Check for overlaps (excluding current tier if updating)
         for (MembershipTier existing : allTiers) {
-            if (tier.getId() != 0 && tier.getId() == existing.getId()) {
+            if (tier.getId() != null && tier.getId().equals(existing.getId())) {
                 continue;
             }
 
@@ -134,15 +128,8 @@ public class TierServiceImpl implements TierService {
     @Override
     @Transactional
     public MembershipTier addVoucherToTier(String tierName, VoucherDto voucherDto) {
-        // Handle case-insensitive tier name
-        MembershipTier.TierName tierNameEnum;
-        try {
-            tierNameEnum = MembershipTier.TierName.valueOf(tierName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new ValidationException("Invalid tier name: " + tierName);
-        }
-
-        MembershipTier tier = tierRepository.findByTierName(tierNameEnum);
+        // 直接使用字符串查询，不再需要枚举转换
+        MembershipTier tier = tierRepository.findByTierName(tierName.toUpperCase());
         if (tier == null) {
             throw new ValidationException("Tier not found: " + tierName);
         }
@@ -182,7 +169,6 @@ public class TierServiceImpl implements TierService {
         int userPoints = member.getPointBalance();
         MembershipTier newTier = null;
 
-        // Find appropriate tier based on points
         for (MembershipTier tier : activeTiers) {
             if (userPoints >= tier.getMinPoints() &&
                     (tier.getMaxPoints() == Integer.MAX_VALUE ||
@@ -192,22 +178,19 @@ public class TierServiceImpl implements TierService {
             }
         }
 
-        // Handle points exceeding highest tier
         if (newTier == null && !activeTiers.isEmpty()) {
-            newTier = activeTiers.get(activeTiers.size() - 1); // Highest tier
+            newTier = activeTiers.get(activeTiers.size() - 1);
         }
 
-        // Update tier if changed
         if (newTier != null && !newTier.equals(member.getTier())) {
-            // Send upgrade notification
-            sendTierUpgradeEmail(member, newTier);  // Added email notification
+            sendTierUpgradeEmail(member, newTier);
 
             member.setTier(newTier);
             memberRepository.save(member);
             logger.info("Updated user {} tier from {} to {}",
                     member.getUser().getEmail(),
-                    member.getTier() != null ? member.getTier().getTierName().name() : "NONE",
-                    newTier.getTierName().name()
+                    member.getTier() != null ? member.getTier().getTierName() : "NONE",
+                    newTier.getTierName() // 直接使用字符串
             );
         }
     }
@@ -291,8 +274,8 @@ public class TierServiceImpl implements TierService {
         tierRepository.save(tier);
 
         if (!active) {
-            // Reassign members to default tier
-            MembershipTier defaultTier = tierRepository.findByTierName(MembershipTier.TierName.SILVER);
+            // 使用字符串查询默认层
+            MembershipTier defaultTier = tierRepository.findByTierName("SILVER");
             if (defaultTier == null) {
                 throw new ValidationException("Default Silver tier not found");
             }

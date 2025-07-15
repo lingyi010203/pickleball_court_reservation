@@ -46,8 +46,11 @@ public class MemberService {
         }
 
         if (member.getTier() == null) {
-            // Use default tier if still null
-            MembershipTier defaultTier = tierRepository.findByTierName(MembershipTier.TierName.SILVER);
+            // 使用字符串查询默认层
+            MembershipTier defaultTier = tierRepository.findByTierName("SILVER");
+            if (defaultTier == null) {
+                throw new ResourceNotFoundException("Default SILVER tier not found");
+            }
             member.setTier(defaultTier);
             memberRepository.save(member);
         }
@@ -59,7 +62,7 @@ public class MemberService {
         List<Voucher> vouchers = voucherRepository.findByTierId(member.getTier().getId());
 
         return new MemberDashboardDto(
-                member.getTier().getTierName().name(),
+                member.getTier().getTierName(), // 直接返回字符串值
                 member.getPointBalance(),
                 member.getTier().getBenefits(),
                 vouchers.stream()
@@ -72,7 +75,6 @@ public class MemberService {
                                 v.getExpiryDate()
                         ))
                         .collect(Collectors.toList()),
-                // Add these new fields
                 member.getTier().getMinPoints(),
                 member.getTier().getMaxPoints()
         );
@@ -168,8 +170,8 @@ public class MemberService {
                 .map(tier -> {
                     TierDto dto = new TierDto();
                     dto.setId(tier.getId());
-                    // Fix tier name case
-                    dto.setTierName(tier.getTierName().name());
+                    // 直接使用字符串值
+                    dto.setTierName(tier.getTierName());
                     dto.setBenefits(tier.getBenefits());
                     dto.setMinPoints(tier.getMinPoints());
                     dto.setMaxPoints(tier.getMaxPoints());

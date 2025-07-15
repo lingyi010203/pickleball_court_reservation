@@ -57,11 +57,11 @@ import AdminInviteForm from './AdminInviteForm';
 const AdminManageUsers = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const username = UserService.getUsername();
   const [pending, setPending] = useState([]);
   const [reason, setReason] = useState("");
   const [rejectId, setRejectId] = useState(null);
-  const [inviteOpen, setInviteOpen] = useState(false);
 
 
   // Tab change handler
@@ -121,7 +121,7 @@ const AdminManageUsers = () => {
       ) : (
         <AdminModerationDashboard />
       )}
-      
+
       <AdminInviteForm open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </Container>
   );
@@ -179,7 +179,7 @@ const PendingRequestsTab = () => {
         }
       );
 
-      // Update local state 
+      // Update local state
       setPendingRequests(prev =>
         prev.filter(request => request.userId !== userId)
       );
@@ -211,7 +211,7 @@ const PendingRequestsTab = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update local state 
+      // Update local state
       setPendingRequests(prev =>
         prev.filter(request => request.userId !== userId)
       );
@@ -353,7 +353,6 @@ const PendingRequestsTab = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Current Type</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Requested Type</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Verification Documents</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -385,7 +384,6 @@ const PendingRequestsTab = () => {
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Verification Documents</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Tooltip title="Approve request">
@@ -452,7 +450,7 @@ const PendingRequestsTab = () => {
 };
 
 // User Management Tab Component - FIXED VERSION
-const UserManagementTab = ({ setInviteOpen }) => {
+const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -717,7 +715,6 @@ const UserManagementTab = ({ setInviteOpen }) => {
 
   return (
     <>
-      {/* Add User Button */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 2 }}>
         <Button
           variant="contained"
@@ -727,7 +724,7 @@ const UserManagementTab = ({ setInviteOpen }) => {
         >
           Add New User
         </Button>
-	  <Button
+        <Button
           variant="outlined"
           onClick={() => setInviteOpen(true)}
           sx={{ borderColor: '#8e44ad', color: '#8e44ad', '&:hover': { borderColor: '#732d91' } }}
@@ -735,7 +732,7 @@ const UserManagementTab = ({ setInviteOpen }) => {
           Send Invitation
         </Button>
       </Box>
-
+      <AdminInviteForm open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
       {/* Filter and Search Bar */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
@@ -1018,7 +1015,7 @@ const UserManagementTab = ({ setInviteOpen }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirstamation Dialog */}
       <ConfirmationDialog
         open={openDeleteDialog}
         onClose={handleCloseDeleteDialog}

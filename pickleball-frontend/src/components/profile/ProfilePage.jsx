@@ -21,6 +21,12 @@ import axios from 'axios';
 import UserService from '../../service/UserService';
 import { useNavigate } from 'react-router-dom';
 import EditProfileForm from './EditProfileForm';
+import { getWalletBalance, initializeWallet, topUpWallet } from '../../service/WalletService';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
 
 const ProfilePage = ({ editMode = false }) => {
   const navigate = useNavigate();
@@ -37,6 +43,12 @@ const ProfilePage = ({ editMode = false }) => {
   const [activeView, setActiveView] = useState('overview');
   const [usernameChanged, setUsernameChanged] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState('');
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('');
+  const [topupLoading, setTopupLoading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -75,6 +87,29 @@ const ProfilePage = ({ editMode = false }) => {
 
     fetchProfile();
   }, [navigate]);
+
+  // Fetch wallet balance
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        setWalletLoading(true);
+        let balance;
+        try {
+          balance = await getWalletBalance();
+        } catch (err) {
+          await initializeWallet();
+          balance = await getWalletBalance();
+        }
+        setWalletBalance(balance);
+        setWalletError('');
+      } catch (err) {
+        setWalletError('Failed to load wallet balance: ' + err.message);
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+    fetchWallet();
+  }, []);
 
   const handleUpdateProfile = async (updatedProfile) => {
     try {
@@ -162,6 +197,30 @@ const ProfilePage = ({ editMode = false }) => {
 
   const handleSnackbarClose = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const handleOpenTopup = () => setTopupOpen(true);
+  const handleCloseTopup = () => {
+    setTopupOpen(false);
+    setTopupAmount('');
+  };
+  const handleTopup = async () => {
+    if (!topupAmount || isNaN(topupAmount) || Number(topupAmount) <= 0) {
+      setWalletError('Please enter a valid amount');
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      await topUpWallet(Number(topupAmount));
+      const newBalance = await getWalletBalance();
+      setWalletBalance(newBalance);
+      setSnackbar({ open: true, message: 'Top-up successful!', severity: 'success' });
+      handleCloseTopup();
+    } catch (err) {
+      setWalletError('Top-up failed: ' + err.message);
+    } finally {
+      setTopupLoading(false);
+    }
   };
 
   // Update handlePhotoUpdate function
@@ -308,6 +367,65 @@ const ProfilePage = ({ editMode = false }) => {
         <Grid item xs={12} md={9} sx={{ maxWidth: 950 }}>
           {activeView === 'overview' ? (
             <>
+              {/* Wallet Section */}
+              <Box sx={{
+                backgroundColor: '#f5f5fa',
+                borderRadius: '16px',
+                p: 3,
+                mb: 2,
+                boxShadow: '0 2px 8px rgba(149,157,165,0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <Box>
+                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>Wallet Balance</Typography>
+                  {walletLoading ? (
+                    <CircularProgress size={20} />
+                  ) : walletError ? (
+                    <Typography color="error">{walletError}</Typography>
+                  ) : (
+                    <Typography variant="h5" fontWeight="bold" color="#4caf50">
+                      RM{walletBalance?.toFixed(2)}
+                    </Typography>
+                  )}
+                </Box>
+                <Button
+                  variant="contained"
+                  sx={{ backgroundColor: '#4caf50', '&:hover': { backgroundColor: '#388e3c' } }}
+                  onClick={handleOpenTopup}
+                  disabled={walletLoading}
+                >
+                  Top Up
+                </Button>
+              </Box>
+
+              {/* Top Up Dialog */}
+              <Dialog open={topupOpen} onClose={handleCloseTopup}>
+                <DialogTitle>Top Up Wallet</DialogTitle>
+                <DialogContent>
+                  <TextField
+                    autoFocus
+                    margin="dense"
+                    label="Amount (RM)"
+                    type="number"
+                    fullWidth
+                    value={topupAmount}
+                    onChange={e => setTopupAmount(e.target.value)}
+                    inputProps={{ min: 1, step: 1 }}
+                  />
+                  {walletError && (
+                    <Alert severity="error" sx={{ mt: 2 }}>{walletError}</Alert>
+                  )}
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={handleCloseTopup} disabled={topupLoading}>Cancel</Button>
+                  <Button onClick={handleTopup} variant="contained" disabled={topupLoading}>
+                    {topupLoading ? <CircularProgress size={20} /> : 'Top Up'}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+
               {/* Activity Overview Section */}
               <Box sx={{
                 backgroundColor: 'white',
