@@ -26,10 +26,6 @@ public class Booking {
     @JoinColumn(name = "user_id", nullable = false, referencedColumnName = "user_id")
     private Member member;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "slot_id", nullable = false)
-    private Slot slot;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", nullable = false)
     private Payment payment;
@@ -40,22 +36,17 @@ public class Booking {
     @Column(name = "number_of_players")
     private Integer numberOfPlayers;
 
-    @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
-    private BookingSlot bookingSlot;
+    @Column(name = "num_paddles")
+    private Integer numPaddles; // 新增：租借球拍数量
+
+    @Column(name = "buy_ball_set")
+    private Boolean buyBallSet; // 新增：购买球组
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL)
+    private java.util.List<BookingSlot> bookingSlots;
 
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
     private CancellationRequest cancellationRequest;
-
-    public void setBookingSlot(BookingSlot bookingSlot) {
-        if (bookingSlot == null) {
-            if (this.bookingSlot != null) {
-                this.bookingSlot.setBooking(null);
-            }
-        } else {
-            bookingSlot.setBooking(this);
-        }
-        this.bookingSlot = bookingSlot;
-    }
 
     public enum status {
         CONFIRMED, CANCELLED, PENDING

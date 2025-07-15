@@ -393,7 +393,7 @@ const ProfilePage = ({ editMode = false }) => {
                 <Button
                   variant="contained"
                   sx={{ backgroundColor: '#4caf50', '&:hover': { backgroundColor: '#388e3c' } }}
-                  onClick={handleOpenTopup}
+                  onClick={() => navigate('/wallet/topup')}
                   disabled={walletLoading}
                 >
                   Top Up

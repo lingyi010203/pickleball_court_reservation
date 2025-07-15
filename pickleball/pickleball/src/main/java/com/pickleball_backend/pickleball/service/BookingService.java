@@ -89,7 +89,14 @@ public class BookingService {
         Court court = courtRepository.findById(slots.get(0).getCourtId())
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
         int totalDuration = slots.stream().mapToInt(Slot::getDurationHours).sum();
-        double amount = calculateBookingAmount(court, slots.get(0), totalDuration); // 以第一个slot为基准
+        double baseAmount = calculateBookingAmount(court, slots.get(0), totalDuration); // 以第一个slot为基准
+
+        // 新增：加上 paddle/ball set
+        int numPaddles = request.getNumPaddles() != null ? request.getNumPaddles() : 0;
+        boolean buyBallSet = request.getBuyBallSet() != null && request.getBuyBallSet();
+        double paddleFee = numPaddles * 5.0;
+        double ballSetFee = buyBallSet ? 12.0 : 0.0;
+        double amount = baseAmount + paddleFee + ballSetFee;
 
         // 7. Process wallet payment if requested
         Payment payment = new Payment();
@@ -120,10 +127,11 @@ public class BookingService {
         }
         booking.setStatus(bookingStatus);
         booking.setMember(member);
-        booking.setSlot(slots.get(0)); // 以第一个slot为主
         booking.setPayment(payment);
         booking.setPurpose(request.getPurpose());
         booking.setNumberOfPlayers(request.getNumberOfPlayers());
+        booking.setNumPaddles(request.getNumPaddles());
+        booking.setBuyBallSet(request.getBuyBallSet());
         booking = bookingRepository.save(booking);
 
         // 9. Create BookingSlot records
@@ -149,6 +157,27 @@ public class BookingService {
         BookingResponseDto response = mapToBookingResponse(booking, court, slots.get(0));
         response.setDurationHours(totalDuration);
         response.setWalletBalance(wallet.getBalance());
+
+        // 13. 更新用户统计数据
+        User user = member.getUser();
+        if (user != null) {
+            List<Booking> userBookings = bookingRepository.findByMemberId(member.getId());
+            user.setBookingsMade(userBookings.size());
+            // 统计所有预订的总时长（小时）
+            double totalHours = userBookings.stream().mapToDouble(b -> {
+                if (b.getBookingSlots() != null && !b.getBookingSlots().isEmpty()) {
+                    return b.getBookingSlots().stream().mapToInt(bs -> bs.getSlot().getDurationHours()).sum();
+                } else if (b.getNumberOfPlayers() != null) {
+                    return 0; // 这里不能用 numberOfPlayers，老数据无 duration 时记为0
+                } else {
+                    return 0;
+                }
+            }).sum();
+            user.setBookingHours(totalHours);
+            user.setAmountSpent(userBookings.stream().mapToDouble(Booking::getTotalAmount).sum());
+            userRepository.save(user);
+        }
+
         return response;
     }
 
@@ -189,19 +218,24 @@ public class BookingService {
         return hourlyRate * durationHours;
     }
 
+    // 生成响应时，slot 相关信息通过 booking.getBookingSlots().get(0).getSlot()
     private BookingResponseDto mapToBookingResponse(Booking booking, Court court, Slot slot) {
         BookingResponseDto response = new BookingResponseDto();
         response.setBookingId(booking.getId());
         response.setCourtName(court.getName());
         response.setCourtLocation(court.getLocation());
-        response.setSlotDate(slot.getDate());
-        response.setStartTime(slot.getStartTime());
-        response.setEndTime(slot.getEndTime());
+        // Slot slot = booking.getSlot();
+        Slot slot0 = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
+        if (slot0 != null) {
+            response.setSlotDate(slot0.getDate());
+            response.setStartTime(slot0.getStartTime());
+            response.setEndTime(slot0.getEndTime());
+            response.setCourtNumber(slot0.getCourtNumber() != null ? slot0.getCourtNumber() : 0);
+        }
         response.setTotalAmount(booking.getTotalAmount());
         response.setBookingStatus(booking.getStatus());
         response.setPurpose(booking.getPurpose());
         response.setNumberOfPlayers(booking.getNumberOfPlayers());
-        response.setCourtNumber(slot.getCourtNumber());
 
         // Add payment details
         if (booking.getPayment() != null) {
@@ -217,7 +251,7 @@ public class BookingService {
 
 
     @Transactional
-    public CancellationResponse cancelBooking(Integer bookingId, String username) {
+    public CancellationResponse cancelBooking(Integer bookingId, String username, String reason) {
         // 1. 获取用户账户
         UserAccount account = userAccountRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
@@ -232,7 +266,7 @@ public class BookingService {
         }
 
         // 4. 获取时间段信息
-        Slot slot = booking.getSlot();
+        Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
 
         // 5. 检查取消资格（1小时限制）
         LocalDateTime slotDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
@@ -249,7 +283,7 @@ public class BookingService {
         request.setBooking(booking);
         request.setRequestDate(LocalDate.now());
         request.setStatus("PENDING");
-        request.setReason("User requested cancellation");
+        request.setReason(reason != null ? reason : "User requested cancellation");
         cancellationRequestRepository.save(request);
 
         // 8. 获取场馆信息
@@ -264,13 +298,12 @@ public class BookingService {
                 court
         );
 
-        // 10. 返回响应
         return new CancellationResponse(
                 request.getId(),
-                bookingId,
-                "PENDING",
-                LocalDate.now(),
-                "Cancellation request submitted. Waiting for admin approval."
+                booking.getId(),
+                request.getStatus(),
+                request.getRequestDate(),
+                "Cancellation request submitted"
         );
     }
 
@@ -297,7 +330,7 @@ public class BookingService {
                     Booking booking = request.getBooking();
                     if (booking == null) return null;
 
-                    Slot slot = booking.getSlot();
+                    Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
                     if (slot == null) return null;
 
                     // Get court safely
@@ -313,8 +346,8 @@ public class BookingService {
                             request.getId(),
                             booking.getId(),
                             memberName,
-                            slot.getDate(),
-                            slot.getStartTime(),
+                            slot != null ? slot.getDate() : null,
+                            slot != null ? slot.getStartTime() : null,
                             court != null ? court.getName() : "Court not found",
                             request.getReason()
                     );
@@ -324,7 +357,7 @@ public class BookingService {
     }
 
     @Transactional
-    public CancellationResponse processCancellation(Integer requestId, boolean approve) {
+    public CancellationResponse processCancellation(Integer requestId, boolean approve, String adminRemark) {
         CancellationRequest request = cancellationRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cancellation request not found"));
 
@@ -333,10 +366,10 @@ public class BookingService {
         }
 
         Booking booking = request.getBooking();
-        BookingSlot bookingSlot = booking.getBookingSlot();
-        Slot slot = bookingSlot.getSlot();
-        Court court = courtRepository.findById(slot.getCourtId())
-                .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
+        BookingSlot bookingSlot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0) : null;
+        Slot slot = bookingSlot != null ? bookingSlot.getSlot() : null;
+        Court court = slot != null ? courtRepository.findById(slot.getCourtId())
+                .orElseThrow(() -> new ResourceNotFoundException("Court not found")) : null;
 
         if (approve) {
             // 1. Free up the slot
@@ -386,6 +419,10 @@ public class BookingService {
             request.setStatus("REJECTED");
         }
 
+        // 新增：保存 adminRemark
+        if (adminRemark != null) {
+            request.setAdminRemark(adminRemark);
+        }
         cancellationRequestRepository.save(request);
 
         // Send decision email
@@ -393,7 +430,7 @@ public class BookingService {
                 booking.getMember().getUser().getEmail(),
                 booking,
                 slot,
-                court.getName(),
+                court != null ? court.getName() : "Court not found",
                 approve
         );
 
@@ -414,7 +451,7 @@ public class BookingService {
         boolean updated = false;
         for (Booking booking : bookings) {
             if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
-                Slot slot = booking.getSlot();
+                Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
                 if (slot != null && slot.getDate() != null && slot.getEndTime() != null) {
                     LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
                     if (endDateTime.isBefore(now)) {
@@ -433,25 +470,25 @@ public class BookingService {
         return bookings.stream()
                 .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
                 .map(booking -> {
-                    Slot slot = booking.getSlot();
-                    Court court = courtRepository.findById(slot.getCourtId())
-                            .orElse(new Court());
+                    Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
+                    Court court = slot != null ? courtRepository.findById(slot.getCourtId())
+                            .orElse(new Court()) : new Court();
 
                     BookingHistoryDto dto = new BookingHistoryDto();
                     dto.setId(booking.getId());
                     dto.setCourtName(court.getName());
                     dto.setLocation(court.getLocation());
-                    dto.setDate(slot.getDate());
-                    dto.setStartTime(slot.getStartTime());
-                    dto.setEndTime(slot.getEndTime());
+                    dto.setDate(slot != null ? slot.getDate() : null);
+                    dto.setStartTime(slot != null ? slot.getStartTime() : null);
+                    dto.setEndTime(slot != null ? slot.getEndTime() : null);
                     dto.setAmount(booking.getTotalAmount());
                     dto.setStatus(booking.getStatus());
                     dto.setCreatedAt(booking.getBookingDate());
                     dto.setPurpose(booking.getPurpose());
                     dto.setPlayers(booking.getNumberOfPlayers());
-                    dto.setCourtNumber(slot.getCourtNumber());
+                    dto.setCourtNumber(slot != null && slot.getCourtNumber() != null ? slot.getCourtNumber() : 0);
                     // Add duration to history
-                    dto.setDurationHours(slot.getDurationHours());
+                    dto.setDurationHours(slot != null && slot.getDurationHours() != null ? slot.getDurationHours() : 0);
                     return dto;
                 })
                 .collect(Collectors.toList());

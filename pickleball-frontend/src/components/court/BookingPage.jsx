@@ -10,18 +10,16 @@ import {
   CircularProgress,
   Divider,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
   Snackbar,
   Alert
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
-  ChevronLeft as LeftIcon,
-  ChevronRight as RightIcon
+  CalendarToday as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  AccessTime
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatTime } from '../../components/court/DateUtils';
@@ -30,20 +28,68 @@ import { getAllSlotsForCourt } from '../../service/SlotService';
 import BookingService from '../../service/BookingService';
 import dayjs from 'dayjs';
 
+const PADDLE_PRICE = 5; // 每个 paddle 租金
+const BALL_SET_PRICE = 12; // 一组 ball set 售价
+
 const BookingPage = () => {
   const { courtId } = useParams();
   const navigate = useNavigate();
   const [court, setCourt] = useState(null);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(dayjs());
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(dayjs().date(24));
   const [availableDates, setAvailableDates] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
-  const [selectedSlots, setSelectedSlots] = useState([]); // 替换 selectedSlot
+  const [selectedSlots, setSelectedSlots] = useState([]);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [error, setError] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('Today');
+  const [currentMonth, setCurrentMonth] = useState(dayjs().format('MMMM YYYY'));
+  const [numPlayers, setNumPlayers] = useState(2);
+  const [numPaddles, setNumPaddles] = useState(0);
+  const [buyBallSet, setBuyBallSet] = useState(false);
+
+  // 日历数据结构
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const tabs = ['Today', 'Tomorrow', 'This Week', 'Custom Date'];
+  
+  // 生成日历数据
+  const generateCalendar = () => {
+    const startOfMonth = dayjs().startOf('month');
+    const endOfMonth = dayjs().endOf('month');
+    const startDate = startOfMonth.startOf('week');
+    const endDate = endOfMonth.endOf('week');
+    
+    const calendar = [];
+    let week = [];
+    let current = startDate;
+    
+    while (current.isBefore(endDate) || current.isSame(endDate, 'day')) {
+      if (week.length === 7) {
+        calendar.push(week);
+        week = [];
+      }
+      
+      week.push(current.month() === dayjs().month() ? current.date() : null);
+      current = current.add(1, 'day');
+    }
+    
+    if (week.length > 0) {
+      calendar.push(week);
+    }
+    
+    return calendar;
+  };
+  
+  const calendar = generateCalendar();
+
+  // 检查日期是否可用
+  const isDateAvailable = (date) => {
+    if (!date) return false;
+    const dateStr = dayjs().date(date).format('YYYY-MM-DD');
+    return availableDates.includes(dateStr);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,10 +98,9 @@ const BookingPage = () => {
         const courtData = await CourtService.getCourtById(courtId);
         setCourt(courtData);
 
-        const slotsData = await getAllSlotsForCourt(courtId); // 获取所有slot
+        const slotsData = await getAllSlotsForCourt(courtId);
         setSlots(slotsData);
 
-        // Extract available dates (所有slot的日期)
         const dates = [...new Set(slotsData.map(slot => slot.date))];
         setAvailableDates(dates);
       } catch (error) {
@@ -71,65 +116,45 @@ const BookingPage = () => {
 
   useEffect(() => {
     if (selectedDate) {
-      let filtered = slots.filter(slot =>
+      let filtered = slots.filter(slot => 
         slot.date === selectedDate.format('YYYY-MM-DD')
       );
-      // 如果是今天，只保留2小时后的slot
+      
       if (selectedDate.isSame(dayjs(), 'day')) {
         const nowPlus2h = dayjs().add(2, 'hour');
         filtered = filtered.filter(slot => {
-          // slot.startTime: 'HH:mm' 字符串
           const slotDateTime = dayjs(`${slot.date} ${slot.startTime}`, 'YYYY-MM-DD HH:mm');
           return slotDateTime.isAfter(nowPlus2h);
         });
       }
+      
       setAvailableSlots(filtered);
       setSelectedSlots([]);
     }
   }, [selectedDate, slots]);
 
-  const today = dayjs();
-  const maxMonth = today.add(2, 'month').endOf('month'); // 允许切换到本月+2个月（共3个月）
-
-  const handlePrevMonth = () => {
-    if (currentMonth.isAfter(today, 'month')) {
-      setCurrentMonth(currentMonth.subtract(1, 'month'));
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (currentMonth.isBefore(maxMonth, 'month')) {
-      setCurrentMonth(currentMonth.add(1, 'month'));
-    }
-  };
-
-  const handleDateSelect = (date) => {
-    setSelectedDate(date);
-  };
-
-  // 替换 handleSlotSelect
   const handleSlotSelect = (slot) => {
-    // 如果已选，取消选择
     if (selectedSlots.some(s => s.id === slot.id)) {
       setSelectedSlots(selectedSlots.filter(s => s.id !== slot.id));
       return;
     }
-    // 只允许同一天
+    
     if (selectedSlots.length > 0 && slot.date !== selectedSlots[0].date) return;
-    // 只允许连续
+    
     const allSlots = [...selectedSlots, slot].sort((a, b) => a.startTime.localeCompare(b.startTime));
     let isConsecutive = true;
+    
     for (let i = 1; i < allSlots.length; i++) {
       if (allSlots[i].startTime !== allSlots[i - 1].endTime) {
         isConsecutive = false;
         break;
       }
     }
+    
     if (!isConsecutive) return;
     setSelectedSlots(allSlots);
   };
 
-  // handleBookNow 传所有slotId
   const handleBookNow = () => {
     if (!selectedSlots.length) return;
     const bookingDetails = {
@@ -140,9 +165,11 @@ const BookingPage = () => {
       startTime: selectedSlots[0].startTime,
       endTime: selectedSlots[selectedSlots.length - 1].endTime,
       durationHours: selectedSlots.length,
-      price: calculatePrice(),
+      price: total, // 修正：传递总价（含paddle/ball set）
       purpose: "Recreational",
-      numberOfPlayers: 4
+      numberOfPlayers: numPlayers, // 传递人数
+      numPaddles, // 传递paddle数量
+      buyBallSet // 传递ball set选择
     };
     navigate('/payment', { state: { bookingDetails } });
   };
@@ -150,162 +177,42 @@ const BookingPage = () => {
   const calculatePrice = () => {
     if (!selectedSlots.length || !court) return 0;
 
-    const startTime = dayjs(selectedSlots[0].startTime, 'HH:mm');
-    const peakStart = dayjs(court.peakStartTime || '16:00', 'HH:mm');
-    const peakEnd = dayjs(court.peakEndTime || '20:00', 'HH:mm');
+    const startTime = selectedSlots[0].startTime; // Use string directly
+    const peakStart = court.peakStartTime || '16:00';
+    const peakEnd = court.peakEndTime || '20:00';
 
-    const isPeak = startTime.isAfter(peakStart) && startTime.isBefore(peakEnd);
+    const isPeak = startTime >= peakStart && startTime <= peakEnd;
 
-    return selectedSlots.length *
-      (isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50));
+    return selectedSlots.length * (isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50));
   };
 
-  // 组件作用域定义 totalDuration/totalPrice
   const totalDuration = selectedSlots.length;
   const totalPrice = totalDuration * (selectedSlots[0] && court ? (() => {
-    const startTime = dayjs(selectedSlots[0].startTime, 'HH:mm');
-    const peakStart = dayjs(court.peakStartTime || '16:00', 'HH:mm');
-    const peakEnd = dayjs(court.peakEndTime || '20:00', 'HH:mm');
-    const isPeak = startTime.isAfter(peakStart) && startTime.isBefore(peakEnd);
+    const startTime = selectedSlots[0].startTime; // Use string directly
+    const peakStart = court.peakStartTime || '16:00';
+    const peakEnd = court.peakEndTime || '20:00';
+    const isPeak = startTime >= peakStart && startTime <= peakEnd;
     return isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50);
   })() : 0);
 
-  const renderCalendar = () => {
-    const startOfMonth = currentMonth.startOf('month');
-    const endOfMonth = currentMonth.endOf('month');
-    const daysInMonth = currentMonth.daysInMonth();
-
-    const days = [];
-    for (let i = 0; i < daysInMonth; i++) {
-      const date = startOfMonth.add(i, 'day');
-      const dateStr = date.format('YYYY-MM-DD');
-      const isAvailable = availableDates.includes(dateStr);
-      const isSelected = selectedDate && selectedDate.isSame(date, 'day');
-
-      days.push(
-        <Grid item xs key={i} sx={{ textAlign: 'center' }}>
-          <Button
-            fullWidth
-            variant={isSelected ? "contained" : "outlined"}
-            color={isAvailable ? "primary" : "secondary"}
-            disabled={!isAvailable}
-            onClick={() => isAvailable && handleDateSelect(date)}
-            sx={{
-              py: 1,
-              borderRadius: '8px',
-              minWidth: 'auto',
-              backgroundColor: isAvailable ?
-                (isSelected ? '#1976d2' : 'transparent') : '#f5f5f5',
-              color: isAvailable ?
-                (isSelected ? '#fff' : '#1976d2') : '#9e9e9e',
-              borderColor: isAvailable ? '#1976d2' : '#e0e0e0',
-              '&:hover': {
-                backgroundColor: isAvailable ?
-                  (isSelected ? '#1565c0' : '#e3f2fd') : '#f5f5f5'
-              }
-            }}
-          >
-            {date.date()}
-          </Button>
-        </Grid>
-      );
-    }
-
-    return (
-      <Card sx={{ mb: 4, borderRadius: 3 }}>
-        <CardContent>
-          <Box sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 2
-          }}>
-            <IconButton onClick={handlePrevMonth} disabled={currentMonth.isSame(today, 'month')}>
-              <LeftIcon />
-            </IconButton>
-            <Typography variant="h6" fontWeight="bold">
-              {currentMonth.format('MMMM YYYY')}
-            </Typography>
-            <IconButton onClick={handleNextMonth} disabled={currentMonth.isSame(maxMonth, 'month')}>
-              <RightIcon />
-            </IconButton>
-          </Box>
-
-          <Grid container spacing={1} sx={{ mb: 1 }}>
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-              <Grid item xs key={index} sx={{ textAlign: 'center' }}>
-                <Typography variant="body2" fontWeight="bold" color="text.secondary">
-                  {day}
-                </Typography>
-              </Grid>
-            ))}
-          </Grid>
-
-          <Grid container spacing={1}>
-            {days}
-          </Grid>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const renderTimeSlots = () => {
-    if (!selectedDate || availableSlots.length === 0) {
-      return null;
-    }
-
-    return (
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Time Slots - {selectedDate.format('dddd, MMMM D, YYYY')}
-          </Typography>
-
-          <Grid container spacing={2}>
-            {availableSlots.map((slot) => (
-              <Grid item xs={12} sm={6} md={4} key={slot.id}>
-                <Button
-                  fullWidth
-                  variant={selectedSlots.some(s => s.id === slot.id) ? "contained" : "outlined"}
-                  onClick={slot.status === 'BOOKED' ? undefined : () => handleSlotSelect(slot)}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: '8px',
-                    borderColor: slot.status === 'BOOKED' ? '#e53935' : '#1976d2',
-                    color: slot.status === 'BOOKED' ? '#e53935' : (selectedSlots.some(s => s.id === slot.id) ? '#fff' : '#1976d2'),
-                    backgroundColor: slot.status === 'BOOKED'
-                      ? '#fff'
-                      : (selectedSlots.some(s => s.id === slot.id) ? '#1976d2' : 'transparent'),
-                    pointerEvents: slot.status === 'BOOKED' ? 'none' : 'auto',
-                    opacity: 1,
-                    '&:hover': {
-                      backgroundColor: slot.status === 'BOOKED'
-                        ? '#fff'
-                        : (selectedSlots.some(s => s.id === slot.id) ? '#1565c0' : '#e3f2fd'),
-                      borderColor: slot.status === 'BOOKED' ? '#e53935' : '#1565c0'
-                    }
-                  }}
-                >
-                  {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                </Button>
-              </Grid>
-            ))}
-          </Grid>
-        </CardContent>
-      </Card>
-    );
-  };
+  // 计算总价
+  const total =
+    totalPrice +
+    numPaddles * PADDLE_PRICE +
+    (buyBallSet ? BALL_SET_PRICE : 0);
 
   const renderBookingSummary = () => {
     if (!court) return null;
-    // 不要再定义 totalDuration/totalPrice，直接用外部的
+    
     return (
       <Card sx={{
         position: 'sticky',
         top: 20,
         borderRadius: 3,
         boxShadow: 3,
-        mb: 4
+        mb: 4,
+        background: 'linear-gradient(135deg, #f8f9ff, #ffffff)',
+        border: '1px solid rgba(0, 0, 0, 0.05)'
       }}>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -346,43 +253,108 @@ const BookingPage = () => {
             <>
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 2
-              }}>
-                <Typography variant="body1">
-                  Subtotal
+              {/* 新增：人数选择 */}
+              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Number of Players:
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} textAlign="right">
+                  <input
+                    type="number"
+                    min={2}
+                    max={8}
+                    value={numPlayers}
+                    onChange={e => setNumPlayers(Math.max(2, Math.min(8, Number(e.target.value))))}
+                    style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #ccc', textAlign: 'right' }}
+                  />
+                </Grid>
+              </Grid>
+              {/* 新增：paddle 租借 */}
+              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Paddles to Rent:
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} textAlign="right">
+                  <input
+                    type="number"
+                    min={0}
+                    max={8}
+                    value={numPaddles}
+                    onChange={e => setNumPaddles(Math.max(0, Math.min(8, Number(e.target.value))))}
+                    style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #ccc', textAlign: 'right' }}
+                  />
+                  <Typography variant="caption" sx={{ ml: 1 }}>
+                    RM{PADDLE_PRICE} each
+                  </Typography>
+                </Grid>
+              </Grid>
+              {/* 新增：ball set 购买 */}
+              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                <Grid item xs={8}>
+                  <Typography variant="body2" color="text.secondary">
+                    Buy Ball Set (4 balls, RM{BALL_SET_PRICE})
+                  </Typography>
+                </Grid>
+                <Grid item xs={4} textAlign="right">
+                  <input
+                    type="checkbox"
+                    checked={buyBallSet}
+                    onChange={e => setBuyBallSet(e.target.checked)}
+                    style={{ transform: 'scale(1.3)' }}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* 价格详情 */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Pricing Details:
                 </Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  RM{totalPrice.toFixed(2)}
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Off-peak: RM{court.offPeakHourlyPrice || 50}/hour
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Peak: RM{court.peakHourlyPrice || 80}/hour
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Paddles: RM{PADDLE_PRICE} each
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Ball Set: RM{BALL_SET_PRICE} (set of 4)
                 </Typography>
               </Box>
 
-              {bookingInProgress ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
+              <Divider sx={{ my: 2 }} />
+              <Grid container>
+                <Grid item xs={6}>
+                  <Typography variant="body1" fontWeight="bold">
+                    Total Amount:
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} textAlign="right">
+                  <Typography variant="body1" fontWeight="bold" color="#2e7d32">
+                    RM{total.toFixed(2)}
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* Book Now 按钮 */}
+              <Box sx={{ mt: 3, textAlign: 'center' }}>
                 <Button
-                  fullWidth
                   variant="contained"
+                  color="primary"
                   size="large"
+                  disabled={!selectedSlots.length || !court}
                   onClick={handleBookNow}
-                  disabled={!selectedSlots.length}
-                  sx={{
-                    py: 1.5,
-                    fontWeight: 'bold',
-                    backgroundColor: '#ff6f00',
-                    '&:hover': {
-                      backgroundColor: '#e65100'
-                    }
-                  }}
+                  sx={{ px: 6, py: 1.5, fontWeight: 600, fontSize: '1.1rem', borderRadius: 2 }}
                 >
                   Book Now
                 </Button>
-              )}
+              </Box>
             </>
           )}
 
@@ -466,8 +438,281 @@ const BookingPage = () => {
 
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
-          {renderCalendar()}
-          {renderTimeSlots()}
+          <Card sx={{ 
+            borderRadius: 3, 
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+            mb: 4,
+            background: 'linear-gradient(135deg, #f8f9ff, #ffffff)'
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              {/* 头部 */}
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
+                  Book Court
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Reserve a pickleball court for your next game
+                </Typography>
+              </Box>
+
+              {/* Tab导航 */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 1, 
+                mb: 4,
+                p: 0.5, 
+                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                borderRadius: '12px',
+                width: 'fit-content'
+              }}>
+                {tabs.map((tab) => (
+                  <Button
+                    key={tab}
+                    variant={activeTab === tab ? "contained" : "outlined"}
+                    onClick={() => {
+                      setActiveTab(tab);
+                      switch (tab) {
+                        case 'Today':
+                          setSelectedDate(dayjs());
+                          break;
+                        case 'Tomorrow':
+                          setSelectedDate(dayjs().add(1, 'day'));
+                          break;
+                        case 'This Week':
+                          setSelectedDate(dayjs().add(7, 'day'));
+                          break;
+                        case 'Custom Date':
+                          // Keep current date for custom selection
+                          break;
+                      }
+                    }}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      px: 3,
+                      py: 1,
+                      ...(activeTab === tab && {
+                        background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                        color: 'white',
+                        boxShadow: '0 4px 8px rgba(37, 117, 252, 0.25)'
+                      })
+                    }}
+                  >
+                    {tab}
+                  </Button>
+                ))}
+              </Box>
+
+              {/* 日历头部 */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 4
+              }}>
+                <IconButton
+                  onClick={() => {
+                    const newMonth = dayjs().subtract(1, 'month');
+                    setCurrentMonth(newMonth.format('MMMM YYYY'));
+                  }}
+                  sx={{ 
+                    p: 1.5,
+                    borderRadius: '50%',
+                    background: 'rgba(0, 0, 0, 0.03)',
+                    '&:hover': {
+                      background: 'rgba(0, 0, 0, 0.08)'
+                    }
+                  }}
+                >
+                  <ChevronLeft />
+                </IconButton>
+                
+                <Typography variant="h6" fontWeight="bold">
+                  {currentMonth}
+                </Typography>
+                
+                <IconButton
+                  onClick={() => {
+                    const newMonth = dayjs().add(1, 'month');
+                    setCurrentMonth(newMonth.format('MMMM YYYY'));
+                  }}
+                  sx={{ 
+                    p: 1.5,
+                    borderRadius: '50%',
+                    background: 'rgba(0, 0, 0, 0.03)',
+                    '&:hover': {
+                      background: 'rgba(0, 0, 0, 0.08)'
+                    }
+                  }}
+                >
+                  <ChevronRight />
+                </IconButton>
+              </Box>
+
+              {/* 日历网格 */}
+              <Box sx={{ mb: 4 }}>
+                {/* 星期标题 */}
+                <Grid container spacing={0} sx={{ mb: 2 }}>
+                  {daysOfWeek.map((day) => (
+                    <Grid item xs key={day}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          textAlign: 'center',
+                          fontWeight: 600,
+                          color: 'text.secondary',
+                          py: 1
+                        }}
+                      >
+                        {day}
+                      </Typography>
+                    </Grid>
+                  ))}
+                </Grid>
+                
+                {/* 日期网格 */}
+                <Grid container spacing={1}>
+                  {calendar.map((week, weekIndex) => (
+                    <React.Fragment key={weekIndex}>
+                      {week.map((date, dateIndex) => (
+                        <Grid item xs key={`${weekIndex}-${dateIndex}`}>
+                          {date ? (
+                            <Button
+                              fullWidth
+                              variant={selectedDate?.date() === date ? "contained" : "outlined"}
+                              onClick={() => {
+                                if (isDateAvailable(date)) {
+                                  const newDate = dayjs().date(date);
+                                  setSelectedDate(newDate);
+                                }
+                              }}
+                              disabled={!isDateAvailable(date)}
+                              sx={{
+                                height: 56,
+                                minWidth: 0,
+                                borderRadius: '12px',
+                                fontWeight: 600,
+                                ...(selectedDate?.date() === date && {
+                                  background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                                  color: 'white',
+                                  boxShadow: '0 4px 12px rgba(37, 117, 252, 0.3)'
+                                }),
+                                ...(isDateAvailable(date) ? {} : {
+                                  border: '2px solid #f44336',
+                                  color: '#f44336',
+                                  opacity: 0.7,
+                                  '&:hover': {
+                                    border: '2px solid #f44336',
+                                    backgroundColor: 'rgba(244, 67, 54, 0.1)'
+                                  }
+                                })
+                              }}
+                            >
+                              {date}
+                            </Button>
+                          ) : (
+                            <Box sx={{ height: 56 }} />
+                          )}
+                        </Grid>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </Grid>
+              </Box>
+              
+              {/* 时间槽位 */}
+              <Card sx={{ 
+                borderRadius: 3,
+                background: 'white',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+              }}>
+                <CardContent>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    mb: 3 
+                  }}>
+                    <AccessTime sx={{ 
+                      color: 'text.secondary', 
+                      mr: 1.5 
+                    }} />
+                    <Typography variant="h6" fontWeight="bold">
+                      Available Time Slots - {selectedDate?.format('dddd, MMMM D, YYYY')}
+                    </Typography>
+                  </Box>
+                  
+                  <Grid container spacing={1.5}>
+                    {availableSlots.length > 0 ? (
+                      availableSlots.map((slot) => (
+                        <Grid item xs={6} sm={4} md={3} key={slot.id}>
+                          <Button
+                            fullWidth
+                            variant={
+                              selectedSlots.some(s => s.id === slot.id) 
+                                ? "contained" 
+                                : slot.status === 'BOOKED' 
+                                  ? "outlined" 
+                                  : "outlined"
+                            }
+                            onClick={() => handleSlotSelect(slot)}
+                            disabled={slot.status === 'BOOKED'}
+                            sx={{
+                              py: 1.5,
+                              borderRadius: '12px',
+                              fontWeight: 600,
+                              ...(selectedSlots.some(s => s.id === slot.id) ? {
+                                 background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                                 color: 'white',
+                                 boxShadow: '0 4px 8px rgba(37, 117, 252, 0.3)'
+                               } : {}),
+                               ...(slot.status === 'BOOKED' ? {
+                                 borderColor: '#e53935',
+                                 color: '#e53935',
+                                 opacity: 0.7
+                               } : {})
+                            }}
+                          >
+                            {formatTime(slot.startTime)}
+                          </Button>
+                        </Grid>
+                      ))
+                    ) : (
+                      <Grid item xs={12}>
+                        <Box sx={{ 
+                          textAlign: 'center', 
+                          py: 4,
+                          color: 'text.secondary'
+                        }}>
+                          <AccessTime sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }} />
+                          <Typography variant="body1">
+                            No available time slots for this date
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </CardContent>
+              </Card>
+              
+              {/* 价格信息 */}
+              {court && (
+                <Box sx={{ 
+                  mt: 3, 
+                  p: 2, 
+                  bgcolor: 'rgba(46, 125, 50, 0.1)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(46, 125, 50, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Typography variant="body2" fontWeight="600" color="success.main">
+                    RM{court.offPeakHourlyPrice || 50}-{court.peakHourlyPrice || 80}/hour
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
 
         <Grid item xs={12} md={4}>

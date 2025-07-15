@@ -1,0 +1,4 @@
+export const COURT_STATUS = {
+  ACTIVE: 'ACTIVE',
+  MAINTENANCE: 'MAINTENANCE'
+}; 

@@ -97,37 +97,15 @@ const AdminDashboard = () => {
       // 处理用户数据
       const totalUsers = Number(usersResponse.data);
 
-      // 处理预订数据（安全处理）
-      let totalBookings = 0;
-      let totalRevenue = 0;
+      // 处理预订数据（分页对象）
+      const bookingsPage = bookingsResponse.data;
+      const bookings = bookingsPage.content || [];
+      const totalBookings = bookingsPage.totalElements || 0;
+      const totalRevenue = bookings.reduce(
+        (sum, booking) => sum + (booking.totalAmount || 0),
+        0
+      );
 
-      if (Array.isArray(bookingsResponse.data)) {
-        totalBookings = bookingsResponse.data.length;
-        totalRevenue = bookingsResponse.data.reduce(
-          (sum, booking) => sum + (booking.totalAmount || 0),
-          0
-        );
-      }
-      // Fetch user statistics
-      const usersResponse = await axios.get('http://localhost:8081/api/admin/dashboard/users/count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Fetch booking statistics
-      const bookingsResponse = await axios.get('http://localhost:8081/api/admin/dashboard/bookings', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Fetch global average rating
-      const avgRatingResponse = await axios.get('http://localhost:8081/api/admin/dashboard/average-rating', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Calculate changes (mock data for demo)
-      const totalUsers = usersResponse.data;
-      const totalBookings = bookingsResponse.data.length;
-      const totalRevenue = bookingsResponse.data.reduce((sum, booking) => sum + booking.totalAmount, 0);
-      const averageRating = avgRatingResponse.data;
       console.log('Setting dashboard data:', {
         totalUsers,
         totalUsersChange: 12,

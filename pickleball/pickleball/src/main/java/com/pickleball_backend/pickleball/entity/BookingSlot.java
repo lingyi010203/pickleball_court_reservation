@@ -10,12 +10,11 @@ import java.time.LocalDateTime;
 public class BookingSlot {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // ADDED
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @OneToOne
-    @MapsId  // Shares the same ID as Booking
-    @JoinColumn(name = "booking_id")
+    @ManyToOne
+    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
     @ManyToOne

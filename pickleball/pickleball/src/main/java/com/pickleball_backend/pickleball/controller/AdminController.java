@@ -207,15 +207,19 @@ public class AdminController {
     @PutMapping("/cancellation-requests/{requestId}/approve")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<CancellationResponse> approveCancellation(
-            @PathVariable Integer requestId) {
-        return ResponseEntity.ok(bookingService.processCancellation(requestId, true));
+            @PathVariable Integer requestId,
+            @RequestBody(required = false) java.util.Map<String, Object> body) {
+        String adminRemark = body != null && body.get("adminRemark") != null ? body.get("adminRemark").toString() : null;
+        return ResponseEntity.ok(bookingService.processCancellation(requestId, true, adminRemark));
     }
 
     @PutMapping("/cancellation-requests/{requestId}/reject")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<CancellationResponse> rejectCancellation(
-            @PathVariable Integer requestId) {
-        return ResponseEntity.ok(bookingService.processCancellation(requestId, false));
+            @PathVariable Integer requestId,
+            @RequestBody(required = false) java.util.Map<String, Object> body) {
+        String adminRemark = body != null && body.get("adminRemark") != null ? body.get("adminRemark").toString() : null;
+        return ResponseEntity.ok(bookingService.processCancellation(requestId, false, adminRemark));
     }
 
     @GetMapping("/user-profile/{username}")

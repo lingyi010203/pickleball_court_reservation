@@ -67,14 +67,4 @@ public class BookingController {
 
         return ResponseEntity.ok(bookingService.getBookingDetails(id, memberId));
     }*/
-
-    @PostMapping("/member/bookings/{bookingId}/cancel")
-    public ResponseEntity<CancellationResponse> cancelBooking(
-            @PathVariable Integer bookingId,
-            Principal principal) {
-
-        String username = principal.getName();
-        CancellationResponse response = bookingService.cancelBooking(bookingId, username);
-        return ResponseEntity.ok(response);
-    }
 }

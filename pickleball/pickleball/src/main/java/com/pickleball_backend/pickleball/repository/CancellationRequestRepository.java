@@ -12,7 +12,6 @@ public interface CancellationRequestRepository extends JpaRepository<Cancellatio
 
     @Query("SELECT cr FROM CancellationRequest cr " +
             "JOIN FETCH cr.booking b " +
-            "JOIN FETCH b.slot s " +
             "JOIN FETCH b.member m " +
             "JOIN FETCH m.user u " +
             "WHERE cr.status = :status")

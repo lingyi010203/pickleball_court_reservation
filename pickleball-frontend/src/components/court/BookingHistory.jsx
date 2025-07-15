@@ -15,7 +15,12 @@ import {
   Paper,
   Stack,
   IconButton,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField
 } from '@mui/material';
 import {
   SportsTennis as CourtIcon,
@@ -219,6 +224,9 @@ const BookingHistory = () => {
   const [error, setError] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelStatus, setCancelStatus] = useState({});
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelBookingId, setCancelBookingId] = useState(null);
 
   const fetchBookingHistory = async () => {
     try {
@@ -231,14 +239,15 @@ const BookingHistory = () => {
       // 数据规范化处理 - 根据实际API响应调整字段映射
       const normalizedBookings = response.data.map(booking => ({
         bookingId: booking.id || booking.bookingId,
-        courtName: booking.venue?.name || booking.courtName || "AAA Pickleball Court",
-        courtLocation: booking.venue?.address || booking.location || "123 Sports Complex, Kuala Lumpur",
-        slotDate: booking.date || booking.slotDate,
-        startTime: booking.startTime || "08:00",
-        endTime: booking.endTime || "09:00",
+        courtName: booking.venue?.name || booking.courtName || (booking.bookingSlots && booking.bookingSlots[0]?.slot?.courtName) || "AAA Pickleball Court",
+        courtLocation: booking.venue?.address || booking.location || (booking.bookingSlots && booking.bookingSlots[0]?.slot?.courtLocation) || "123 Sports Complex, Kuala Lumpur",
+        slotDate: booking.date, // 修正
+        startTime: booking.startTime, // 修正
+        endTime: booking.endTime, // 修正
         numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
         totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
-        status: booking.bookingStatus || booking.status || "CONFIRMED"
+        status: booking.bookingStatus || booking.status || "CONFIRMED",
+        courtNumber: booking.courtNumber,
       }));
 
       console.log("Normalized Bookings:", normalizedBookings);
@@ -264,28 +273,31 @@ const BookingHistory = () => {
   };
 
   const handleCancelBooking = (id) => {
-  setCancellingId(id);
-  const confirmed = window.confirm("Are you sure you want to cancel this booking?");
+    setCancelBookingId(id);
+    setCancelReason('');
+    setCancelDialogOpen(true);
+  };
 
-  if (confirmed) {
-    setCancelStatus(prev => ({ ...prev, [id]: 'processing' }));
-
-    // 修复：移除路径中开头的 /api
-    api.post(`/member/bookings/${id}/cancel`) // 修改这里
+  const handleConfirmCancel = () => {
+    if (!cancelReason.trim()) {
+      alert('Please provide a reason for cancellation.');
+      return;
+    }
+    setCancellingId(cancelBookingId);
+    setCancelStatus(prev => ({ ...prev, [cancelBookingId]: 'processing' }));
+    api.post(`/member/bookings/${cancelBookingId}/cancel`, { reason: cancelReason })
       .then(response => {
         setBookings(prev => prev.map(booking =>
-          booking.bookingId === id
+          booking.bookingId === cancelBookingId
             ? { ...booking, status: 'CANCELLATION_REQUESTED' }
             : booking
         ));
-        setCancelStatus(prev => ({ ...prev, [id]: 'requested' }));
-        alert("Cancellation request submitted successfully!");
+        setCancelStatus(prev => ({ ...prev, [cancelBookingId]: 'requested' }));
+        alert('Cancellation request submitted successfully!');
       })
       .catch(error => {
         console.error('Cancellation failed:', error);
-        setCancelStatus(prev => ({ ...prev, [id]: 'error' }));
-        
-        // 详细的错误信息
+        setCancelStatus(prev => ({ ...prev, [cancelBookingId]: 'error' }));
         let errorMsg = 'Unknown error';
         if (error.response) {
           errorMsg = `Server error: ${error.response.status}`;
@@ -297,16 +309,20 @@ const BookingHistory = () => {
         } else {
           errorMsg = error.message;
         }
-        
         alert(`Cancellation failed: ${errorMsg}`);
       })
       .finally(() => {
         setCancellingId(null);
+        setCancelDialogOpen(false);
+        setCancelBookingId(null);
       });
-  } else {
-    setCancellingId(null);
-  }
-};
+  };
+
+  const handleCancelDialogClose = () => {
+    setCancelDialogOpen(false);
+    setCancelBookingId(null);
+    setCancelReason('');
+  };
 
   const handleLeaveReview = (id) => {
     console.log(`Leave review for booking ${id}`);
@@ -714,6 +730,34 @@ const BookingHistory = () => {
           </ModernButton>
         </Box>
       )}
+
+      {/* Cancel Reason Dialog */}
+      <Dialog open={cancelDialogOpen} onClose={handleCancelDialogClose} maxWidth="xs" fullWidth>
+        <DialogTitle>Cancel Booking</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Please provide a reason for cancelling this booking:
+          </Typography>
+          <TextField
+            label="Cancellation Reason"
+            value={cancelReason}
+            onChange={e => setCancelReason(e.target.value)}
+            fullWidth
+            required
+            multiline
+            minRows={3}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDialogClose} color="primary">
+            Back
+          </Button>
+          <Button onClick={handleConfirmCancel} color="error" variant="contained">
+            Confirm Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Footer */}
       <Box sx={{ mt: 8, textAlign: 'center', color: COLORS.neutral, opacity: 0.6 }}>

@@ -24,4 +24,7 @@ public class CancellationRequest {
 
     @Column(nullable = false, length = 50)
     private String status; // PENDING, APPROVED, REJECTED
+
+    @Column(name = "admin_remark")
+    private String adminRemark;
 }

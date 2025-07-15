@@ -8,6 +8,8 @@ import { FilterList, Search, SportsTennis } from '@mui/icons-material';
 import CourtService from '../../service/CourtService';
 import CourtCard from './CourtCard';
 import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
+
 
 const CourtPage = () => {
   const [courts, setCourts] = useState([]);

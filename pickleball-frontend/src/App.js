@@ -22,6 +22,7 @@ import BookingPage from './components/court/BookingPage';
 import BookingHistory from './components/court/BookingHistory';
 import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
 import PaymentPage from './components/court/PaymentPage';
+import WalletTopUpPage from './components/profile/WalletTopUpPage';
 import EventPage from './components/event/EventPage';
 import EventCreatePage from './components/event/EventCreatePage';
 import EventEditPage from './components/event/EventEditPage';
@@ -36,22 +37,6 @@ import AdminManageBookings from './components/admin/AdminManageBookings';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Token verification logic would go here
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return authToken ? children : <Navigate to="/login" replace />;
 };
 
@@ -147,6 +132,13 @@ function App() {
               <PaymentPage />
             </ProtectedRoute>
           } />
+        
+        {/* Wallet top-up page */}
+        <Route path="wallet/topup" element={
+          <ProtectedRoute>
+            <WalletTopUpPage />
+          </ProtectedRoute>
+        } />
 
           {/* Booking confirmation page */}
           <Route path="booking/confirmation" element={
