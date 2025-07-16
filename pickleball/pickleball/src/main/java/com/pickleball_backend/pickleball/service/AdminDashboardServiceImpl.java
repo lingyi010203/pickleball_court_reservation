@@ -341,6 +341,37 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 activities.add(dto);
             } catch (Exception ignore) {}
         });
+        // 最近取消预订
+        cancellationRequestRepository.findTop3ByOrderByRequestDateDesc().forEach(cr -> {
+            try {
+                RecentActivityDto dto = new RecentActivityDto();
+                dto.setType("cancellation");
+                String userName = "";
+                if (cr.getBooking() != null && cr.getBooking().getMember() != null && 
+                    cr.getBooking().getMember().getUser() != null && 
+                    cr.getBooking().getMember().getUser().getName() != null) {
+                    userName = cr.getBooking().getMember().getUser().getName();
+                }
+                dto.setUser(userName);
+                // 获取场地名
+                String courtName = "court";
+                if (cr.getBooking() != null && cr.getBooking().getBookingSlots() != null && !cr.getBooking().getBookingSlots().isEmpty()) {
+                    Integer courtId = null;
+                    if (cr.getBooking().getBookingSlots().get(0) != null && cr.getBooking().getBookingSlots().get(0).getSlot() != null) {
+                        courtId = cr.getBooking().getBookingSlots().get(0).getSlot().getCourtId();
+                    }
+                    if (courtId != null) {
+                        try {
+                            courtName = courtRepository.findById(courtId).map(c -> c.getName()).orElse("court");
+                        } catch (Exception ignore) {}
+                    }
+                }
+                dto.setDetail("cancelled " + courtName + " booking");
+                dto.setTimestamp(cr.getRequestDate());
+                dto.setIcon("\u274C"); // ❌
+                activities.add(dto);
+            } catch (Exception ignore) {}
+        });
         // 最近注册
         userRepository.findTop3ByOrderByCreatedAtDesc().forEach(u -> {
             try {

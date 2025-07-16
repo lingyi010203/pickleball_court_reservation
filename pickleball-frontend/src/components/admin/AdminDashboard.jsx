@@ -772,7 +772,12 @@ const AdminDashboard = () => {
                               {item.icon}
                             </Avatar>
                             <Box>
-                              <Typography fontWeight="bold">{item.type === 'booking' ? 'New Booking' : item.type === 'user' ? 'New User Registration' : 'New Review'}</Typography>
+                              <Typography fontWeight="bold">
+                                {item.type === 'booking' ? 'New Booking' : 
+                                 item.type === 'user' ? 'New User Registration' : 
+                                 item.type === 'cancellation' ? 'Booking Cancellation' :
+                                 'New Review'}
+                              </Typography>
                               <Typography variant="body2">{item.user} {item.detail}</Typography>
                               <Typography variant="caption" color="text.secondary">
                                 {dayjs(item.timestamp).fromNow()}
@@ -796,7 +801,12 @@ const AdminDashboard = () => {
                                 {item.icon}
                               </Avatar>
                               <Box>
-                                <Typography fontWeight="bold">{item.type === 'booking' ? 'New Booking' : item.type === 'user' ? 'New User Registration' : 'New Review'}</Typography>
+                                <Typography fontWeight="bold">
+                                  {item.type === 'booking' ? 'New Booking' : 
+                                   item.type === 'user' ? 'New User Registration' : 
+                                   item.type === 'cancellation' ? 'Booking Cancellation' :
+                                   'New Review'}
+                                </Typography>
                                 <Typography variant="body2">{item.user} {item.detail}</Typography>
                                 <Typography variant="caption" color="text.secondary">
                                   {dayjs(item.timestamp).fromNow()}

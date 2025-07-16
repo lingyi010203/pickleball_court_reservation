@@ -16,4 +16,6 @@ public interface CancellationRequestRepository extends JpaRepository<Cancellatio
             "JOIN FETCH m.user u " +
             "WHERE cr.status = :status")
     List<CancellationRequest> findByStatusWithRelations(@Param("status") String status);
+
+    List<CancellationRequest> findTop3ByOrderByRequestDateDesc();
 }

@@ -2,7 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -20,7 +20,7 @@ public class CancellationRequest {
     private String reason;
 
     @Column(name = "request_date", nullable = false)
-    private LocalDate requestDate;
+    private LocalDateTime requestDate;
 
     @Column(nullable = false, length = 50)
     private String status; // PENDING, APPROVED, REJECTED
