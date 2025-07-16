@@ -43,7 +43,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   FilterList as FilterIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Visibility as ViewIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -967,14 +968,25 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Tooltip title="Edit user">
-                        <IconButton
-                          onClick={() => handleOpenDialog(user)}
-                          disabled={loading}
-                        >
-                          <EditIcon color="primary" />
-                        </IconButton>
-                      </Tooltip>
+                      {user.status === 'DELETED' ? (
+                        <Tooltip title="View user details (read-only)">
+                          <IconButton
+                            onClick={() => handleOpenDialog(user)}
+                            disabled={loading}
+                          >
+                            <ViewIcon color="info" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title="Edit user">
+                          <IconButton
+                            onClick={() => handleOpenDialog(user)}
+                            disabled={loading}
+                          >
+                            <EditIcon color="primary" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Delete user">
                         <IconButton
                           onClick={() => handleOpenDeleteDialog(user)}

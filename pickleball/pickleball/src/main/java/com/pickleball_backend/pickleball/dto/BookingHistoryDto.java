@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.dto;
 
 import lombok.Data;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Data
@@ -14,7 +15,7 @@ public class BookingHistoryDto {
     private LocalTime endTime;
     private double amount;
     private String status; // UPCOMING, COMPLETED, CANCELLED
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
     private String purpose;
     private Integer players;
     private Integer courtNumber;

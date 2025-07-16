@@ -2,7 +2,7 @@ package com.pickleball_backend.pickleball.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
@@ -10,7 +10,7 @@ public class CancellationResponse {
     private Integer requestId;
     private Integer bookingId;
     private String status;
-    private LocalDate requestDate;
+    private LocalDateTime requestDate;
     private String message;
 
 

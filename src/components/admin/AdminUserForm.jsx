@@ -25,6 +25,9 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Check if user is deleted for read-only mode
+  const isReadOnly = user && user.status === 'DELETED';
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -43,6 +46,9 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
   }, [user]);
 
   const handleChange = (e) => {
+    // Don't allow changes if in read-only mode
+    if (isReadOnly) return;
+    
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -52,6 +58,13 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Don't submit if in read-only mode
+    if (isReadOnly) {
+      onClose();
+      return;
+    }
+    
     setLoading(true);
     setError('');
     
@@ -88,6 +101,12 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+      {isReadOnly && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          This user has been deleted. You can view their details but cannot make changes.
+        </Alert>
+      )}
+      
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <TextField
@@ -98,6 +117,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             onChange={handleChange}
             required
             margin="normal"
+            disabled={isReadOnly}
           />
         </Grid>
         <Grid item xs={12} md={6}>
@@ -110,6 +130,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             onChange={handleChange}
             required
             margin="normal"
+            disabled={isReadOnly}
           />
         </Grid>
         
@@ -121,6 +142,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             value={formData.phone}
             onChange={handleChange}
             margin="normal"
+            disabled={isReadOnly}
           />
         </Grid>
         <Grid item xs={12} md={6}>
@@ -133,6 +155,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             onChange={handleChange}
             InputLabelProps={{ shrink: true }}
             margin="normal"
+            disabled={isReadOnly}
           />
         </Grid>
         
@@ -144,6 +167,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
               value={formData.gender}
               onChange={handleChange}
               label="Gender"
+              disabled={isReadOnly}
             >
               <MenuItem value="Male">Male</MenuItem>
               <MenuItem value="Female">Female</MenuItem>
@@ -161,6 +185,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
               onChange={handleChange}
               label="Role"
               required
+              disabled={isReadOnly}
             >
               <MenuItem value="User">User</MenuItem>
               <MenuItem value="Coach">Coach</MenuItem>
@@ -178,12 +203,12 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             value={formData.username}
             onChange={handleChange}
             required={!user}
-            disabled={!!user}
+            disabled={!!user || isReadOnly}
             margin="normal"
           />
         </Grid>
         
-        {!user && (
+        {!user && !isReadOnly && (
           <>
             <Grid item xs={12} md={6}>
               <FormControlLabel
@@ -192,6 +217,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
                     checked={formData.generatePassword}
                     onChange={handleChange}
                     name="generatePassword"
+                    disabled={isReadOnly}
                   />
                 }
                 label="Generate random password"
@@ -209,6 +235,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
                   onChange={handleChange}
                   required
                   margin="normal"
+                  disabled={isReadOnly}
                 />
               </Grid>
             )}
@@ -223,6 +250,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
               value={formData.status}
               onChange={handleChange}
               label="Status"
+              disabled={isReadOnly}
             >
               <MenuItem value="ACTIVE">Active</MenuItem>
               <MenuItem value="INACTIVE">Inactive</MenuItem>
@@ -242,16 +270,18 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
         
         <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
           <Button variant="outlined" onClick={onClose} disabled={loading}>
-            Cancel
+            {isReadOnly ? 'Close' : 'Cancel'}
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
-            disabled={loading}
-            sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
-          >
-            {loading ? <CircularProgress size={24} /> : user ? 'Update User' : 'Create User'}
-          </Button>
+          {!isReadOnly && (
+            <Button 
+              type="submit" 
+              variant="contained" 
+              disabled={loading}
+              sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+            >
+              {loading ? <CircularProgress size={24} /> : user ? 'Update User' : 'Create User'}
+            </Button>
+          )}
         </Grid>
       </Grid>
     </Box>

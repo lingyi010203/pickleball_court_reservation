@@ -6,44 +6,51 @@ import {
   ListItemText, Divider, Chip, Select,
   MenuItem, InputLabel, FormControl,
   Checkbox, FormControlLabel, TextField,
-  IconButton, Backdrop, CircularProgress
+  IconButton, Backdrop, CircularProgress,
+  Dialog, DialogTitle, DialogContent
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  BarChart as ReportsIcon,
-  People as UsersIcon,
   Event as BookingsIcon,
   SportsTennis as CourtsIcon,
   Settings as SettingsIcon,
   Notifications as NotificationsIcon,
   Search as SearchIcon,
   Logout as LogoutIcon,
-  ArrowBack as BackIcon,
   CardMembership as TierIcon,
-  People as PeopleIcon
+  People as PeopleIcon,
+  BarChart as BarChartIcon,
+  EventNote as EventNoteIcon,
+  AttachMoney as AttachMoneyIcon,
+  Analytics as AnalyticsIcon,
+  ArrowForward as ArrowForwardIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  TableChart as TableChartIcon,
+  GridOn as GridOnIcon,
+  FileDownload as FileDownloadIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import UserService from '../../service/UserService';
-import AdminManageUsers from './AdminManageUsers';
-import AdminManageCourts from './AdminManageCourts';
-import AdminManageTiers from './AdminManageTiers';
-import AdminModerationDashboard from './AdminModerationDashboard';
-import AdminManageBookings from './AdminManageBookings';
 import axios from 'axios';
 import { Chart } from 'chart.js/auto';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(relativeTime);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const bookingChartRef = useRef(null);
-  const engagementChartRef = useRef(null);
+  const revenueChartRef = useRef(null);
   const bookingChartInstance = useRef(null);
-  const engagementChartInstance = useRef(null);
+  const revenueChartInstance = useRef(null);
 
   const [adminUsername, setAdminUsername] = useState(UserService.getAdminUsername() || 'Admin');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
-  const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [bookingTrendsLoading, setBookingTrendsLoading] = useState(true);
+  const [revenueTrendsLoading, setRevenueTrendsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     totalUsers: 0,
     totalUsersChange: 0,
@@ -65,93 +72,205 @@ const AdminDashboard = () => {
     includeRevenue: true
   });
 
-  const [bookingTimeRange, setBookingTimeRange] = useState('month');
-  const [engagementTimeRange, setEngagementTimeRange] = useState('month');
+  const [bookingTimeRange, setBookingTimeRange] = useState('7d');
+  const [revenueTimeRange, setRevenueTimeRange] = useState('7d');
+  const [bookingTrends, setBookingTrends] = useState({ labels: [], data: [] });
+  const [revenueTrends, setRevenueTrends] = useState({ labels: [], data: [] });
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+
+  // Fetch Booking Trends from backend
+  useEffect(() => {
+    setBookingTrendsLoading(true);
+    const fetchBookingTrends = async () => {
+      try {
+        const token = UserService.getAdminToken();
+        const res = await axios.get(
+          `http://localhost:8081/api/admin/dashboard/booking-trends?range=${bookingTimeRange}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setBookingTrends(res.data);
+      } catch (err) {
+        setBookingTrends({ labels: [], data: [] });
+      } finally {
+        setBookingTrendsLoading(false);
+      }
+    };
+    fetchBookingTrends();
+  }, [bookingTimeRange]);
+
+  // Fetch Revenue Trends from backend
+  useEffect(() => {
+    setRevenueTrendsLoading(true);
+    const fetchRevenueTrends = async () => {
+      try {
+        const token = UserService.getAdminToken();
+        const res = await axios.get(
+          `http://localhost:8081/api/admin/dashboard/revenue-trends?range=${revenueTimeRange}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setRevenueTrends(res.data);
+      } catch (err) {
+        setRevenueTrends({ labels: [], data: [] });
+      } finally {
+        setRevenueTrendsLoading(false);
+      }
+    };
+    fetchRevenueTrends();
+  }, [revenueTimeRange]);
+
+  // 拆分图表初始化函数
+  const initBookingChart = () => {
+    if (bookingChartInstance.current) {
+      bookingChartInstance.current.destroy();
+    }
+    const ctx = bookingChartRef.current;
+    if (!ctx) return;
+    // 动态设置 canvas 宽高为父容器实际像素宽高
+    const parent = ctx.parentElement;
+    if (parent) {
+      ctx.width = parent.offsetWidth;
+      ctx.height = parent.offsetHeight;
+    }
+    bookingChartInstance.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: formatLabels(bookingTrends.labels, bookingTimeRange),
+        datasets: [
+          {
+            label: 'Bookings',
+            data: bookingTrends.data,
+            borderColor: '#1976d2',
+            backgroundColor: 'rgba(25, 118, 210, 0.1)',
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true },
+        },
+      },
+    });
+  };
+
+  const initRevenueChart = () => {
+    if (revenueChartInstance.current) {
+      revenueChartInstance.current.destroy();
+    }
+    const ctx = revenueChartRef.current;
+    if (!ctx) return;
+    // 动态设置 canvas 宽高为父容器实际像素宽高
+    const parent = ctx.parentElement;
+    if (parent) {
+      ctx.width = parent.offsetWidth;
+      ctx.height = parent.offsetHeight;
+    }
+    revenueChartInstance.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: formatLabels(revenueTrends.labels, revenueTimeRange),
+        datasets: [
+          {
+            label: 'Revenue',
+            data: revenueTrends.data,
+            borderColor: '#43a047',
+            backgroundColor: 'rgba(67, 160, 71, 0.1)',
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true },
+        },
+      },
+    });
+  };
+
+  // useEffect 分别监听
+  useEffect(() => {
+    initBookingChart();
+    // eslint-disable-next-line
+  }, [bookingTrends.labels, bookingTrends.data, bookingTimeRange]);
 
   useEffect(() => {
-    const username = UserService.getAdminUsername() || 'Admin';
-    setAdminUsername(username);
+    initRevenueChart();
+    // eslint-disable-next-line
+  }, [revenueTrends.labels, revenueTrends.data, revenueTimeRange]);
+
+  useEffect(() => {
     fetchDashboardData();
-    return () => destroyCharts();
   }, []);
-
-  useEffect(() => {
-    initCharts();
-  }, [bookingTimeRange, engagementTimeRange]);
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      setSummaryLoading(true);
       const token = UserService.getAdminToken();
-
-      // 分别获取用户数据和预订数据
-      const [usersResponse, bookingsResponse] = await Promise.all([
-        axios.get('http://localhost:8081/api/admin/dashboard/users/count', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('http://localhost:8081/api/admin/dashboard/bookings', {
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(() => ({ data: [] })) // 预订API失败时返回空数组
-      ]);
-
-      // 处理用户数据
-      const totalUsers = Number(usersResponse.data);
-
-      // 处理预订数据（分页对象）
-      const bookingsPage = bookingsResponse.data;
-      const bookings = bookingsPage.content || [];
-      const totalBookings = bookingsPage.totalElements || 0;
-      const totalRevenue = bookings.reduce(
-        (sum, booking) => sum + (booking.totalAmount || 0),
-        0
-      );
-
-      console.log('Setting dashboard data:', {
-        totalUsers,
-        totalUsersChange: 12,
-        totalBookings,
-        totalBookingsChange: 8,
-        totalRevenue,
-        totalRevenueChange: 15,
-        averageRating: 4.7,
-        averageRatingChange: 0.2
+      const response = await axios.get('http://localhost:8081/api/admin/dashboard/summary', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
+      const data = response.data;
       setDashboardData({
-        totalUsers,
-        totalUsersChange: 12,
-        totalBookings,
-        totalBookingsChange: 8,
-        totalRevenue,
-        totalRevenueChange: 15, // Mock percentage change
-        averageRating,
-        averageRatingChange: 0.2 // Mock data
-        totalRevenueChange: 15,
-        averageRating,
-        averageRatingChange: 0.2
+        totalUsers: data.totalUsers,
+        totalUsersChange: data.totalUsersChange,
+        totalBookings: data.totalBookings,
+        totalBookingsChange: data.totalBookingsChange,
+        totalRevenue: data.totalRevenue,
+        totalRevenueChange: data.totalRevenueChange,
+        averageRating: data.averageRating,
+        averageRatingChange: data.averageRatingChange
       });
-
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      // 仅重置受影响的部分，保留用户数据
+      console.error('Error fetching dashboard summary:', error);
       setDashboardData(prev => ({
         ...prev,
         totalBookings: 0,
         totalRevenue: 0
       }));
     } finally {
-      setLoading(false);
+      setSummaryLoading(false);
     }
   };
+
+  const fetchRecentActivity = async () => {
+    try {
+      const token = UserService.getAdminToken();
+      const res = await axios.get('http://localhost:8081/api/admin/dashboard/recent-activity', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRecentActivity(res.data);
+    } catch (err) {
+      setRecentActivity([]);
+    }
+  };
+
+  useEffect(() => {
+    if (getCurrentTab() === 'dashboard') {
+      fetchRecentActivity();
+    }
+  }, [location.pathname]);
 
   const destroyCharts = () => {
     if (bookingChartInstance.current) {
       bookingChartInstance.current.destroy();
       bookingChartInstance.current = null;
     }
-    if (engagementChartInstance.current) {
-      engagementChartInstance.current.destroy();
-      engagementChartInstance.current = null;
+    if (revenueChartInstance.current) {
+      revenueChartInstance.current.destroy();
+      revenueChartInstance.current = null;
     }
   };
 
@@ -194,49 +313,29 @@ const AdminDashboard = () => {
     }
   };
 
-  const initCharts = () => {
-    destroyCharts();
-
-    // Booking Trends Chart
-    if (bookingChartRef.current) {
-      const bookingCtx = bookingChartRef.current.getContext('2d');
-      bookingChartInstance.current = new Chart(bookingCtx, {
-        type: 'line',
-        data: {
-          labels: getBookingLabels(bookingTimeRange),
-          datasets: [{
-            label: 'Bookings',
-            data: getBookingData(bookingTimeRange),
-            borderColor: '#667eea',
-            tension: 0.4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false
+  // 格式化 labels 工具函数
+  const formatLabels = (labels, range) => {
+    if (range === '7d' || range === '30d') {
+      // yyyy-MM-dd -> MM-dd
+      return labels.map(dateStr => {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          return `${parts[1]}-${parts[2]}`;
         }
+        return dateStr;
+      });
+    } else if (range === '12m') {
+      // yyyy-MM -> MMM yy
+      return labels.map(monthStr => {
+        const [year, month] = monthStr.split('-');
+        if (year && month) {
+          const d = new Date(Number(year), Number(month) - 1);
+          return d.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        }
+        return monthStr;
       });
     }
-
-    // User Engagement Chart
-    if (engagementChartRef.current) {
-      const engagementCtx = engagementChartRef.current.getContext('2d');
-      engagementChartInstance.current = new Chart(engagementCtx, {
-        type: 'bar',
-        data: {
-          labels: getBookingLabels(engagementTimeRange),
-          datasets: [{
-            label: 'Active Users',
-            data: getEngagementData(engagementTimeRange),
-            backgroundColor: '#764ba2'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false
-        }
-      });
-    }
+    return labels;
   };
 
   const handleLogout = () => {
@@ -244,14 +343,33 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
-  const generateReport = () => {
-    console.log('Generating report...', {
-      type: reportType,
-      startDate,
-      endDate,
-      format: exportFormat,
-      filters
-    });
+  const generateReport = async () => {
+    try {
+      const token = UserService.getAdminToken();
+      const res = await axios.post(
+        'http://localhost:8081/api/admin/dashboard/generate-report',
+        {
+          type: reportType,
+          startDate,
+          endDate,
+          format: exportFormat,
+          filters
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `report.${exportFormat === 'excel' ? 'xlsx' : exportFormat}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert('Failed to generate report');
+    }
   };
 
   const handleFilterChange = (filter) => (event) => {
@@ -274,7 +392,8 @@ const AdminDashboard = () => {
     if (location.pathname.startsWith('/admin/bookings')) return 'bookings';
     return 'dashboard';
   };
-  const currentTab = getCurrentTab();
+  // 页面主 loading 状态
+  const loading = summaryLoading || bookingTrendsLoading || revenueTrendsLoading;
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
@@ -319,19 +438,19 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentTab === 'dashboard' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'dashboard' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{
               minWidth: 40,
-              color: currentTab === 'dashboard' ? 'primary.main' : 'inherit'
+              color: getCurrentTab() === 'dashboard' ? 'primary.main' : 'inherit'
             }}>
               <DashboardIcon />
             </ListItemIcon>
             <ListItemText
               primary="Dashboard"
               primaryTypographyProps={{
-                fontWeight: currentTab === 'dashboard' ? 'bold' : 'normal'
+                fontWeight: getCurrentTab() === 'dashboard' ? 'bold' : 'normal'
               }}
             />
           </ListItem>
@@ -341,7 +460,7 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentTab === 'users' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'users' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -355,7 +474,7 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentTab === 'courts' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'courts' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -369,7 +488,7 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentTab === 'tiers' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'tiers' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -383,7 +502,7 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: currentTab === 'bookings' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'bookings' ? '#f0f2f5' : 'inherit'
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -391,21 +510,6 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Manage Bookings" />
           </ListItem>
-
-           <ListItem
-                      button
-                      onClick={() => setCurrentView('moderation')}
-                      sx={{
-                        borderRadius: 1,
-                        mb: 0.5,
-                        bgcolor: currentView === 'moderation' ? '#f0f2f5' : 'inherit'
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <PeopleIcon />
-                      </ListItemIcon>
-                      <ListItemText primary="Moderation Dashboard" />
-                    </ListItem>
           <ListItem button sx={{ borderRadius: 1 }}>
             <ListItemIcon sx={{ minWidth: 40 }}>
               <SettingsIcon />
@@ -493,8 +597,7 @@ const AdminDashboard = () => {
             </Box>
           </Box>
         </Box>
-        {/* Main Content Routing */}
-        {currentTab === 'dashboard' && (location.pathname === '/admin/dashboard' || location.pathname === '/admin') ? (
+        {getCurrentTab() === 'dashboard' && (location.pathname === '/admin/dashboard' || location.pathname === '/admin') ? (
           <>
             {/* Overview Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -518,7 +621,7 @@ const AdminDashboard = () => {
                       sx={{ color: dashboardData.totalUsersChange >= 0 ? 'success.main' : 'error.main' }}
                     >
                       {dashboardData.totalUsersChange >= 0 ? '+' : ''}
-                      {dashboardData.totalUsersChange}% from last month
+                      {dashboardData.totalUsersChange.toFixed(1)}% from last month
                     </Typography>
                   </Box>
                 </Paper>
@@ -544,7 +647,7 @@ const AdminDashboard = () => {
                       sx={{ color: dashboardData.totalBookingsChange >= 0 ? 'success.main' : 'error.main' }}
                     >
                       {dashboardData.totalBookingsChange >= 0 ? '+' : ''}
-                      {dashboardData.totalBookingsChange}% from last month
+                      {dashboardData.totalBookingsChange.toFixed(1)}% from last month
                     </Typography>
                   </Box>
                 </Paper>
@@ -570,7 +673,7 @@ const AdminDashboard = () => {
                       sx={{ color: dashboardData.totalRevenueChange >= 0 ? 'success.main' : 'error.main' }}
                     >
                       {dashboardData.totalRevenueChange >= 0 ? '+' : ''}
-                      {dashboardData.totalRevenueChange}% from last month
+                      {dashboardData.totalRevenueChange.toFixed(1)}% from last month
                     </Typography>
                   </Box>
                 </Paper>
@@ -596,7 +699,7 @@ const AdminDashboard = () => {
                       sx={{ color: dashboardData.averageRatingChange >= 0 ? 'success.main' : 'error.main' }}
                     >
                       {dashboardData.averageRatingChange >= 0 ? '+' : ''}
-                      {dashboardData.averageRatingChange} from last month
+                      {dashboardData.averageRatingChange.toFixed(1)} from last month
                     </Typography>
                   </Box>
                 </Paper>
@@ -605,8 +708,8 @@ const AdminDashboard = () => {
 
             {/* Charts Section */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} lg={6}>
-                <Paper sx={{ p: 2, height: 400 }}>
+              <Grid item xs={12} md={6} lg={6}>
+                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">Booking Trends</Typography>
                     <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -614,35 +717,35 @@ const AdminDashboard = () => {
                         value={bookingTimeRange}
                         onChange={(e) => setBookingTimeRange(e.target.value)}
                       >
-                        <MenuItem value="week">Last Week</MenuItem>
-                        <MenuItem value="month">Last Month</MenuItem>
-                        <MenuItem value="year">Last Year</MenuItem>
+                        <MenuItem value="7d">Last 7 Days</MenuItem>
+                        <MenuItem value="30d">Last 30 Days</MenuItem>
+                        <MenuItem value="12m">Last 12 Months</MenuItem>
                       </Select>
                     </FormControl>
                   </Box>
                   <Box sx={{ height: 'calc(100% - 40px)' }}>
-                    <canvas ref={bookingChartRef} />
+                    <canvas ref={bookingChartRef} style={{ width: '100%', height: '100%' }} />
                   </Box>
                 </Paper>
               </Grid>
 
-              <Grid item xs={12} lg={6}>
-                <Paper sx={{ p: 2, height: 400 }}>
+              <Grid item xs={12} md={6} lg={6}>
+                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6">User Engagement</Typography>
+                    <Typography variant="h6">Revenue Trends</Typography>
                     <FormControl size="small" sx={{ minWidth: 120 }}>
                       <Select
-                        value={engagementTimeRange}
-                        onChange={(e) => setEngagementTimeRange(e.target.value)}
+                        value={revenueTimeRange}
+                        onChange={(e) => setRevenueTimeRange(e.target.value)}
                       >
-                        <MenuItem value="week">Last Week</MenuItem>
-                        <MenuItem value="month">Last Month</MenuItem>
-                        <MenuItem value="year">Last Year</MenuItem>
+                        <MenuItem value="7d">Last 7 Days</MenuItem>
+                        <MenuItem value="30d">Last 30 Days</MenuItem>
+                        <MenuItem value="12m">Last 12 Months</MenuItem>
                       </Select>
                     </FormControl>
                   </Box>
                   <Box sx={{ height: 'calc(100% - 40px)' }}>
-                    <canvas ref={engagementChartRef} />
+                    <canvas ref={revenueChartRef} style={{ width: '100%', height: '100%' }} />
                   </Box>
                 </Paper>
               </Grid>
@@ -654,81 +757,160 @@ const AdminDashboard = () => {
                 <Paper sx={{ p: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">Recent Activity</Typography>
-                    <Button size="small">View All</Button>
+                    <Button size="small" onClick={() => setActivityDialogOpen(true)} disabled={recentActivity.length <= 4}>View All</Button>
                   </Box>
-
                   <List>
-                    <ListItem sx={{ alignItems: 'flex-start' }}>
-                      <Avatar sx={{ bgcolor: 'grey.100', color: 'text.primary', mr: 2 }}>
-                        📅
-                      </Avatar>
-                      <Box>
-                        <Typography fontWeight="bold">New Booking</Typography>
-                        <Typography variant="body2">John Doe booked Conference Room A</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          2 minutes ago
-                        </Typography>
-                      </Box>
-                    </ListItem>
-
-                    <Divider component="li" sx={{ my: 1 }} />
-
-                    <ListItem sx={{ alignItems: 'flex-start' }}>
-                      <Avatar sx={{ bgcolor: 'grey.100', color: 'text.primary', mr: 2 }}>
-                        👤
-                      </Avatar>
-                      <Box>
-                        <Typography fontWeight="bold">New User Registration</Typography>
-                        <Typography variant="body2">Jane Smith created an account</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          15 minutes ago
-                        </Typography>
-                      </Box>
-                    </ListItem>
-
-                    <Divider component="li" sx={{ my: 1 }} />
-
-                    <ListItem sx={{ alignItems: 'flex-start' }}>
-                      <Avatar sx={{ bgcolor: 'grey.100', color: 'text.primary', mr: 2 }}>
-                        ⭐
-                      </Avatar>
-                      <Box>
-                        <Typography fontWeight="bold">New Review</Typography>
-                        <Typography variant="body2">Mike Johnson rated a venue 5 stars</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          1 hour ago
-                        </Typography>
-                      </Box>
-                    </ListItem>
+                    {recentActivity.length === 0 ? (
+                      <ListItem>
+                        <ListItemText primary="No recent activity." />
+                      </ListItem>
+                    ) : (
+                      recentActivity.slice(0, 4).map((item, idx) => (
+                        <React.Fragment key={idx}>
+                          <ListItem sx={{ alignItems: 'flex-start' }}>
+                            <Avatar sx={{ bgcolor: 'grey.100', color: 'text.primary', mr: 2 }}>
+                              {item.icon}
+                            </Avatar>
+                            <Box>
+                              <Typography fontWeight="bold">
+                                {item.type === 'booking' ? 'New Booking' :
+                                 item.type === 'user' ? 'New User Registration' :
+                                 item.type === 'cancellation' ? 'Booking Cancellation' :
+                                 'New Review'}
+                              </Typography>
+                              <Typography variant="body2">{item.user} {item.detail}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {dayjs(item.timestamp).fromNow()}
+                              </Typography>
+                            </Box>
+                          </ListItem>
+                          {idx !== Math.min(recentActivity.length, 4) - 1 && <Divider component="li" sx={{ my: 1 }} />}
+                        </React.Fragment>
+                      ))
+                    )}
                   </List>
+                  {/* Dialog for all activity */}
+                  <Dialog open={activityDialogOpen} onClose={() => setActivityDialogOpen(false)} maxWidth="sm" fullWidth>
+                    <DialogTitle>All Recent Activity</DialogTitle>
+                    <DialogContent>
+                      <List>
+                        {recentActivity.map((item, idx) => (
+                          <React.Fragment key={idx}>
+                            <ListItem sx={{ alignItems: 'flex-start' }}>
+                              <Avatar sx={{ bgcolor: 'grey.100', color: 'text.primary', mr: 2 }}>
+                                {item.icon}
+                              </Avatar>
+                              <Box>
+                                <Typography fontWeight="bold">
+                                  {item.type === 'booking' ? 'New Booking' :
+                                   item.type === 'user' ? 'New User Registration' :
+                                   item.type === 'cancellation' ? 'Booking Cancellation' :
+                                   'New Review'}
+                                </Typography>
+                                <Typography variant="body2">{item.user} {item.detail}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {dayjs(item.timestamp).fromNow()}
+                                </Typography>
+                              </Box>
+                            </ListItem>
+                            {idx !== recentActivity.length - 1 && <Divider component="li" sx={{ my: 1 }} />}
+                          </React.Fragment>
+                        ))}
+                      </List>
+                    </DialogContent>
+                  </Dialog>
                 </Paper>
               </Grid>
 
-              {/* Report Section */}
-              <Grid item xs={12} md={4}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Generate Reports</Typography>
+              {/* Report Section - 美化版 */}
+              {/* 在您的 AdminDashboard.jsx 文件中替换现有的报告生成部分 */}
+              <Grid item xs={12} md={8}>
+                <Paper sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+                  background: 'linear-gradient(145deg, #ffffff, #f8f9ff)',
+                  border: '1px solid rgba(100, 110, 230, 0.15)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&:before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: '100%',
+                    height: '4px',
+                    background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                  }
+                }}>
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    mb: 2.5,
+                    position: 'relative'
+                  }}>
+                    <BarChartIcon sx={{
+                      color: '#667eea',
+                      fontSize: 28,
+                      mr: 1.5,
+                      bgcolor: 'rgba(102, 126, 234, 0.1)',
+                      p: 1,
+                      borderRadius: 1
+                    }} />
+                    <Typography variant="h6" sx={{
+                      fontWeight: 700,
+                      color: '#2d3748'
+                    }}>
+                      Generate Reports
+                    </Typography>
+                  </Box>
 
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2.5}>
                     <Grid item xs={12}>
                       <FormControl fullWidth size="small">
-                        <InputLabel>Report Type</InputLabel>
+                        <InputLabel sx={{ fontWeight: 500 }}>Report Type</InputLabel>
                         <Select
                           value={reportType}
                           onChange={(e) => setReportType(e.target.value)}
                           label="Report Type"
+                          sx={{
+                            '& .MuiSelect-select': {
+                              py: 1.2,
+                              fontWeight: 500
+                            }
+                          }}
                         >
-                          <MenuItem value="bookings">Booking Report</MenuItem>
-                          <MenuItem value="users">User Report</MenuItem>
-                          <MenuItem value="revenue">Revenue Report</MenuItem>
-                          <MenuItem value="analytics">Analytics Report</MenuItem>
+                          <MenuItem value="bookings" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <EventNoteIcon sx={{ color: '#667eea', mr: 1.5 }} />
+                              <span>Booking Report</span>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="users" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <PeopleIcon sx={{ color: '#667eea', mr: 1.5 }} />
+                              <span>User Report</span>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="revenue" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <AttachMoneyIcon sx={{ color: '#667eea', mr: 1.5 }} />
+                              <span>Revenue Report</span>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="analytics" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <AnalyticsIcon sx={{ color: '#667eea', mr: 1.5 }} />
+                              <span>Analytics Report</span>
+                            </Box>
+                          </MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
 
                     <Grid item xs={12}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>Date Range</Typography>
-                      <Grid container spacing={1}>
+
+                      <Grid container spacing={1.5}>
                         <Grid item xs={5}>
                           <TextField
                             fullWidth
@@ -737,10 +919,21 @@ const AdminDashboard = () => {
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              sx: {
+                                py: 1.2,
+                                fontWeight: 500
+                              }
+                            }}
+                            label="Start Date"
                           />
                         </Grid>
-                        <Grid item xs={2} sx={{ textAlign: 'center', pt: 1 }}>
-                          to
+                        <Grid item xs={2} sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <ArrowForwardIcon sx={{ color: '#a0aec0' }} />
                         </Grid>
                         <Grid item xs={5}>
                           <TextField
@@ -750,6 +943,13 @@ const AdminDashboard = () => {
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                             InputLabelProps={{ shrink: true }}
+                            InputProps={{
+                              sx: {
+                                py: 1.2,
+                                fontWeight: 500
+                              }
+                            }}
+                            label="End Date"
                           />
                         </Grid>
                       </Grid>
@@ -757,31 +957,70 @@ const AdminDashboard = () => {
 
                     <Grid item xs={12}>
                       <FormControl fullWidth size="small">
-                        <InputLabel>Export Format</InputLabel>
+                        <InputLabel sx={{ fontWeight: 500 }}>Export Format</InputLabel>
                         <Select
                           value={exportFormat}
                           onChange={(e) => setExportFormat(e.target.value)}
                           label="Export Format"
+                          sx={{
+                            '& .MuiSelect-select': {
+                              py: 1.2,
+                              fontWeight: 500
+                            }
+                          }}
                         >
-                          <MenuItem value="pdf">PDF</MenuItem>
-                          <MenuItem value="excel">Excel</MenuItem>
-                          <MenuItem value="csv">CSV</MenuItem>
+                          <MenuItem value="pdf" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <PictureAsPdfIcon sx={{ color: '#e53e3e', mr: 1.5 }} />
+                              <span>PDF Document</span>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="excel" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <TableChartIcon sx={{ color: '#38a169', mr: 1.5 }} />
+                              <span>Excel Spreadsheet</span>
+                            </Box>
+                          </MenuItem>
+                          <MenuItem value="csv" sx={{ py: 1.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <GridOnIcon sx={{ color: '#3182ce', mr: 1.5 }} />
+                              <span>CSV File</span>
+                            </Box>
+                          </MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
 
                     <Grid item xs={12}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>Filters</Typography>
-                      <Box>
+                      <Typography variant="subtitle1" sx={{
+                        fontWeight: 600,
+                        mb: 1.5,
+                        color: '#4a5568'
+                      }}>
+                        Report Options
+                      </Typography>
+                      <Paper sx={{
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: '#f8f9ff',
+                        border: '1px solid rgba(102, 126, 234, 0.15)'
+                      }}>
                         <FormControlLabel
                           control={
                             <Checkbox
                               checked={filters.includeUsers}
                               onChange={handleFilterChange('includeUsers')}
                               size="small"
+                              color="primary"
+                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
                             />
                           }
-                          label="Include User Details"
+                          label={
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              Include User Details
+                            </Typography>
+                          }
+                          sx={{ mb: 1.2 }}
                         />
                         <FormControlLabel
                           control={
@@ -789,9 +1028,16 @@ const AdminDashboard = () => {
                               checked={filters.includeBookings}
                               onChange={handleFilterChange('includeBookings')}
                               size="small"
+                              color="primary"
+                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
                             />
                           }
-                          label="Include Booking Details"
+                          label={
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              Include Booking Details
+                            </Typography>
+                          }
+                          sx={{ mb: 1.2 }}
                         />
                         <FormControlLabel
                           control={
@@ -799,26 +1045,54 @@ const AdminDashboard = () => {
                               checked={filters.includeRevenue}
                               onChange={handleFilterChange('includeRevenue')}
                               size="small"
+                              color="primary"
+                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
                             />
                           }
-                          label="Include Revenue Data"
+                          label={
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              Include Revenue Data
+                            </Typography>
+                          }
                         />
-                      </Box>
+                      </Paper>
                     </Grid>
 
-                    <Grid item xs={12}>
+                    <Grid item xs={12} sx={{ mt: 1 }}>
                       <Button
                         fullWidth
                         variant="contained"
                         onClick={generateReport}
-                        sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+                        startIcon={<FileDownloadIcon />}
+                        sx={{
+                          py: 1.5,
+                          fontWeight: 600,
+                          fontSize: '0.95rem',
+                          letterSpacing: '0.5px',
+                          borderRadius: 1.5,
+                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                          background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                          '&:hover': {
+                            boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                            background: 'linear-gradient(90deg, #5c6bc0, #6a45a2)'
+                          }
+                        }}
                       >
                         Generate Report
                       </Button>
+                      <Typography variant="caption" sx={{
+                        display: 'block',
+                        textAlign: 'center',
+                        mt: 1.5,
+                        color: '#718096'
+                      }}>
+                        Reports are generated and will be downloaded soon.
+                      </Typography>
                     </Grid>
                   </Grid>
                 </Paper>
               </Grid>
+
             </Grid>
           </>
         ) : null}

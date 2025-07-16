@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     long countByUserAccount_Status(String status);
     List<User> findByNameContainingIgnoreCaseOrUserAccount_UsernameContainingIgnoreCase(String name, String username);
 
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
     @Query("SELECT u FROM User u " +
             "JOIN u.userAccount ua " +
             "WHERE (:search IS NULL OR u.name LIKE %:search% OR u.email LIKE %:search%) " +
@@ -34,6 +37,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             @Param("status") String status,
             @Param("userType") String userType,
             Pageable pageable);
+
+    java.util.List<User> findTop3ByOrderByCreatedAtDesc();
 
     List<User> findByUserTypeIn(List<String> userTypes);
 
@@ -61,4 +66,5 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     // Fixed: Use UserAccount relationship
     @Query("SELECT u FROM User u JOIN u.userAccount ua WHERE LOWER(ua.username) = LOWER(:username)")
     Optional<User> findByUsernameCaseInsensitive(@Param("username") String username);
+
 }

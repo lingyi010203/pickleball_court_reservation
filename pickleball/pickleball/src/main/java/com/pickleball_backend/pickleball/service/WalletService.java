@@ -84,7 +84,7 @@ public class WalletService {
         // 7. Create payment record
         Payment payment = new Payment();
         payment.setAmount(request.getAmount());
-        payment.setPaymentDate(LocalDate.now());
+        payment.setPaymentDate(java.time.LocalDateTime.now());
         payment.setStatus("COMPLETED");
         payment.setPaymentType("TOP_UP");
         payment.setPaymentMethod(request.getSource());

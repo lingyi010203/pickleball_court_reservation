@@ -15,8 +15,8 @@ public class Payment {
     @Column(nullable = false, columnDefinition = "double(5,2)")
     private double amount;
 
-    @Column(name = "payment_date", nullable = false)
-    private LocalDate paymentDate;
+    @Column(name = "payment_date")
+    private java.time.LocalDateTime paymentDate;
 
     @Column(name = "status", length = 50)
     private String status = "COMPLETED";

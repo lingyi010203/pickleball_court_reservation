@@ -101,7 +101,8 @@ public class BookingService {
         // 7. Process wallet payment if requested
         Payment payment = new Payment();
         payment.setAmount(amount);
-        payment.setPaymentDate(LocalDate.now());
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setPaymentType("BOOKING");
 
         if (request.isUseWallet()) {
             if (wallet.getBalance() < amount) {
@@ -119,7 +120,7 @@ public class BookingService {
 
         // 8. Create booking
         Booking booking = new Booking();
-        booking.setBookingDate(LocalDate.now());
+        booking.setBookingDate(LocalDateTime.now());
         booking.setTotalAmount(amount);
         String bookingStatus = "CONFIRMED";
         if (bookingStatus.length() > 50) {
@@ -267,30 +268,107 @@ public class BookingService {
 
         // 4. 获取时间段信息
         Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
-
-        // 5. 检查取消资格（1小时限制）
+        if (slot == null) {
+            throw new ValidationException("No slot found for this booking");
+        }
         LocalDateTime slotDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+        long hours = java.time.temporal.ChronoUnit.HOURS.between(LocalDateTime.now(), slotDateTime);
+
+        // 5. 自动批准逻辑
+        if (hours > 24) {
+            // 1. Free up the slot
+            slot.setAvailable(true);
+            slotRepository.save(slot);
+
+            // 2. Update booking status
+            String bookingStatus = "CANCELLED";
+            if (bookingStatus.length() > 50) {
+                bookingStatus = bookingStatus.substring(0, 50);
+            }
+            booking.setStatus(bookingStatus);
+            bookingRepository.save(booking);
+
+            // 3. Update booking slot status
+            BookingSlot bookingSlot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0) : null;
+            if (bookingSlot != null) {
+                String slotStatus = "CANCELLED";
+                if (slotStatus.length() > 50) {
+                    slotStatus = slotStatus.substring(0, 50);
+                }
+                bookingSlot.setStatus(slotStatus);
+                bookingSlotRepository.save(bookingSlot);
+            }
+
+            // 4. Update or create cancellation request
+            CancellationRequest request = booking.getCancellationRequest();
+            if (request == null) {
+                request = new CancellationRequest();
+                request.setBooking(booking);
+                request.setRequestDate(LocalDateTime.now());
+            }
+            request.setStatus("APPROVED");
+            request.setReason(reason != null ? reason : "User requested cancellation");
+            request.setAdminRemark("Auto-approved by system (more than 24h before slot)");
+            cancellationRequestRepository.save(request);
+
+            // 5. 退款50%到钱包
+            double refund = booking.getTotalAmount() * 0.5;
+            Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
+            wallet.setBalance(wallet.getBalance() + refund);
+            walletRepository.save(wallet);
+            // 可选：记录退款流水
+
+            // 6. 更新支付状态
+            Payment payment = booking.getPayment();
+            if (payment != null) {
+                payment.setStatus("REFUNDED");
+                paymentRepository.save(payment);
+            }
+
+            // 7. 发送邮件通知
+            Court court = courtRepository.findById(slot.getCourtId())
+                .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
+            emailService.sendCancellationDecision(
+                booking.getMember().getUser().getEmail(),
+                booking,
+                slot,
+                court != null ? court.getName() : "Court not found",
+                true
+            );
+
+            return new CancellationResponse(
+                request.getId(),
+                booking.getId(),
+                request.getStatus(),
+                request.getRequestDate(),
+                "Cancellation auto-approved and 50% refunded to wallet"
+            );
+        }
+
+        // 6. 原有流程（<=24小时，人工审核）
+        // 检查1小时限制
         if (LocalDateTime.now().plusHours(1).isAfter(slotDateTime)) {
             throw new ValidationException("Cannot cancel within 1 hour of booking");
         }
 
-        // 6. 更新预订状态
+        // 更新预订状态
         booking.setStatus("CANCELLATION_REQUESTED");
         bookingRepository.save(booking);
 
-        // 7. 创建取消请求
+        // 创建取消请求
         CancellationRequest request = new CancellationRequest();
         request.setBooking(booking);
-        request.setRequestDate(LocalDate.now());
+        request.setRequestDate(LocalDateTime.now());
         request.setStatus("PENDING");
         request.setReason(reason != null ? reason : "User requested cancellation");
         cancellationRequestRepository.save(request);
 
-        // 8. 获取场馆信息
+        // 获取场馆信息
         Court court = courtRepository.findById(slot.getCourtId())
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
 
-        // 9. 发送确认邮件
+        // 发送确认邮件
         emailService.sendCancellationConfirmation(
                 booking.getMember().getUser().getEmail(),
                 booking,
