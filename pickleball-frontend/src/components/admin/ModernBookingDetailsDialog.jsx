@@ -19,6 +19,23 @@ const formatDate = (date) => {
   });
 };
 
+const formatSlotDate = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+const formatTime = (time) => {
+  if (!time) return '-';
+  return new Date(`2000-01-01 ${time}`).toLocaleString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 const ModernBookingDetailsDialog = ({
   open,
   onClose,
@@ -64,7 +81,10 @@ const ModernBookingDetailsDialog = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
               <EventIcon color="primary" sx={{ mr: 0.5 }} />
               <Typography variant="body1" fontWeight={500}>
-                {formatDate(safeBooking.bookingDate)}
+                {safeBooking.slotDate && safeBooking.startTime && safeBooking.endTime 
+                  ? `${formatSlotDate(safeBooking.slotDate)} ${formatTime(safeBooking.startTime)} - ${formatTime(safeBooking.endTime)}`
+                  : formatDate(safeBooking.bookingDate)
+                }
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
@@ -85,25 +105,83 @@ const ModernBookingDetailsDialog = ({
               <Box>
                 <Typography variant="caption" color="text.secondary">Duration</Typography>
                 <Typography variant="body1" fontWeight={500}>
-                  {safeBooking.duration ? `${safeBooking.duration} hour(s)` : '-'}
+                  {safeBooking.durationHours ? `${safeBooking.durationHours} hour(s)` : '-'}
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Total</Typography>
+                <Typography variant="caption" color="text.secondary">Total Amount</Typography>
                 <Typography variant="body1" fontWeight={500}>
                   {safeBooking.totalAmount != null ? `RM ${safeBooking.totalAmount.toFixed(2)}` : '-'}
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Payment</Typography>
+                <Typography variant="caption" color="text.secondary">Payment Method</Typography>
                 <Typography variant="body1" fontWeight={500}>
                   {safeBooking.paymentMethod || '-'}
                 </Typography>
               </Box>
             </Box>
+            
+            {/* Additional Payment Information */}
+            {(safeBooking.paymentType || safeBooking.paymentStatus || safeBooking.transactionId) && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mt: 1 }}>
+                {safeBooking.paymentType && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Payment Type</Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {safeBooking.paymentType}
+                    </Typography>
+                  </Box>
+                )}
+                {safeBooking.paymentStatus && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Payment Status</Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {safeBooking.paymentStatus}
+                    </Typography>
+                  </Box>
+                )}
+                {safeBooking.transactionId && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Transaction ID</Typography>
+                    <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                      {safeBooking.transactionId}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
         </Box>
         <Divider sx={{ my: 2 }} />
+        
+        {/* Booking Details */}
+        {(safeBooking.purpose || safeBooking.numberOfPlayers) && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+              Booking Details
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {safeBooking.purpose && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Purpose</Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {safeBooking.purpose}
+                  </Typography>
+                </Box>
+              )}
+              {safeBooking.numberOfPlayers && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Number of Players</Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {safeBooking.numberOfPlayers}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
+        
         {/* 会员信息 */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>

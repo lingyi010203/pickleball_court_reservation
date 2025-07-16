@@ -27,5 +27,13 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Integer> {
             @Param("targetId") Integer targetId
     );
 
+    @Query("SELECT AVG(f.rating) FROM Feedback f")
+    Double findAverageRating();
+
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(f.rating) FROM Feedback f WHERE f.createdAt BETWEEN :start AND :end")
+    Double findAverageRatingByDate(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
     List<Feedback> findByUserId(Integer userId);
+
+    java.util.List<Feedback> findTop2ByOrderByCreatedAtDesc();
 }

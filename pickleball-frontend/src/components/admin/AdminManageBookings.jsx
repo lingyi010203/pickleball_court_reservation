@@ -293,12 +293,15 @@ const AdminManageBookings = () => {
     }
 
     // CSV Header you want
-    const header = ['Booking ID', 'Date & Time', 'Member', 'Court', 'Status', 'Amount (RM)'];
+    const header = ['Booking ID', 'Court Date & Time', 'Member', 'Court', 'Status', 'Amount (RM)'];
 
     // Generate CSV rows
     const rows = bookings.map(b => {
-      // You can use your own date formatter
-      const formattedDateTime = formatDateTimeForExport(b.bookingDate);
+      // Use slot date and time instead of booking date
+      const formattedDateTime = b.slotDate && b.startTime && b.endTime 
+        ? `${formatSlotDateForExport(b.slotDate)} ${formatTimeForExport(b.startTime)} - ${formatTimeForExport(b.endTime)}`
+        : 'No slot info';
+      
       return [
         b.id,
         `"${formattedDateTime}"`,         // Quote in case of comma
@@ -339,11 +342,39 @@ const AdminManageBookings = () => {
     return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
   };
 
+  const formatSlotDateForExport = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  };
+
+  const formatTimeForExport = (timeString) => {
+    if (!timeString) return '';
+    const time = new Date(`2000-01-01T${timeString}`);
+    return time.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
   const isSelected = (id) => selectedBookings.indexOf(id) !== -1;
 
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const formatSlotDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    const time = new Date(`2000-01-01T${timeString}`);
+    return time.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   return (
@@ -541,7 +572,7 @@ const AdminManageBookings = () => {
                     direction={orderBy === 'bookingDate' ? order : 'desc'}
                     onClick={() => handleSort('bookingDate')}
                   >
-                    Date & Time
+                    Court Date & Time
                   </TableSortLabel>
                 </TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Member</TableCell>
@@ -574,7 +605,10 @@ const AdminManageBookings = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <DateIcon sx={{ color: '#9e9e9e', fontSize: 18, mr: 1 }} />
                           <Typography variant="body2">
-                            {formatDate(booking.bookingDate)}
+                            {booking.slotDate && booking.startTime && booking.endTime 
+                              ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
+                              : 'No slot info'
+                            }
                           </Typography>
                         </Box>
                       </TableCell>

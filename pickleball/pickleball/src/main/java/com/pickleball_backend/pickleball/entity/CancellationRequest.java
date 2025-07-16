@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 @Entity
 @Data
-@Table(name = "cancellationrequest")
+@Table(name = "cancellation_request")
 public class CancellationRequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

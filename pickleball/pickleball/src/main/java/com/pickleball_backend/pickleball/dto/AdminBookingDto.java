@@ -7,7 +7,9 @@ import java.time.LocalTime;
 @Data
 public class AdminBookingDto {
     private Integer id;
-    private LocalDate bookingDate;
+    private java.time.LocalDateTime bookingDate;
+    public java.time.LocalDateTime getBookingDate() { return bookingDate; }
+    public void setBookingDate(java.time.LocalDateTime bookingDate) { this.bookingDate = bookingDate; }
     private double totalAmount;
     private String status;
     private String memberName;
@@ -21,4 +23,11 @@ public class AdminBookingDto {
     private String memberPhone;
     private String memberEmail;
     private CancellationRequestDto cancellationRequest;
+    
+    // Duration and payment information
+    private Integer durationHours;
+    private String paymentMethod;
+    private String paymentType;
+    private String paymentStatus;
+    private String transactionId;
 }

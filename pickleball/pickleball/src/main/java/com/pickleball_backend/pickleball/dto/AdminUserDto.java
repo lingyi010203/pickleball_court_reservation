@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.dto;
 
 import lombok.Data;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class AdminUserDto {
@@ -17,4 +18,5 @@ public class AdminUserDto {
     private String profileImage;
     private int pointBalance;
     private String tier;
+    private LocalDateTime createdAt;
 }

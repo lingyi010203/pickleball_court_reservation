@@ -101,7 +101,8 @@ public class BookingService {
         // 7. Process wallet payment if requested
         Payment payment = new Payment();
         payment.setAmount(amount);
-        payment.setPaymentDate(LocalDate.now());
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setPaymentType("BOOKING");
 
         if (request.isUseWallet()) {
             if (wallet.getBalance() < amount) {
@@ -119,7 +120,7 @@ public class BookingService {
 
         // 8. Create booking
         Booking booking = new Booking();
-        booking.setBookingDate(LocalDate.now());
+        booking.setBookingDate(LocalDateTime.now());
         booking.setTotalAmount(amount);
         String bookingStatus = "CONFIRMED";
         if (bookingStatus.length() > 50) {

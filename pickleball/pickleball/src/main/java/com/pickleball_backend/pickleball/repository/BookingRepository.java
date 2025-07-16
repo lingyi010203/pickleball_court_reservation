@@ -1,6 +1,9 @@
 package com.pickleball_backend.pickleball.repository;
 
 import com.pickleball_backend.pickleball.entity.Booking;
+import com.pickleball_backend.pickleball.entity.Court;
+import com.pickleball_backend.pickleball.entity.Member;
+import com.pickleball_backend.pickleball.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -41,4 +44,13 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
         @Param("endDate") LocalDate endDate,
         Pageable pageable
     );
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(b) FROM Booking b WHERE b.bookingDate BETWEEN :start AND :end")
+    long countByBookingDateBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT b.member.id) FROM Booking b WHERE b.bookingDate BETWEEN :start AND :end")
+    long countDistinctMemberIdByBookingDateBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    @EntityGraph(attributePaths = {"member.user"})
+    List<Booking> findTop5ByOrderByBookingDateDesc();
 }

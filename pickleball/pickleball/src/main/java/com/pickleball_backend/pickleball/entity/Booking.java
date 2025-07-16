@@ -13,8 +13,8 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "booking_date", nullable = false)
-    private LocalDate bookingDate;
+    @Column(name = "booking_date")
+    private java.time.LocalDateTime bookingDate;
 
     @Column(name = "total_amount", nullable = false, columnDefinition = "double(5,2)")
     private double totalAmount;
