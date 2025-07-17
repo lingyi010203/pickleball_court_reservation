@@ -139,16 +139,6 @@ const BookingConfirmationPage = () => {
                 </Typography>
               </Grid>
               
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Court Number:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  #{booking.courtNumber}
-                </Typography>
-              </Grid>
             </Grid>
             
             <Divider sx={{ my: 2 }} />

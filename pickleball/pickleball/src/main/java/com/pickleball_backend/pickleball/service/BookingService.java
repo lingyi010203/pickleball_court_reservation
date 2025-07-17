@@ -231,7 +231,6 @@ public class BookingService {
             response.setSlotDate(slot0.getDate());
             response.setStartTime(slot0.getStartTime());
             response.setEndTime(slot0.getEndTime());
-            response.setCourtNumber(slot0.getCourtNumber() != null ? slot0.getCourtNumber() : 0);
         }
         response.setTotalAmount(booking.getTotalAmount());
         response.setBookingStatus(booking.getStatus());
@@ -563,8 +562,7 @@ public class BookingService {
                     dto.setStatus(booking.getStatus());
                     dto.setCreatedAt(booking.getBookingDate());
                     dto.setPurpose(booking.getPurpose());
-                    dto.setPlayers(booking.getNumberOfPlayers());
-                    dto.setCourtNumber(slot != null && slot.getCourtNumber() != null ? slot.getCourtNumber() : 0);
+                    dto.setNumberOfPlayers(booking.getNumberOfPlayers());
                     // Add duration to history
                     dto.setDurationHours(slot != null && slot.getDurationHours() != null ? slot.getDurationHours() : 0);
                     return dto;

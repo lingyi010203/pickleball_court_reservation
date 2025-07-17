@@ -33,22 +33,39 @@ public class CourtServiceImpl implements CourtService {
     private final BookingSlotRepository bookingSlotRepository;
     @Autowired
     private VenueRepository venueRepository;
+    private static final Map<String, DayOfWeek> DAY_OF_WEEK_MAP = Map.of(
+        "MON", DayOfWeek.MONDAY,
+        "TUE", DayOfWeek.TUESDAY,
+        "WED", DayOfWeek.WEDNESDAY,
+        "THU", DayOfWeek.THURSDAY,
+        "FRI", DayOfWeek.FRIDAY,
+        "SAT", DayOfWeek.SATURDAY,
+        "SUN", DayOfWeek.SUNDAY
+    );
+
     @Override
     public Court createCourt(CourtDto courtDto) {
-        Venue venue = venueRepository.findById(courtDto.getVenueId())
-                .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
+        try {
+            System.out.println("==> createCourt called, dto=" + courtDto);
+            Venue venue = venueRepository.findById(courtDto.getVenueId())
+                    .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
 
-        if (courtRepository.existsByNameAndLocation(courtDto.getName(), courtDto.getLocation())) {
-            throw new IllegalArgumentException("Court with the same name and location already exists");
+            if (courtRepository.existsByNameAndLocation(courtDto.getName(), courtDto.getLocation())) {
+                throw new IllegalArgumentException("Court with the same name and location already exists");
+            }
+
+            Court court = new Court();
+            court.setVenue(venue);
+            saveOrUpdateCourt(court, courtDto);
+
+            generateSlotsForNewCourt(court);
+
+            System.out.println("==> createCourt success, id=" + court.getId());
+            return court;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
         }
-
-        Court court = new Court();
-        court.setVenue(venue);
-        saveOrUpdateCourt(court, courtDto);
-
-        generateSlotsForNewCourt(court);
-
-        return court;
     }
 
 
@@ -104,8 +121,12 @@ public class CourtServiceImpl implements CourtService {
     }
 
     private DayOfWeek parseDayOfWeek(String dayStr) {
+        String upper = dayStr.trim().toUpperCase();
+        if (DAY_OF_WEEK_MAP.containsKey(upper)) {
+            return DAY_OF_WEEK_MAP.get(upper);
+        }
         try {
-            return DayOfWeek.valueOf(dayStr.trim().toUpperCase());
+            return DayOfWeek.valueOf(upper);
         } catch (IllegalArgumentException e) {
             throw new ValidationException("Invalid day in operating days: " + dayStr);
         }
@@ -130,30 +151,38 @@ public class CourtServiceImpl implements CourtService {
     }
 
     private Court saveOrUpdateCourt(Court court, CourtDto courtDto) {
-        court.setName(courtDto.getName());
-        court.setLocation(courtDto.getLocation());
-        court.setStatus(courtDto.getStatus().toUpperCase());
-        court.setOpeningTime(courtDto.getOpeningTime());
-        court.setClosingTime(courtDto.getClosingTime());
-        // operatingDays 统一大写并去重
-        if (courtDto.getOperatingDays() != null && !courtDto.getOperatingDays().isEmpty()) {
-            String normalizedDays = Arrays.stream(courtDto.getOperatingDays().split(","))
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .distinct()
-                .collect(Collectors.joining(","));
-            court.setOperatingDays(normalizedDays);
-        } else {
-            court.setOperatingDays(null);
-        }
-        court.setPeakHourlyPrice(courtDto.getPeakHourlyPrice());
-        court.setOffPeakHourlyPrice(courtDto.getOffPeakHourlyPrice());
-        court.setDailyPrice(courtDto.getDailyPrice());
-        court.setPeakStartTime(courtDto.getPeakStartTime());
-        court.setPeakEndTime(courtDto.getPeakEndTime());
+        try {
+            System.out.println("==> saveOrUpdateCourt called, dto=" + courtDto);
+            court.setName(courtDto.getName());
+            court.setLocation(courtDto.getLocation());
+            court.setStatus(courtDto.getStatus().toUpperCase());
+            court.setOpeningTime(courtDto.getOpeningTime());
+            court.setClosingTime(courtDto.getClosingTime());
+            // operatingDays 统一大写并去重
+            if (courtDto.getOperatingDays() != null && !courtDto.getOperatingDays().isEmpty()) {
+                String normalizedDays = Arrays.stream(courtDto.getOperatingDays().split(","))
+                    .map(String::trim)
+                    .map(String::toUpperCase)
+                    .distinct()
+                    .collect(Collectors.joining(","));
+                court.setOperatingDays(normalizedDays);
+            } else {
+                court.setOperatingDays(null);
+            }
+            court.setPeakHourlyPrice(courtDto.getPeakHourlyPrice());
+            court.setOffPeakHourlyPrice(courtDto.getOffPeakHourlyPrice());
+            court.setDailyPrice(courtDto.getDailyPrice());
+            court.setPeakStartTime(courtDto.getPeakStartTime());
+            court.setPeakEndTime(courtDto.getPeakEndTime());
 
-        validatePeakTimes(courtDto);
-        return courtRepository.save(court);
+            validatePeakTimes(courtDto);
+            Court saved = courtRepository.save(court);
+            System.out.println("==> saveOrUpdateCourt success, id=" + saved.getId());
+            return saved;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     private void validatePeakTimes(CourtDto courtDto) {

@@ -12,13 +12,13 @@ public class VenueService {
     private VenueRepository venueRepository;
 
     public Venue createVenue(VenueDto venueDto) {
-        if (venueRepository.existsByNameAndLocation(venueDto.getName(), venueDto.getLocation())) {
+        if (venueRepository.existsByNameAndLocation(venueDto.getName(), venueDto.getAddress())) {
             throw new IllegalArgumentException("Venue with the same name and location already exists");
         }
 
         Venue venue = new Venue();
         venue.setName(venueDto.getName());
-        venue.setLocation(venueDto.getLocation());
+        venue.setLocation(venueDto.getAddress());
         venue.setDescription(venueDto.getDescription());
         return venueRepository.save(venue);
     }

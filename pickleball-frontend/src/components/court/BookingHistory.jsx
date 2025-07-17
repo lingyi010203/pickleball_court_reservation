@@ -247,7 +247,6 @@ const BookingHistory = () => {
         numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
         totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
         status: booking.bookingStatus || booking.status || "CONFIRMED",
-        courtNumber: booking.courtNumber,
       }));
 
       console.log("Normalized Bookings:", normalizedBookings);

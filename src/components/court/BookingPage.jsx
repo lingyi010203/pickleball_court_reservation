@@ -328,9 +328,6 @@ const BookingPage = () => {
                   <Typography variant="body1">
                     <strong>Duration:</strong> {selectedSlot.durationHours} hours
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Court:</strong> #{selectedSlot.courtNumber}
-                  </Typography>
                 </>
               )}
             </Stack>
