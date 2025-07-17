@@ -24,6 +24,5 @@ public class SlotResponseDto {
     @JsonFormat(pattern = "HH:mm")
     private LocalTime endTime;
     private String status;
-    private Integer courtNumber;
     private Integer durationHours;
 }

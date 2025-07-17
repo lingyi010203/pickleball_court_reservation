@@ -55,7 +55,6 @@ public class SlotServiceImpl implements SlotService {
 
         return slots.stream().map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
-            dto.setCourtNumber(slot.getCourtNumber());
             dto.setId(slot.getId());
             dto.setCourtId(slot.getCourtId());
             dto.setDate(slot.getDate());
@@ -91,7 +90,6 @@ public class SlotServiceImpl implements SlotService {
 
             Slot slot = new Slot();
             slot.setCourtId(dto.getCourtId());
-            slot.setCourtNumber(dto.getCourtNumber());
             slot.setDate(dto.getDate());
             slot.setStartTime(dto.getStartTime());
             slot.setEndTime(dto.getEndTime());
@@ -119,7 +117,6 @@ public class SlotServiceImpl implements SlotService {
 
         return slots.stream().map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
-            dto.setCourtNumber(slot.getCourtNumber());
             dto.setId(slot.getId());
             dto.setCourtId(slot.getCourtId());
             dto.setDate(slot.getDate());
@@ -144,7 +141,6 @@ public class SlotServiceImpl implements SlotService {
             SlotResponseDto dto = new SlotResponseDto();
             dto.setId(slot.getId());
             dto.setCourtId(slot.getCourtId());
-            dto.setCourtNumber(slot.getCourtNumber());
             dto.setDate(slot.getDate());
             dto.setStartTime(slot.getStartTime());
             dto.setEndTime(slot.getEndTime());

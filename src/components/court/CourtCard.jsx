@@ -42,27 +42,39 @@ const CourtCard = ({ court }) => {
         <Typography gutterBottom variant="h6" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
           {court.name}
         </Typography>
+        {/* 场馆信息 */}
+        {court.venue && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.85rem' }}>
+            {court.venue.name} ({court.venue.location})
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.875rem' }}>
           {court.location}
         </Typography>
+        {/* 营业时间 */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: '0.85rem' }}>
+          Open: {court.openingTime} - {court.closingTime}
+        </Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+          {/* 价格信息 */}
           <Chip 
-            label={`RM${court.offPeakHourlyPrice || '50'}/hr`} 
+            label={`Off-peak: RM${court.offPeakHourlyPrice || '50'}/hr`} 
             size="small" 
             color="primary" 
             sx={{ fontWeight: 'bold', borderRadius: '8px' }}
           />
           <Chip 
-            label={court.status === 'MAINTENANCE' ? 'Maintenance' : 'Available'} 
+            label={`Peak: RM${court.peakHourlyPrice || '80'}/hr (${court.peakStartTime || '16:00'}-${court.peakEndTime || '20:00'})`} 
+            size="small" 
+            color="warning" 
+            sx={{ fontWeight: 'bold', borderRadius: '8px' }}
+          />
+          {/* 状态显示更细致 */}
+          <Chip 
+            label={court.status === 'MAINTENANCE' ? 'Maintenance' : court.status === 'ACTIVE' ? 'Available' : court.status === 'INACTIVE' ? 'Inactive' : court.status} 
             size="small" 
             variant="outlined" 
-            color={court.status === 'MAINTENANCE' ? 'error' : 'success'}
-            sx={{ borderRadius: '8px' }}
-          />
-          <Chip 
-            label={`${court.numberOfCourts || 1} courts`} 
-            size="small" 
-            variant="outlined"
+            color={court.status === 'MAINTENANCE' ? 'error' : court.status === 'ACTIVE' ? 'success' : 'default'}
             sx={{ borderRadius: '8px' }}
           />
         </Box>

@@ -11,6 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.pickleball_backend.pickleball.entity.Venue;
+import com.pickleball_backend.pickleball.repository.CourtRepository;
+import com.pickleball_backend.pickleball.repository.VenueRepository;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,20 +25,48 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CourtController {
     private final CourtService courtService;
+    @Autowired
+    private CourtRepository courtRepository;
+    @Autowired
+    private VenueRepository venueRepository;
 
     @PostMapping
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> createCourt(@RequestBody CourtDto courtDto) {
         try {
             Court newCourt = courtService.createCourt(courtDto);
-            return new ResponseEntity<>(newCourt, HttpStatus.CREATED);
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", newCourt.getId()));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (Exception e) {
+            e.printStackTrace(); // 确保异常输出到控制台
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating court");
         }
+    }
+
+    @PostMapping("/add")
+    public Integer addCourt(@RequestBody CourtDto courtDto) {
+        Court court = new Court();
+        court.setName(courtDto.getName());
+        court.setLocation(courtDto.getLocation());
+        court.setStatus(courtDto.getStatus());
+        court.setOpeningTime(courtDto.getOpeningTime());
+        court.setClosingTime(courtDto.getClosingTime());
+        court.setOperatingDays(courtDto.getOperatingDays());
+        court.setPeakHourlyPrice(courtDto.getPeakHourlyPrice());
+        court.setOffPeakHourlyPrice(courtDto.getOffPeakHourlyPrice());
+        court.setDailyPrice(courtDto.getDailyPrice());
+        court.setPeakStartTime(courtDto.getPeakStartTime());
+        court.setPeakEndTime(courtDto.getPeakEndTime());
+        
+        // 关键：设置所属场馆
+        Venue venue = venueRepository.findById(courtDto.getVenueId()).orElseThrow();
+        court.setVenue(venue);
+        
+        court = courtRepository.save(court);
+        return court.getId();
     }
 
 

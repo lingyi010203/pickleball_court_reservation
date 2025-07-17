@@ -59,6 +59,12 @@ const AdminManageCourts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // 1. 新增 useState
+  const [venues, setVenues] = useState([]);
+  const [selectedVenueId, setSelectedVenueId] = useState('');
+  const [showAddVenue, setShowAddVenue] = useState(false);
+  const [newVenue, setNewVenue] = useState({ name: '', address: '' });
+
   const daysOptions = [
     'Mon', 'Tue', 'Wed',
     'Thu', 'Fri', 'Sat', 'Sun'
@@ -70,125 +76,28 @@ const AdminManageCourts = () => {
     { value: 'CLOSED', label: 'Closed' }
   ];
 
+  // 2. 获取场馆列表
   useEffect(() => {
-    fetchCourts();
-  }, [page, rowsPerPage, order, orderBy, searchTerm, statusFilter]);
+    const token = UserService.getAdminToken();
+    axios.get('/api/admin/venues', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => setVenues(res.data));
+  }, []);
 
-  const fetchCourts = async () => {
-    try {
-      setLoading(true);
-      const token = UserService.getAdminToken();
-      const params = {
-        page,
-        size: rowsPerPage,
-        sort: orderBy,
-        direction: order,
-        search: searchTerm,
-        status: statusFilter
-      };
-      
-      const response = await axios.get('http://localhost:8081/api/admin/courts', {
-        headers: { Authorization: `Bearer ${token}` },
-        params
-      });
-      
-      if (response.data.content) {
-        setCourts(response.data.content);
-        setTotalCourts(response.data.totalElements);
-      } else {
-        setCourts(response.data);
-        setTotalCourts(response.data.length);
-      }
-    } catch (err) {
-      setError('Failed to fetch courts. Please try again.');
-      console.error('Error fetching courts:', err);
-      setSnackbar({
-        open: true,
-        message: 'Failed to fetch courts. Please try again.',
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
+  // 3. 新建场馆提交
+  const handleAddVenue = async () => {
+    const token = UserService.getAdminToken();
+    const res = await axios.post('/api/admin/venues', newVenue, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const newVenueObj = { id: res.data, ...newVenue };
+    setVenues([...venues, newVenueObj]);
+    setSelectedVenueId(res.data);
+    setShowAddVenue(false);
+    setNewVenue({ name: '', address: '' });
   };
 
-  const handleSort = (property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    setPage(0);
-  };
-
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-    setPage(0);
-  };
-
-  const handleOpenDialog = (court = null) => {
-    if (court) {
-      setCurrentCourt(court);
-      const daysArr = Array.from(new Set(
-        (court.operatingDays || '')
-          .split(',')
-          .map(day => {
-            const map = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
-            return map[day.trim().toUpperCase()] || (day.charAt(0).toUpperCase() + day.slice(1).toLowerCase());
-          })
-          .filter(Boolean)
-      ));
-      setDaysOfWeek(daysArr);
-      setFormData({
-        name: court.name,
-        location: court.location,
-        status: court.status,
-        openingTime: court.openingTime || '10:00',
-        closingTime: court.closingTime || '00:00',
-        operatingDays: Array.from(new Set(daysArr.map(d => d.toUpperCase()))).join(','),
-        peakHourlyPrice: court.peakHourlyPrice || 0,
-        offPeakHourlyPrice: court.offPeakHourlyPrice || 0,
-        dailyPrice: court.dailyPrice || 0,
-        peakStartTime: court.peakStartTime || '18:00',
-        peakEndTime: court.peakEndTime || '00:00'
-      });
-    } else {
-      setCurrentCourt(null);
-      setDaysOfWeek([]);
-      setFormData({
-        name: '',
-        location: '',
-        status: 'ACTIVE',
-        openingTime: '10:00',
-        closingTime: '00:00',
-        operatingDays: '',
-        peakHourlyPrice: 0,
-        offPeakHourlyPrice: 0,
-        dailyPrice: 0,
-        peakStartTime: '18:00',
-        peakEndTime: '00:00'
-      });
-    }
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setCurrentCourt(null);
-    setFormErrors({});
-  };
-
+  // 4. 新建场地表单
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
@@ -233,6 +142,7 @@ const AdminManageCourts = () => {
 
   const handleSubmit = async () => {
     const errors = validateForm();
+    if (!selectedVenueId) errors.venueId = '请选择场馆';
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
     
@@ -242,6 +152,7 @@ const AdminManageCourts = () => {
       const uniqueDays = Array.from(new Set(daysOfWeek));
       const payload = {
         ...formData,
+        venueId: selectedVenueId,
         operatingDays: uniqueDays.map(d => d.toUpperCase()).join(','),
         peakHourlyPrice: parseFloat(formData.peakHourlyPrice) || 0,
         offPeakHourlyPrice: parseFloat(formData.offPeakHourlyPrice) || 0,
@@ -395,6 +306,133 @@ const AdminManageCourts = () => {
 
   const isSelected = (id) => selectedCourts.indexOf(id) !== -1;
 
+  // Missing functions
+  const fetchCourts = async () => {
+    try {
+      setLoading(true);
+      const token = UserService.getAdminToken();
+      const response = await axios.get(
+        'http://localhost:8081/api/admin/courts',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCourts(response.data);
+      setTotalCourts(response.data.length);
+    } catch (err) {
+      setError('Failed to fetch courts');
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch courts',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDialog = (court = null) => {
+    if (court) {
+      setCurrentCourt(court);
+      setFormData({
+        name: court.name || '',
+        location: court.location || '',
+        status: court.status || 'ACTIVE',
+        openingTime: court.openingTime || '10:00',
+        closingTime: court.closingTime || '00:00',
+        operatingDays: court.operatingDays || '',
+        peakHourlyPrice: court.peakHourlyPrice || 0,
+        offPeakHourlyPrice: court.offPeakHourlyPrice || 0,
+        dailyPrice: court.dailyPrice || 0,
+        peakStartTime: court.peakStartTime || '18:00',
+        peakEndTime: court.peakEndTime || '00:00'
+      });
+      setSelectedVenueId(court.venue?.id || '');
+      setDaysOfWeek(court.operatingDays ? court.operatingDays.split(',').map(d => d.trim()) : []);
+    } else {
+      setCurrentCourt(null);
+      setFormData({
+        name: '',
+        location: '',
+        status: 'ACTIVE',
+        openingTime: '10:00',
+        closingTime: '00:00',
+        operatingDays: '',
+        peakHourlyPrice: 0,
+        offPeakHourlyPrice: 0,
+        dailyPrice: 0,
+        peakStartTime: '18:00',
+        peakEndTime: '00:00'
+      });
+      setSelectedVenueId('');
+      setDaysOfWeek([]);
+    }
+    setFormErrors({});
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setCurrentCourt(null);
+    setFormData({
+      name: '',
+      location: '',
+      status: 'ACTIVE',
+      openingTime: '10:00',
+      closingTime: '00:00',
+      operatingDays: '',
+      peakHourlyPrice: 0,
+      offPeakHourlyPrice: 0,
+      dailyPrice: 0,
+      peakStartTime: '18:00',
+      peakEndTime: '00:00'
+    });
+    setDaysOfWeek([]);
+    setFormErrors({});
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
+  const handleSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Load courts on component mount
+  useEffect(() => {
+    fetchCourts();
+  }, []);
+
+  // 打开新建场馆弹窗时自动带入当前venue name
+  const handleVenueSelect = (e) => {
+    if (e.target.value === 'add_new_venue') {
+      // 自动带入当前下拉已选venue的名字
+      const selectedVenue = venues.find(v => v.id === selectedVenueId);
+      setNewVenue({
+        name: selectedVenue ? selectedVenue.name : '',
+        address: ''
+      });
+      setShowAddVenue(true);
+    } else {
+      setSelectedVenueId(e.target.value);
+      if (formErrors.venueId) setFormErrors(prev => ({ ...prev, venueId: '' }));
+    }
+  };
+
   if (loading && !courts.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -534,7 +572,7 @@ const AdminManageCourts = () => {
                     />
                   </TableCell>
                   <TableCell>{court.name}</TableCell>
-                  <TableCell>{court.location}</TableCell>
+                  <TableCell>{court.venue ? `${court.venue.name} (${court.venue.location})` : 'N/A'}</TableCell>
                   <TableCell>
                     <Chip
                       label={court.status}
@@ -649,18 +687,21 @@ const AdminManageCourts = () => {
               />
             </Grid>
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal" error={!!formErrors.status}>
-                <InputLabel>Status *</InputLabel>
+              <FormControl fullWidth margin="normal" required error={!selectedVenueId && !!formErrors.venueId}>
+                <InputLabel>Venue *</InputLabel>
                 <Select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  label="Status *"
+                  value={selectedVenueId}
+                  onChange={handleVenueSelect}
+                  label="Venue *"
+                  displayEmpty
                 >
-                  <MenuItem value="ACTIVE">Active</MenuItem>
-                  <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
-                  <MenuItem value="CLOSED">Closed</MenuItem>
+                  <MenuItem value="" disabled>请选择场馆</MenuItem>
+                  {venues.map(v => (
+                    <MenuItem key={v.id} value={v.id}>{v.name} ({v.address || v.location})</MenuItem>
+                  ))}
+                  <MenuItem value="add_new_venue" style={{ color: '#8e44ad', fontWeight: 'bold' }}>+ 新建场馆</MenuItem>
                 </Select>
+                {formErrors.venueId && <Typography color="error" variant="caption">{formErrors.venueId}</Typography>}
               </FormControl>
             </Grid>
             <Divider sx={{ my: 2, width: '100%' }}>Operating Days</Divider>
@@ -843,6 +884,19 @@ const AdminManageCourts = () => {
           <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
             {deleting ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 新建场馆弹窗 */}
+      <Dialog open={showAddVenue} onClose={() => setShowAddVenue(false)}>
+        <DialogTitle>Add New Venue</DialogTitle>
+        <DialogContent>
+          <TextField label="Venue Name" value={newVenue.name} onChange={e => setNewVenue({ ...newVenue, name: e.target.value })} fullWidth />
+          <TextField label="Address" value={newVenue.address} onChange={e => setNewVenue({ ...newVenue, address: e.target.value })} fullWidth sx={{ mt: 2 }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddVenue(false)}>Cancel</Button>
+          <Button onClick={handleAddVenue} variant="contained">Add</Button>
         </DialogActions>
       </Dialog>
 

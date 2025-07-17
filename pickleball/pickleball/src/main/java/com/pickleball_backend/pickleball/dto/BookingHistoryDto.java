@@ -17,7 +17,6 @@ public class BookingHistoryDto {
     private String status; // UPCOMING, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
     private String purpose;
-    private Integer players;
-    private Integer courtNumber;
+    private Integer numberOfPlayers;
     private Integer durationHours;
 }
