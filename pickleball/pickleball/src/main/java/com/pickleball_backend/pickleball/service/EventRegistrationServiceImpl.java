@@ -50,13 +50,14 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
         // Handle missing member record
         if (member == null) {
             // Create default tier if missing
-            MembershipTier defaultTier = membershipTierRepository.findByTierName(MembershipTier.TierName.SILVER);
+            MembershipTier defaultTier = membershipTierRepository.findByTierName("SILVER");
             if (defaultTier == null) {
                 defaultTier = new MembershipTier();
-                defaultTier.setTierName(MembershipTier.TierName.SILVER);
+                defaultTier.setTierName("SILVER");
                 defaultTier.setMinPoints(0);
                 defaultTier.setMaxPoints(2000);
                 defaultTier.setBenefits("10% discount");
+                defaultTier.setActive(true);
                 defaultTier = membershipTierRepository.save(defaultTier);
             }
 

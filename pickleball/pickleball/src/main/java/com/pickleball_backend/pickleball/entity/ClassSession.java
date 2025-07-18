@@ -17,6 +17,15 @@ public class ClassSession {
     private String status; // AVAILABLE, BOOKED, CANCELLED, COMPLETED
     private String note;
 
+    @Column(name = "slot_type")
+    private String slotType; // COACH_AVAILABILITY or REGULAR_BOOKING
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @ManyToOne
     @JoinColumn(name = "coach_id")
     private User coach;
@@ -28,4 +37,12 @@ public class ClassSession {
     @ManyToOne
     @JoinColumn(name = "player_id")
     private User player;
+
+    @OneToOne
+    @JoinColumn(name = "payment_id") // 這個欄位名要和你的資料庫一致
+    private Payment payment;
+
+    @OneToOne(mappedBy = "session", cascade = CascadeType.ALL)
+    private CancellationRequest cancellationRequest;
+
 }

@@ -116,9 +116,7 @@ const BookingPage = () => {
 
   useEffect(() => {
     if (selectedDate) {
-      let filtered = slots.filter(slot => 
-        slot.date === selectedDate.format('YYYY-MM-DD')
-      );
+      let filtered = slots.filter(slot => slot.date === selectedDate.format('YYYY-MM-DD'));
       
       if (selectedDate.isSame(dayjs(), 'day')) {
         const nowPlus2h = dayjs().add(2, 'hour');

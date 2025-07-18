@@ -468,5 +468,40 @@ public class EmailService {
             log.error("Failed to send session cancellation email to {}: {}", email, e.getMessage());
         }
     }
+
+    public void sendSessionCancellation(
+            String playerEmail,
+            LocalDateTime sessionTime,
+            String coachName,
+            String courtName) {
+
+        String subject = "Session Cancellation Notification";
+        String content = String.format(
+                "Your session has been cancelled:\n\n" +
+                        "Coach: %s\n" +
+                        "Court: %s\n" +
+                        "Time: %s\n\n" +
+                        "A full refund has been processed to your account.",
+                coachName, courtName, sessionTime
+        );
+
+        sendEmail(playerEmail, subject, content);
+    }
+
+    public void sendRefundFailureNotification(
+            String coachEmail,
+            Integer sessionId,
+            String error) {
+
+        String subject = "Refund Processing Failure";
+        String content = String.format(
+                "Failed to process refund for session %d:\n\n" +
+                        "Error: %s\n\n" +
+                        "Please contact support for resolution.",
+                sessionId, error
+        );
+
+        sendEmail(coachEmail, subject, content);
+    }
 }
 

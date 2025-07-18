@@ -30,19 +30,19 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findAllWithAdminRelationsByIds(@Param("ids") List<Integer> ids);
 
     @Query("SELECT b FROM Booking b " +
-           "LEFT JOIN b.member m " +
-           "LEFT JOIN m.user u " +
-           "WHERE " +
-           "(:search IS NULL OR u.name LIKE %:search% OR u.email LIKE %:search%) " +
-           "AND (:status IS NULL OR b.status = :status) " +
-           "AND (:startDate IS NULL OR b.bookingDate >= :startDate) " +
-           "AND (:endDate IS NULL OR b.bookingDate <= :endDate)")
+            "LEFT JOIN b.member m " +
+            "LEFT JOIN m.user u " +
+            "WHERE " +
+            "(:search IS NULL OR u.name LIKE %:search% OR u.email LIKE %:search%) " +
+            "AND (:status IS NULL OR b.status = :status) " +
+            "AND (:startDate IS NULL OR b.bookingDate >= :startDate) " +
+            "AND (:endDate IS NULL OR b.bookingDate <= :endDate)")
     Page<Booking> findByAdminFilters(
-        @Param("search") String search,
-        @Param("status") String status,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate,
-        Pageable pageable
+            @Param("search") String search,
+            @Param("status") String status,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable
     );
 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(b) FROM Booking b WHERE b.bookingDate BETWEEN :start AND :end")
@@ -53,4 +53,6 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     @EntityGraph(attributePaths = {"member.user"})
     List<Booking> findTop5ByOrderByBookingDateDesc();
+
+    boolean existsByMember_User_IdAndBookingSlots_Slot_CourtId(Integer userId, Integer courtId);
 }

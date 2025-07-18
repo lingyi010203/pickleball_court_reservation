@@ -23,7 +23,7 @@ public class Booking {
     private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, referencedColumnName = "user_id")
+    @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "user_id")
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)

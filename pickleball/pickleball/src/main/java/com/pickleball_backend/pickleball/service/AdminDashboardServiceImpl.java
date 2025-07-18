@@ -72,7 +72,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     public long getTotalUserCount() {
         return userRepository.count();
     }
-    
+
 
     @Override
     public Page<AdminBookingDto> getAllBookings(Pageable pageable, String search, String status, String startDate, String endDate) {
@@ -160,15 +160,6 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 "success", true,
                 "message", "Booking cancelled successfully by admin."
         );
-    }
-
-    @Override
-    public double getGlobalAverageRating() {
-        Double avg = feedbackRepository.findAll().stream()
-            .mapToInt(f -> f.getRating() != null ? f.getRating() : 0)
-            .average()
-            .orElse(0.0);
-        return avg;
     }
 
     @Override

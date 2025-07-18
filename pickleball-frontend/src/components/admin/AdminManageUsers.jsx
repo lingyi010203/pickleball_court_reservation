@@ -51,39 +51,16 @@ import { useNavigate } from 'react-router-dom';
 import UserService from '../../service/UserService';
 import AdminUserForm from './AdminUserForm';
 import ConfirmationDialog from './ConfirmationDialog';
-import AdminModerationDashboard from './AdminModerationDashboard';
 import AdminInviteForm from './AdminInviteForm';
-
 
 const AdminManageUsers = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const username = UserService.getUsername();
-  const [pending, setPending] = useState([]);
-  const [reason, setReason] = useState("");
-  const [rejectId, setRejectId] = useState(null);
-
 
   // Tab change handler
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-  };
-
-  useEffect(() => {
-    axios.get("/admin/pending-type-changes").then(res => setPending(res.data));
-  }, []);
-
-  const approve = userId => {
-    axios.put(`/admin/approve-user-type/${userId}?newType=EventOrganizer`)
-      .then(() => window.location.reload());
-  };
-
-  const reject = userId => setRejectId(userId);
-
-  const submitReject = () => {
-    axios.put(`/admin/reject-user-type/${rejectId}?reason=${encodeURIComponent(reason)}`)
-      .then(() => window.location.reload());
   };
 
   return (
@@ -111,19 +88,14 @@ const AdminManageUsers = () => {
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
         <Tab label="Pending Requests" />
         <Tab label="User Management" />
-        <Tab label="Feedback" />
       </Tabs>
 
       {/* Tab Content */}
-       {activeTab === 0 ? (
+      {activeTab === 0 ? (
         <PendingRequestsTab />
-      ) : activeTab === 1 ? (
-        <UserManagementTab setInviteOpen={setInviteOpen} />
       ) : (
-        <AdminModerationDashboard />
+        <UserManagementTab inviteOpen={inviteOpen} setInviteOpen={setInviteOpen} />
       )}
-
-      <AdminInviteForm open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </Container>
   );
 };
@@ -180,7 +152,7 @@ const PendingRequestsTab = () => {
         }
       );
 
-      // Update local state
+      // Update local state 
       setPendingRequests(prev =>
         prev.filter(request => request.userId !== userId)
       );
@@ -212,7 +184,7 @@ const PendingRequestsTab = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update local state
+      // Update local state 
       setPendingRequests(prev =>
         prev.filter(request => request.userId !== userId)
       );
@@ -1027,7 +999,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirstamation Dialog */}
+      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         open={openDeleteDialog}
         onClose={handleCloseDeleteDialog}

@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.pickleball_backend.pickleball.repository.BookingRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +27,8 @@ public class FeedbackService {
     private final UserRepository userRepository;
     private final CourtRepository courtRepository;
     private final EventRepository eventRepository;
+    @Autowired
+    private BookingRepository bookingRepository; // 確保有注入
 
     public FeedbackResponseDto createFeedback(FeedbackDto dto) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -32,6 +36,14 @@ public class FeedbackService {
 
         User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+
+        // 只針對COURT做檢查
+        if (dto.getTargetType() == Feedback.TargetType.COURT) {
+            boolean hasBooked = bookingRepository.existsByMember_User_IdAndBookingSlots_Slot_CourtId(user.getId(), dto.getTargetId());
+            if (!hasBooked) {
+                throw new ValidationException("You can only review courts you have booked.");
+            }
+        }
 
         Feedback feedback = new Feedback();
         feedback.setTargetType(dto.getTargetType());
@@ -129,7 +141,7 @@ public class FeedbackService {
         User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
 
-        List<Feedback> feedbackList = feedbackRepository.findByUser_Id(user.getId());
+        List<Feedback> feedbackList = feedbackRepository.findByUserId(user.getId());
 
         return feedbackList.stream()
                 .map(feedback -> {
@@ -144,17 +156,17 @@ public class FeedbackService {
     private String getTargetName(Feedback.TargetType targetType, Integer targetId) {
         switch (targetType) {
             case COURT:
-                Court court = courtRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Court", "id", targetId));
-                return court.getName();
+                return courtRepository.findById(targetId)
+                        .map(Court::getName)
+                        .orElse("Court (deleted)");
             case EVENT:
-                Event event = eventRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Event", "id", targetId));
-                return event.getTitle();
+                return eventRepository.findById(targetId)
+                        .map(Event::getTitle)
+                        .orElse("Event (deleted)");
             case COACH:
-                User coach = userRepository.findById(targetId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Coach", "id", targetId));
-                return coach.getName();
+                return userRepository.findById(targetId)
+                        .map(User::getName)
+                        .orElse("Coach (deleted)");
             default:
                 return "Unknown";
         }

@@ -18,6 +18,9 @@ public class Payment {
     @Column(name = "payment_date")
     private java.time.LocalDateTime paymentDate;
 
+    @Column(name = "refund_date")
+    private java.time.LocalDateTime refundDate;
+
     @Column(name = "status", length = 50)
     private String status = "COMPLETED";
 
@@ -29,4 +32,10 @@ public class Payment {
 
     @Column(name = "transaction_id", length = 50)
     private String transactionId;
+
+    @OneToOne(mappedBy = "payment")
+    private Booking booking;
+
+    @OneToOne(mappedBy = "payment")
+    private ClassSession session;
 }

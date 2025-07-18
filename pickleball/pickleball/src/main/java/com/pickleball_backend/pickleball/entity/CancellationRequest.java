@@ -17,6 +17,10 @@ public class CancellationRequest {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id")
+    private ClassSession session;
+
     private String reason;
 
     @Column(name = "request_date", nullable = false)
@@ -27,4 +31,7 @@ public class CancellationRequest {
 
     @Column(name = "admin_remark")
     private String adminRemark;
+
+    @Column(name = "initiated_by_coach")
+    private boolean initiatedByCoach;
 }

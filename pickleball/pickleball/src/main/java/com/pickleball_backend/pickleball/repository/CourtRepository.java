@@ -22,4 +22,7 @@ public interface CourtRepository extends JpaRepository<Court, Integer> {
     @Modifying
     @Query("UPDATE Court c SET c.isArchived = true, c.archiveTimestamp = :timestamp WHERE c.id = :id")
     void softDeleteCourt(@Param("id") Integer id, @Param("timestamp") LocalDateTime timestamp);
+
+    @Query("SELECT DISTINCT cs.court FROM ClassSession cs WHERE cs.coach.id = :coachId")
+    List<Court> findCourtsByCoachId(@Param("coachId") Integer coachId);
 }

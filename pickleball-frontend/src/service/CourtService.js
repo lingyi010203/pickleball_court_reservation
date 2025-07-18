@@ -74,9 +74,21 @@ const CourtService = {
       console.error('[CourtService] Error in getCourtById:', error);
       throw error;
     }
-  }
+  },
 
-  // You can add more court-related methods here in future
+  /**
+   * Fetch courts that the current user has booked.
+   * @returns {Promise<Array>} List of court objects
+   */
+  getBookedCourts: async () => {
+    try {
+      const response = await api.get('/api/member/courts/booked');
+      return response.data;
+    } catch (error) {
+      console.error('[CourtService] Error in getBookedCourts:', error);
+      throw error;
+    }
+  }
 };
 
 export default CourtService;

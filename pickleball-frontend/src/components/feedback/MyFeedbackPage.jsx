@@ -24,6 +24,7 @@ const MyFeedbackPage = () => {
   const [editingId, setEditingId] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [feedbackErrorDialog, setFeedbackErrorDialog] = useState({ open: false, message: '' });
 
   useEffect(() => {
     if (!isAuthenticated()) return;
@@ -119,7 +120,16 @@ const MyFeedbackPage = () => {
       const response = await api.get('/feedback/user');
       setFeedbackList(response.data);
     } catch (err) {
-      alert('Failed to submit feedback.');
+      // Always show error dialog with backend message if available
+      let msg = 'Failed to submit feedback. You can only review courts you have booked. ';
+      if (err.response && err.response.data) {
+        if (typeof err.response.data === 'string') {
+          msg = err.response.data;
+        } else if (err.response.data.message) {
+          msg = err.response.data.message;
+        }
+      }
+      setFeedbackErrorDialog({ open: true, message: msg });
     } finally {
       setSubmitting(false);
     }
@@ -480,6 +490,31 @@ const MyFeedbackPage = () => {
                 Back
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Dialog for feedback validation */}
+      {feedbackErrorDialog.open && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000
+        }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 32, minWidth: 320, textAlign: 'center', maxWidth: 400 }}>
+            <h3 style={{ marginBottom: 24, color: '#d32f2f' }}>Error</h3>
+            <div style={{ marginBottom: 24 }}>{feedbackErrorDialog.message || 'You must have booked this court before you can leave feedback.'}</div>
+            <button
+              onClick={() => {
+                setFeedbackErrorDialog({ open: false, message: '' });
+                setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] }); // Reset form
+                setEditMode(false);
+                setEditingId(null);
+                // Do NOT close setOpenDialog(false); so the form stays open
+              }}
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#1976d2', color: 'white', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}
+            >
+              Back
+            </button>
           </div>
         </div>
       )}
