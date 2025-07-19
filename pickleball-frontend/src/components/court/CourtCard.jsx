@@ -59,12 +59,6 @@ const CourtCard = ({ court }) => {
             color={court.status === 'MAINTENANCE' ? 'error' : 'success'}
             sx={{ borderRadius: '8px' }}
           />
-          <Chip 
-            label={`${court.numberOfCourts || 1} courts`} 
-            size="small" 
-            variant="outlined"
-            sx={{ borderRadius: '8px' }}
-          />
         </Box>
       </CardContent>
       <CardActions sx={{ 

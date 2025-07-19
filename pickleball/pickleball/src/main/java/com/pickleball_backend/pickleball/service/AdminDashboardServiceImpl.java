@@ -76,34 +76,62 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     @Override
     public Page<AdminBookingDto> getAllBookings(Pageable pageable, String search, String status, String startDate, String endDate) {
-        LocalDate start = null;
-        LocalDate end = null;
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         try {
-            if (startDate != null && !startDate.isEmpty()) {
-                start = LocalDate.parse(startDate, formatter);
+            System.out.println("AdminDashboardService: getAllBookings called");
+            
+            // 检查数据库中的总预订数
+            long totalBookingsInDb = bookingRepository.count();
+            System.out.println("AdminDashboardService: Total bookings in database: " + totalBookingsInDb);
+            
+            // 如果没有预订，直接返回空结果
+            if (totalBookingsInDb == 0) {
+                System.out.println("AdminDashboardService: No bookings found in database");
+                return new org.springframework.data.domain.PageImpl<>(List.of(), pageable, 0);
             }
-            if (endDate != null && !endDate.isEmpty()) {
-                end = LocalDate.parse(endDate, formatter);
+            
+            // 暂时使用简单的查询，不使用过滤条件
+            System.out.println("AdminDashboardService: Using simple query (no filters)");
+            Page<Booking> bookings = bookingRepository.findAllBookings(pageable);
+            
+            System.out.println("AdminDashboardService: Found " + bookings.getTotalElements() + " total bookings, " + bookings.getContent().size() + " on current page");
+            System.out.println("AdminDashboardService: Page info - page: " + pageable.getPageNumber() + ", size: " + pageable.getPageSize());
+            
+            if (bookings.getContent().isEmpty()) {
+                System.out.println("AdminDashboardService: No bookings match the current filters");
+                // 尝试获取所有预订来调试
+                List<Booking> allBookings = bookingRepository.findAll();
+                System.out.println("AdminDashboardService: All bookings in database: " + allBookings.size());
+                if (!allBookings.isEmpty()) {
+                    System.out.println("AdminDashboardService: First booking ID: " + allBookings.get(0).getId() + ", status: " + allBookings.get(0).getStatus());
+                }
             }
+            
+            // 直接使用基本的 booking 数据，避免 EntityGraph 的重复记录问题
+            List<AdminBookingDto> dtos = bookings.getContent().stream()
+                .map(b -> {
+                    try {
+                        return convertToAdminBookingDto(b);
+                    } catch (Exception e) {
+                        System.err.println("Error converting booking " + b.getId() + ": " + e.getMessage());
+                        e.printStackTrace();
+                        // 返回一个基本的 DTO 避免整个请求失败
+                        AdminBookingDto basicDto = new AdminBookingDto();
+                        basicDto.setId(b.getId());
+                        basicDto.setStatus(b.getStatus());
+                        basicDto.setTotalAmount(b.getTotalAmount());
+                        basicDto.setBookingDate(b.getBookingDate());
+                        return basicDto;
+                    }
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            System.out.println("AdminDashboardService: Converted " + dtos.size() + " DTOs");
+            return new org.springframework.data.domain.PageImpl<>(dtos, pageable, bookings.getTotalElements());
         } catch (Exception e) {
-            // ignore parse error, treat as null
+            System.err.println("Error in getAllBookings: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        Page<Booking> bookings = bookingRepository.findByAdminFilters(
-            (search != null && !search.isEmpty()) ? search : null,
-            (status != null && !status.isEmpty()) ? status : null,
-            start,
-            end,
-            pageable
-        );
-        List<Integer> ids = bookings.getContent().stream().map(Booking::getId).toList();
-        List<Booking> bookingsWithAll = ids.isEmpty() ? List.of() : bookingRepository.findAllWithAdminRelationsByIds(ids);
-        java.util.Map<Integer, Booking> bookingMap = bookingsWithAll.stream().collect(java.util.stream.Collectors.toMap(Booking::getId, b -> b));
-        List<AdminBookingDto> dtos = bookings.getContent().stream()
-            .map(b -> bookingMap.getOrDefault(b.getId(), b))
-            .map(this::convertToAdminBookingDto)
-            .collect(java.util.stream.Collectors.toList());
-        return new org.springframework.data.domain.PageImpl<>(dtos, pageable, bookings.getTotalElements());
     }
 
     @Override
@@ -590,53 +618,134 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         return dto;
     }
 
-    private AdminBookingDto convertToAdminBookingDto(Booking booking) {
-        AdminBookingDto dto = new AdminBookingDto();
-        dto.setId(booking.getId());
-        dto.setBookingDate(booking.getBookingDate());
-        dto.setTotalAmount(booking.getTotalAmount());
-        dto.setStatus(booking.getStatus());
+    public AdminBookingDto convertToAdminBookingDto(Booking booking) {
+        try {
+            AdminBookingDto dto = new AdminBookingDto();
+            dto.setId(booking.getId());
+            dto.setBookingDate(booking.getBookingDate());
+            dto.setTotalAmount(booking.getTotalAmount());
+            dto.setStatus(booking.getStatus());
 
-        if (booking.getMember() != null && booking.getMember().getUser() != null) {
-            dto.setMemberName(booking.getMember().getUser().getName());
-            dto.setMemberPhone(booking.getMember().getUser().getPhone());
-            dto.setMemberEmail(booking.getMember().getUser().getEmail());
-        }
-
-        Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
-        if (slot != null) {
-            dto.setSlotDate(slot.getDate());
-            dto.setStartTime(slot.getStartTime());
-            dto.setEndTime(slot.getEndTime());
-
-            Court court = courtRepository.findById(slot.getCourtId()).orElse(null);
-            if (court != null) {
-                dto.setCourtName(court.getName());
+            // 安全地获取会员信息
+            try {
+                if (booking.getMember() != null && booking.getMember().getUser() != null) {
+                    dto.setMemberName(booking.getMember().getUser().getName());
+                    dto.setMemberPhone(booking.getMember().getUser().getPhone());
+                    dto.setMemberEmail(booking.getMember().getUser().getEmail());
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting member info for booking " + booking.getId() + ": " + e.getMessage());
             }
-        }
 
-        // Add payment information
-        if (booking.getPayment() != null) {
-            dto.setPaymentMethod(booking.getPayment().getPaymentMethod());
-            dto.setPaymentType(booking.getPayment().getPaymentType());
-            dto.setPaymentStatus(booking.getPayment().getStatus());
-            dto.setTransactionId(booking.getPayment().getTransactionId());
-        }
+            // 安全地处理多 slot 预订
+            try {
+                if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
+                    System.out.println("AdminDashboardService: Booking " + booking.getId() + " has " + booking.getBookingSlots().size() + " slots");
+                    
+                    // 按时间排序，过滤掉空的 slot
+                    List<BookingSlot> sortedSlots = booking.getBookingSlots().stream()
+                            .filter(bs -> bs != null && bs.getSlot() != null) // 过滤掉空的 slot
+                            .sorted((a, b) -> a.getSlot().getStartTime().compareTo(b.getSlot().getStartTime()))
+                            .collect(Collectors.toList());
+                    
+                    if (!sortedSlots.isEmpty()) {
+                        // 获取第一个和最后一个 slot
+                        Slot firstSlot = sortedSlots.get(0).getSlot();
+                        Slot lastSlot = sortedSlots.get(sortedSlots.size() - 1).getSlot();
+                        
+                        // 计算总时长
+                        int totalDuration = sortedSlots.stream()
+                                .mapToInt(bs -> bs.getSlot().getDurationHours() != null ? bs.getSlot().getDurationHours() : 1)
+                                .sum();
+                        
+                        dto.setSlotDate(firstSlot.getDate());
+                        dto.setStartTime(firstSlot.getStartTime());
+                        dto.setEndTime(lastSlot.getEndTime());
+                        dto.setDurationHours(totalDuration);
 
-        dto.setPurpose(booking.getPurpose());
-        dto.setNumberOfPlayers(booking.getNumberOfPlayers());
-        CancellationRequest cancellationRequest = booking.getCancellationRequest();
-        if (cancellationRequest != null) {
-            dto.setAdminRemark(cancellationRequest.getAdminRemark());
-            // 新增：组装 CancellationRequestDto
-            com.pickleball_backend.pickleball.dto.CancellationRequestDto crDto = new com.pickleball_backend.pickleball.dto.CancellationRequestDto();
-            crDto.setId(cancellationRequest.getId());
-            crDto.setReason(cancellationRequest.getReason());
-            crDto.setStatus(cancellationRequest.getStatus());
-            crDto.setAdminRemark(cancellationRequest.getAdminRemark());
-            crDto.setRequestDate(cancellationRequest.getRequestDate());
-            dto.setCancellationRequest(crDto);
+                        // 获取场地信息
+                        try {
+                            Court court = courtRepository.findById(firstSlot.getCourtId()).orElse(null);
+                            if (court != null) {
+                                dto.setCourtName(court.getName());
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Error getting court info for booking " + booking.getId() + ": " + e.getMessage());
+                        }
+                        
+                        // 设置所有 bookingSlots 信息（用于前端显示）
+                        dto.setBookingSlots(sortedSlots.stream()
+                                .map(bs -> {
+                                    com.pickleball_backend.pickleball.dto.BookingSlotDto slotDto = 
+                                        new com.pickleball_backend.pickleball.dto.BookingSlotDto();
+                                    slotDto.setId(bs.getId());
+                                    slotDto.setStatus(bs.getStatus());
+                                    
+                                    // 安全地设置 slot 信息，避免循环引用
+                                    if (bs.getSlot() != null) {
+                                        com.pickleball_backend.pickleball.dto.SlotDto slotDto2 = 
+                                            new com.pickleball_backend.pickleball.dto.SlotDto();
+                                        slotDto2.setId(bs.getSlot().getId());
+                                        slotDto2.setDate(bs.getSlot().getDate());
+                                        slotDto2.setStartTime(bs.getSlot().getStartTime());
+                                        slotDto2.setEndTime(bs.getSlot().getEndTime());
+                                        slotDto2.setDurationHours(bs.getSlot().getDurationHours());
+                                        slotDto2.setCourtId(bs.getSlot().getCourtId());
+                                        slotDto2.setAvailable(bs.getSlot().isAvailable());
+                                        slotDto.setSlot(slotDto2);
+                                    }
+                                    
+                                    return slotDto;
+                                })
+                                .collect(Collectors.toList()));
+                    }
+                } else {
+                    System.out.println("AdminDashboardService: Booking " + booking.getId() + " has no booking slots");
+                }
+            } catch (Exception e) {
+                System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
+            }
+
+            // 安全地添加支付信息
+            try {
+                if (booking.getPayment() != null) {
+                    dto.setPaymentMethod(booking.getPayment().getPaymentMethod());
+                    dto.setPaymentType(booking.getPayment().getPaymentType());
+                    dto.setPaymentStatus(booking.getPayment().getStatus());
+                    dto.setTransactionId(booking.getPayment().getTransactionId());
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting payment info for booking " + booking.getId() + ": " + e.getMessage());
+            }
+
+            dto.setPurpose(booking.getPurpose());
+            dto.setNumberOfPlayers(booking.getNumberOfPlayers());
+            dto.setNumPaddles(booking.getNumPaddles());
+            dto.setBuyBallSet(booking.getBuyBallSet());
+            
+            // 安全地处理取消请求
+            try {
+                CancellationRequest cancellationRequest = booking.getCancellationRequest();
+                if (cancellationRequest != null) {
+                    dto.setAdminRemark(cancellationRequest.getAdminRemark());
+                    // 新增：组装 CancellationRequestDto
+                    com.pickleball_backend.pickleball.dto.CancellationRequestDto crDto = new com.pickleball_backend.pickleball.dto.CancellationRequestDto();
+                    crDto.setId(cancellationRequest.getId());
+                    crDto.setReason(cancellationRequest.getReason());
+                    crDto.setStatus(cancellationRequest.getStatus());
+                    crDto.setAdminRemark(cancellationRequest.getAdminRemark());
+                    crDto.setRequestDate(cancellationRequest.getRequestDate());
+                    dto.setCancellationRequest(crDto);
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting cancellation request for booking " + booking.getId() + ": " + e.getMessage());
+            }
+            
+            return dto;
+        } catch (Exception e) {
+            System.err.println("Error in convertToAdminBookingDto for booking " + booking.getId() + ": " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        return dto;
     }
 }

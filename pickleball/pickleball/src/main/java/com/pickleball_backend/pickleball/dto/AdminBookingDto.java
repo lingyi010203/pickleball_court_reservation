@@ -3,6 +3,7 @@ package com.pickleball_backend.pickleball.dto;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 public class AdminBookingDto {
@@ -30,4 +31,11 @@ public class AdminBookingDto {
     private String paymentType;
     private String paymentStatus;
     private String transactionId;
+    
+    // Additional booking details
+    private Integer numPaddles;
+    private Boolean buyBallSet;
+    
+    // Multi-slot booking support
+    private List<BookingSlotDto> bookingSlots;
 }

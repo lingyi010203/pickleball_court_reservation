@@ -33,5 +33,5 @@ public class CancellationRequest {
     private String adminRemark;
 
     @Column(name = "initiated_by_coach")
-    private boolean initiatedByCoach;
+    private Boolean initiatedByCoach;
 }

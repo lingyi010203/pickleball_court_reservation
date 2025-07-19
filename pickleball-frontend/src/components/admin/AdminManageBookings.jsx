@@ -298,9 +298,19 @@ const AdminManageBookings = () => {
     // Generate CSV rows
     const rows = bookings.map(b => {
       // Use slot date and time instead of booking date
-      const formattedDateTime = b.slotDate && b.startTime && b.endTime 
-        ? `${formatSlotDateForExport(b.slotDate)} ${formatTimeForExport(b.startTime)} - ${formatTimeForExport(b.endTime)}`
-        : 'No slot info';
+      let formattedDateTime = 'No slot info';
+      
+      if (b.bookingSlots && b.bookingSlots.length > 0) {
+        // 多 slot 预订：显示时间范围
+        const slots = b.bookingSlots.sort((a, b) => 
+          new Date(a.slot.startTime) - new Date(b.slot.startTime)
+        );
+        const firstSlot = slots[0].slot;
+        const lastSlot = slots[slots.length - 1].slot;
+        formattedDateTime = `${formatSlotDateForExport(firstSlot.date)} ${formatTimeForExport(firstSlot.startTime)} - ${formatTimeForExport(lastSlot.endTime)} (${slots.length} slots)`;
+      } else if (b.slotDate && b.startTime && b.endTime) {
+        formattedDateTime = `${formatSlotDateForExport(b.slotDate)} ${formatTimeForExport(b.startTime)} - ${formatTimeForExport(b.endTime)}`;
+      }
       
       return [
         b.id,
@@ -605,9 +615,19 @@ const AdminManageBookings = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <DateIcon sx={{ color: '#9e9e9e', fontSize: 18, mr: 1 }} />
                           <Typography variant="body2">
-                            {booking.slotDate && booking.startTime && booking.endTime 
-                              ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
-                              : 'No slot info'
+                            {booking.bookingSlots && booking.bookingSlots.length > 0 
+                              ? (() => {
+                                  // 多 slot 预订：显示时间范围
+                                  const slots = booking.bookingSlots.sort((a, b) => 
+                                    new Date(a.slot.startTime) - new Date(b.slot.startTime)
+                                  );
+                                  const firstSlot = slots[0].slot;
+                                  const lastSlot = slots[slots.length - 1].slot;
+                                  return `${formatSlotDate(firstSlot.date)} ${formatTime(firstSlot.startTime)} - ${formatTime(lastSlot.endTime)} (${slots.length} slot${slots.length > 1 ? 's' : ''})`;
+                                })()
+                              : booking.slotDate && booking.startTime && booking.endTime 
+                                ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
+                                : 'No slot info'
                             }
                           </Typography>
                         </Box>
@@ -631,7 +651,7 @@ const AdminManageBookings = () => {
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body1" fontWeight="500">
-                          {booking.totalAmount?.toFixed(2)}
+                          {booking.totalAmount?.toFixed(2) ?? '0.00'}
                         </Typography>
                       </TableCell>
                       <TableCell>

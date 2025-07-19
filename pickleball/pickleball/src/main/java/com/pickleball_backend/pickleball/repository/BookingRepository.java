@@ -17,7 +17,14 @@ import org.springframework.data.domain.Pageable;
 
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
-    List<Booking> findByMemberId(Integer memberId);
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.bookingSlots bs " +
+           "LEFT JOIN FETCH bs.slot " +
+           "LEFT JOIN FETCH b.member m " +
+           "LEFT JOIN FETCH m.user " +
+           "LEFT JOIN FETCH b.payment " +
+           "WHERE b.member.id = :memberId")
+    List<Booking> findByMemberId(@Param("memberId") Integer memberId);
 
     @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.cancellationRequest WHERE b.id = :id")
     Optional<Booking> findByIdWithCancellation(@Param("id") Integer id);
@@ -25,7 +32,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.cancellationRequest WHERE b.id IN :ids")
     List<Booking> findAllWithCancellationByIds(@Param("ids") List<Integer> ids);
 
-    @EntityGraph(attributePaths = {"member.user", "cancellationRequest"})
+    @EntityGraph(attributePaths = {"member.user", "cancellationRequest", "bookingSlots", "bookingSlots.slot", "payment"})
     @Query("SELECT b FROM Booking b WHERE b.id IN :ids")
     List<Booking> findAllWithAdminRelationsByIds(@Param("ids") List<Integer> ids);
 
@@ -35,8 +42,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
             "WHERE " +
             "(:search IS NULL OR u.name LIKE %:search% OR u.email LIKE %:search%) " +
             "AND (:status IS NULL OR b.status = :status) " +
-            "AND (:startDate IS NULL OR b.bookingDate >= :startDate) " +
-            "AND (:endDate IS NULL OR b.bookingDate <= :endDate)")
+            "AND (:startDate IS NULL OR DATE(b.bookingDate) >= :startDate) " +
+            "AND (:endDate IS NULL OR DATE(b.bookingDate) <= :endDate)")
     Page<Booking> findByAdminFilters(
             @Param("search") String search,
             @Param("status") String status,
@@ -44,6 +51,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
             @Param("endDate") LocalDate endDate,
             Pageable pageable
     );
+
+    // 简单的查询方法，用于调试
+    @Query("SELECT b FROM Booking b ORDER BY b.bookingDate DESC")
+    Page<Booking> findAllBookings(Pageable pageable);
 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(b) FROM Booking b WHERE b.bookingDate BETWEEN :start AND :end")
     long countByBookingDateBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);

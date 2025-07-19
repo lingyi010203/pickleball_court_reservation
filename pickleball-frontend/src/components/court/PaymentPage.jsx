@@ -68,7 +68,7 @@ const PaymentPage = () => {
       setIsProcessing(true);
 
       const bookingRequest = {
-        slotId: Array.isArray(bookingDetails.slotIds) ? bookingDetails.slotIds[0] : bookingDetails.slotId,
+        // 移除 slotId，只使用 slotIds 来支持多 slot 预订
         slotIds: bookingDetails.slotIds,
         purpose: bookingDetails.purpose,
         numberOfPlayers: bookingDetails.numberOfPlayers,

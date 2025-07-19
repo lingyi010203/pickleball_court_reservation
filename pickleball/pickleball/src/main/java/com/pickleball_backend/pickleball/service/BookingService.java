@@ -61,12 +61,19 @@ public class BookingService {
         List<Integer> slotIds = request.getSlotIds() != null && !request.getSlotIds().isEmpty()
             ? request.getSlotIds()
             : (request.getSlotId() != null ? List.of(request.getSlotId()) : List.of());
+        
+        // 添加调试日志
+        log.info("Booking request - slotId: {}, slotIds: {}, final slotIds: {}", 
+                request.getSlotId(), request.getSlotIds(), slotIds);
+        
         if (slotIds.isEmpty()) {
             throw new ValidationException("No slot selected");
         }
 
         // 5. 获取所有 slot，校验连续性、可用性
         List<Slot> slots = slotRepository.findAllById(slotIds);
+        log.info("Found {} slots out of {} requested slotIds", slots.size(), slotIds.size());
+        
         if (slots.size() != slotIds.size()) {
             throw new ResourceNotFoundException("Some slots not found");
         }
@@ -136,6 +143,7 @@ public class BookingService {
         booking = bookingRepository.save(booking);
 
         // 9. Create BookingSlot records
+        log.info("Creating {} BookingSlot records for booking {}", slots.size(), booking.getId());
         for (Slot slot : slots) {
             BookingSlot bookingSlot = new BookingSlot();
             bookingSlot.setBooking(booking);
@@ -146,6 +154,7 @@ public class BookingService {
             }
             bookingSlot.setStatus(statusValue);
             bookingSlotRepository.save(bookingSlot);
+            log.info("Created BookingSlot: bookingId={}, slotId={}", booking.getId(), slot.getId());
             // 10. Update slot availability
             slot.setAvailable(false);
             slotRepository.save(slot);
@@ -521,53 +530,102 @@ public class BookingService {
     }
 
     public List<BookingHistoryDto> getBookingHistory(Integer memberId, String status) {
-        List<Booking> bookings = bookingRepository.findByMemberId(memberId);
+        try {
+            List<Booking> bookings = bookingRepository.findByMemberId(memberId);
+            log.info("Found {} bookings for member {}", bookings.size(), memberId);
 
-        // 自动修正已过期的CONFIRMED预订为COMPLETED
-        LocalDateTime now = LocalDateTime.now();
-        boolean updated = false;
-        for (Booking booking : bookings) {
-            if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
-                Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
-                if (slot != null && slot.getDate() != null && slot.getEndTime() != null) {
-                    LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
-                    if (endDateTime.isBefore(now)) {
-                        booking.setStatus("COMPLETED");
-                        bookingRepository.save(booking);
-                        updated = true;
+            // 自动修正已过期的CONFIRMED预订为COMPLETED
+            LocalDateTime now = LocalDateTime.now();
+            boolean updated = false;
+            for (Booking booking : bookings) {
+                if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+                    // 检查所有 slots 是否都已过期
+                    boolean allSlotsExpired = true;
+                    if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
+                        for (BookingSlot bookingSlot : booking.getBookingSlots()) {
+                            Slot slot = bookingSlot.getSlot();
+                            if (slot != null && slot.getDate() != null && slot.getEndTime() != null) {
+                                LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+                                if (endDateTime.isAfter(now)) {
+                                    allSlotsExpired = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (allSlotsExpired) {
+                            booking.setStatus("COMPLETED");
+                            bookingRepository.save(booking);
+                            updated = true;
+                        }
                     }
                 }
             }
-        }
-        // 重新获取最新状态
-        if (updated) {
-            bookings = bookingRepository.findByMemberId(memberId);
-        }
+            // 重新获取最新状态
+            if (updated) {
+                bookings = bookingRepository.findByMemberId(memberId);
+            }
 
-        return bookings.stream()
-                .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
-                .map(booking -> {
-                    Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;
-                    Court court = slot != null ? courtRepository.findById(slot.getCourtId())
-                            .orElse(new Court()) : new Court();
+            return bookings.stream()
+                    .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
+                    .map(booking -> {
+                        try {
+                            // 获取第一个和最后一个 slot 来显示时间范围
+                            Slot firstSlot = null;
+                            Slot lastSlot = null;
+                            int totalDuration = 0;
+                            
+                            if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
+                                // 按时间排序
+                                List<BookingSlot> sortedSlots = booking.getBookingSlots().stream()
+                                        .sorted((a, b) -> a.getSlot().getStartTime().compareTo(b.getSlot().getStartTime()))
+                                        .collect(Collectors.toList());
+                                
+                                firstSlot = sortedSlots.get(0).getSlot();
+                                lastSlot = sortedSlots.get(sortedSlots.size() - 1).getSlot();
+                                
+                                // 计算总时长
+                                totalDuration = sortedSlots.stream()
+                                        .mapToInt(bs -> bs.getSlot().getDurationHours() != null ? bs.getSlot().getDurationHours() : 1)
+                                        .sum();
+                                
+                                log.debug("Booking {} has {} slots, total duration: {}", 
+                                        booking.getId(), sortedSlots.size(), totalDuration);
+                            }
+                            
+                            Court court = firstSlot != null ? courtRepository.findById(firstSlot.getCourtId())
+                                    .orElse(new Court()) : new Court();
 
-                    BookingHistoryDto dto = new BookingHistoryDto();
-                    dto.setId(booking.getId());
-                    dto.setCourtName(court.getName());
-                    dto.setLocation(court.getLocation());
-                    dto.setDate(slot != null ? slot.getDate() : null);
-                    dto.setStartTime(slot != null ? slot.getStartTime() : null);
-                    dto.setEndTime(slot != null ? slot.getEndTime() : null);
-                    dto.setAmount(booking.getTotalAmount());
-                    dto.setStatus(booking.getStatus());
-                    dto.setCreatedAt(booking.getBookingDate());
-                    dto.setPurpose(booking.getPurpose());
-                    dto.setNumberOfPlayers(booking.getNumberOfPlayers());
-                    // Add duration to history
-                    dto.setDurationHours(slot != null && slot.getDurationHours() != null ? slot.getDurationHours() : 0);
-                    return dto;
-                })
-                .collect(Collectors.toList());
+                            BookingHistoryDto dto = new BookingHistoryDto();
+                            dto.setId(booking.getId());
+                            dto.setCourtName(court.getName());
+                            dto.setLocation(court.getLocation());
+                            dto.setDate(firstSlot != null ? firstSlot.getDate() : null);
+                            dto.setStartTime(firstSlot != null ? firstSlot.getStartTime() : null);
+                            dto.setEndTime(lastSlot != null ? lastSlot.getEndTime() : null);
+                            dto.setAmount(booking.getTotalAmount());
+                            dto.setStatus(booking.getStatus());
+                            dto.setCreatedAt(booking.getBookingDate());
+                            dto.setPurpose(booking.getPurpose());
+                            dto.setNumberOfPlayers(booking.getNumberOfPlayers());
+                            // 设置总时长
+                            dto.setDurationHours(totalDuration);
+                            return dto;
+                        } catch (Exception e) {
+                            log.error("Error processing booking {}: {}", booking.getId(), e.getMessage());
+                            // 返回一个基本的 DTO，避免整个请求失败
+                            BookingHistoryDto dto = new BookingHistoryDto();
+                            dto.setId(booking.getId());
+                            dto.setStatus(booking.getStatus());
+                            dto.setAmount(booking.getTotalAmount());
+                            dto.setCreatedAt(booking.getBookingDate());
+                            return dto;
+                        }
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error in getBookingHistory for member {}: {}", memberId, e.getMessage(), e);
+            throw new RuntimeException("Failed to load booking history", e);
+        }
     }
 
     private Wallet getOrCreateWallet(Member member) {
@@ -578,5 +636,32 @@ public class BookingService {
                     newWallet.setBalance(0.00);
                     return walletRepository.save(newWallet);
                 });
+    }
+
+    /**
+     * 清理重复的 BookingSlot 记录
+     * 这个方法应该只在需要时手动调用
+     */
+    @Transactional
+    public void cleanupDuplicateBookingSlots() {
+        log.info("Starting cleanup of duplicate booking slots...");
+        
+        // 使用原生 SQL 查询找到重复记录
+        String findDuplicatesSql = """
+            SELECT booking_id, slot_id, COUNT(*) as count 
+            FROM bookingslot 
+            GROUP BY booking_id, slot_id 
+            HAVING COUNT(*) > 1
+            """;
+        
+        // 这里需要注入 JdbcTemplate 来执行原生 SQL
+        // 暂时用日志记录，实际清理需要手动执行 SQL
+        
+        log.warn("Duplicate booking slots detected. Please run the following SQL manually:");
+        log.warn("DELETE bs1 FROM bookingslot bs1");
+        log.warn("INNER JOIN bookingslot bs2");
+        log.warn("WHERE bs1.id > bs2.id");
+        log.warn("AND bs1.booking_id = bs2.booking_id");
+        log.warn("AND bs1.slot_id = bs2.slot_id;");
     }
 }

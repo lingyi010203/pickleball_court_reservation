@@ -49,6 +49,7 @@ const BookingPage = () => {
   const [numPlayers, setNumPlayers] = useState(2);
   const [numPaddles, setNumPaddles] = useState(0);
   const [buyBallSet, setBuyBallSet] = useState(false);
+  const [purpose, setPurpose] = useState('Recreational');
 
   // 日历数据结构
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -164,7 +165,7 @@ const BookingPage = () => {
       endTime: selectedSlots[selectedSlots.length - 1].endTime,
       durationHours: selectedSlots.length,
       price: total, // 修正：传递总价（含paddle/ball set）
-      purpose: "Recreational",
+      purpose: purpose,
       numberOfPlayers: numPlayers, // 传递人数
       numPaddles, // 传递paddle数量
       buyBallSet // 传递ball set选择
@@ -251,6 +252,28 @@ const BookingPage = () => {
             <>
               <Divider sx={{ my: 2 }} />
 
+              {/* 新增：Purpose 选择 */}
+              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Purpose:
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} textAlign="right">
+                  <select
+                    value={purpose}
+                    onChange={e => setPurpose(e.target.value)}
+                    style={{ width: 120, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
+                  >
+                    <option value="Recreational">Recreational</option>
+                    <option value="Training">Training</option>
+                    <option value="Competition">Competition</option>
+                    <option value="Social">Social</option>
+                    <option value="Practice">Practice</option>
+                    <option value="Tournament">Tournament</option>
+                  </select>
+                </Grid>
+              </Grid>
               {/* 新增：人数选择 */}
               <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
                 <Grid item xs={6}>

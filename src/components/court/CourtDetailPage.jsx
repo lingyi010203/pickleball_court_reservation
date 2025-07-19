@@ -203,7 +203,7 @@ const CourtDetailPage = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <PeopleIcon sx={{ mr: 1, color: 'text.secondary' }} />
                       <Typography variant="body1">
-                        <strong>Courts:</strong> {court.numberOfCourts}
+                        {/* Remove: <strong>Courts:</strong> {court.numberOfCourts} */}
                       </Typography>
                     </Box>
                   </Stack>

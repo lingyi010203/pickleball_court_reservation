@@ -6,6 +6,7 @@ import java.time.LocalTime;
 
 @Data
 public class SlotDto {
+    private Integer id;
     private Integer courtId;
     private LocalDate date;
     private LocalTime startTime;
