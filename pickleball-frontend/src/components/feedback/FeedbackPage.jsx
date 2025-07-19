@@ -513,6 +513,31 @@ const FeedbackPage = () => {
               <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
                 Reviewing: {preFilledData.courtName}
               </Typography>
+              {preFilledData.courtLocation && (
+                <Typography variant="body2" color="text.secondary">
+                  Location: {preFilledData.courtLocation}
+                </Typography>
+              )}
+              {preFilledData.slotDate && (
+                <Typography variant="body2" color="text.secondary">
+                  Date: {new Date(preFilledData.slotDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Typography>
+              )}
+              {preFilledData.startTime && preFilledData.endTime && (
+                <Typography variant="body2" color="text.secondary">
+                  Time: {preFilledData.startTime} - {preFilledData.endTime}
+                </Typography>
+              )}
+              {preFilledData.durationHours && (
+                <Typography variant="body2" color="text.secondary">
+                  Duration: {preFilledData.durationHours} hour{preFilledData.durationHours > 1 ? 's' : ''}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">
                 {isEditingMode 
                   ? "You're editing your existing review for this completed booking" 

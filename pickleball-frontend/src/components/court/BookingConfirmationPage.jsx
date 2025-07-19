@@ -20,7 +20,17 @@ const BookingConfirmationPage = () => {
   const navigate = useNavigate();
   const booking = location.state?.booking;
 
+  // 添加调试日志
+  console.log('=== BookingConfirmationPage Debug ===');
+  console.log('Location state:', location.state);
+  console.log('Booking object:', booking);
+  console.log('slotDate:', booking?.slotDate);
+  console.log('startTime:', booking?.startTime);
+  console.log('endTime:', booking?.endTime);
+  console.log('durationHours:', booking?.durationHours);
+
   const formatDate = (dateString) => {
+    console.log('formatDate called with:', dateString);
     if (!dateString) return '';
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
@@ -152,7 +162,7 @@ const BookingConfirmationPage = () => {
               </Grid>
               <Grid item xs={6} textAlign="right">
                 <Typography variant="body2" fontWeight="medium">
-                  {formatDate(booking.bookingSlots && booking.bookingSlots[0]?.slot?.date)}
+                  {formatDate(booking.slotDate)}
                 </Typography>
               </Grid>
               
@@ -163,7 +173,7 @@ const BookingConfirmationPage = () => {
               </Grid>
               <Grid item xs={6} textAlign="right">
                 <Typography variant="body2" fontWeight="medium">
-                  {formatTime(booking.bookingSlots && booking.bookingSlots[0]?.slot?.startTime)} - {formatTime(booking.bookingSlots && booking.bookingSlots[0]?.slot?.endTime)}
+                  {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                 </Typography>
               </Grid>
               
@@ -175,17 +185,6 @@ const BookingConfirmationPage = () => {
               <Grid item xs={6} textAlign="right">
                 <Typography variant="body2" fontWeight="medium">
                   {booking.durationHours} hours
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Court Number:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  #{booking.bookingSlots && booking.bookingSlots[0]?.slot?.courtNumber}
                 </Typography>
               </Grid>
             </Grid>

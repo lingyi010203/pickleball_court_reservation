@@ -240,7 +240,7 @@ const BookingHistory = () => {
       const response = await api.get('/member/bookings');
       console.log("API Response:", response.data);
 
-            // 数据规范化处理 - 根据实际API响应调整字段映射
+      // 数据规范化处理 - 根据实际API响应调整字段映射
       const normalizedBookings = response.data.map(booking => {
         console.log('Processing booking:', booking);
         console.log('Court ID from API:', booking.courtId);
@@ -251,9 +251,9 @@ const BookingHistory = () => {
           courtId: booking.courtId, // 直接从API获取
           courtName: booking.courtName || "AAA Pickleball Court",
           courtLocation: booking.location || "123 Sports Complex, Kuala Lumpur",
-          slotDate: booking.date, // 修正
-          startTime: booking.startTime, // 修正
-          endTime: booking.endTime, // 修正
+          slotDate: booking.date, // 使用API中的date字段
+          startTime: booking.startTime, // 使用API中的startTime字段
+          endTime: booking.endTime, // 使用API中的endTime字段
           numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
           totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
           status: booking.bookingStatus || booking.status || "CONFIRMED",
@@ -277,6 +277,9 @@ const BookingHistory = () => {
         
         console.log('Normalized booking:', normalizedBooking);
         console.log('Extracted courtId:', normalizedBooking.courtId);
+        console.log('Extracted slotDate:', normalizedBooking.slotDate);
+        console.log('Extracted startTime:', normalizedBooking.startTime);
+        console.log('Extracted endTime:', normalizedBooking.endTime);
         
         return normalizedBooking;
       });
@@ -360,6 +363,11 @@ const BookingHistory = () => {
     console.log('Booking data:', booking);
     console.log('Booking ID:', booking.bookingId);
     console.log('Court Name:', booking.courtName);
+    console.log('Court Location:', booking.courtLocation);
+    console.log('Slot Date:', booking.slotDate);
+    console.log('Start Time:', booking.startTime);
+    console.log('End Time:', booking.endTime);
+    console.log('Duration Hours:', booking.durationHours);
     console.log('Has Reviewed:', booking.hasReviewed);
     
     // 检查预订是否包含必要的信息
@@ -367,13 +375,18 @@ const BookingHistory = () => {
       console.error('Missing booking ID');
       console.log('Falling back to select page');
       // 如果信息不全，回退到选择页面
-              navigate('/profile/my-bookings');
+      navigate('/profile/my-bookings');
       return;
     }
 
     const navigationState = {
       targetType: 'COURT',
       courtName: booking.courtName,
+      courtLocation: booking.courtLocation,
+      slotDate: booking.slotDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      durationHours: booking.durationHours,
       bookingId: String(booking.bookingId), // 确保bookingId是字符串类型
       isEditing: false, // 新建评价
       isViewReview: booking.hasReviewed // 如果已经评价过，设置为View Review模式

@@ -81,17 +81,38 @@ const PaymentPage = () => {
       // 使用配置好的api实例代替axios
       const response = await api.post('/member/bookings', bookingRequest);
 
+      // 添加调试日志
+      console.log('=== PaymentPage Debug ===');
+      console.log('API Response:', response.data);
+      console.log('Booking Details:', bookingDetails);
+      console.log('Final booking object:', {
+        ...response.data,
+        slotDate: bookingDetails.date,
+        startTime: bookingDetails.startTime,
+        endTime: bookingDetails.endTime,
+        durationHours: bookingDetails.durationHours,
+        totalAmount: bookingDetails.price,
+        numPaddles: bookingDetails.numPaddles,
+        buyBallSet: bookingDetails.buyBallSet,
+        numberOfPlayers: bookingDetails.numberOfPlayers,
+        courtName: bookingDetails.courtName,
+        courtLocation: bookingDetails.courtLocation
+      });
+
       navigate('/booking/confirmation', {
         state: {
           booking: {
             ...response.data,
-            date: bookingDetails.date,
+            slotDate: bookingDetails.date,
             startTime: bookingDetails.startTime,
             endTime: bookingDetails.endTime,
-            duration: bookingDetails.durationHours,
-            price: bookingDetails.price,
+            durationHours: bookingDetails.durationHours,
+            totalAmount: bookingDetails.price,
             numPaddles: bookingDetails.numPaddles,
-            buyBallSet: bookingDetails.buyBallSet
+            buyBallSet: bookingDetails.buyBallSet,
+            numberOfPlayers: bookingDetails.numberOfPlayers,
+            courtName: bookingDetails.courtName,
+            courtLocation: bookingDetails.courtLocation
           }
         }
       });

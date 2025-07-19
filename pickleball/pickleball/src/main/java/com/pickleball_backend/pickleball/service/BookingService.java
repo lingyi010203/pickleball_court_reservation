@@ -570,6 +570,10 @@ public class BookingService {
                 .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
                 .map(booking -> {
                         try {
+                            log.debug("Processing booking {} with {} booking slots", 
+                                    booking.getId(), 
+                                    booking.getBookingSlots() != null ? booking.getBookingSlots().size() : 0);
+                            
                             // 获取第一个和最后一个 slot 来显示时间范围
                             Slot firstSlot = null;
                             Slot lastSlot = null;
@@ -591,10 +595,35 @@ public class BookingService {
                                 
                                 log.debug("Booking {} has {} slots, total duration: {}", 
                                         booking.getId(), sortedSlots.size(), totalDuration);
+                            } else {
+                                log.warn("Booking {} has no booking slots!", booking.getId());
                             }
                             
-                            Court court = firstSlot != null ? courtRepository.findById(firstSlot.getCourtId())
-                            .orElse(new Court()) : new Court();
+                            Court court = null;
+                            if (firstSlot != null) {
+                                court = courtRepository.findById(firstSlot.getCourtId()).orElse(new Court());
+                            } else {
+                                // 如果没有slots，尝试从booking的其他信息获取court
+                                log.warn("No slots found for booking {}, trying to get court info from booking", booking.getId());
+                                // 尝试通过查询数据库获取court信息
+                                try {
+                                    // 查询这个booking的所有bookingSlots
+                                    List<BookingSlot> bookingSlots = bookingSlotRepository.findByBookingId(booking.getId());
+                                    if (!bookingSlots.isEmpty()) {
+                                        Slot slot = bookingSlots.get(0).getSlot();
+                                        if (slot != null) {
+                                            court = courtRepository.findById(slot.getCourtId()).orElse(new Court());
+                                            log.info("Found court info for booking {} through direct query: {}", booking.getId(), court.getName());
+                                        }
+                                    } else {
+                                        log.error("No booking slots found in database for booking {}", booking.getId());
+                                        court = new Court();
+                                    }
+                                } catch (Exception e) {
+                                    log.error("Error getting court info for booking {}: {}", booking.getId(), e.getMessage());
+                                    court = new Court();
+                                }
+                            }
 
                     BookingHistoryDto dto = new BookingHistoryDto();
                     dto.setId(booking.getId());
@@ -623,6 +652,9 @@ public class BookingService {
                                                 && feedback.getBooking().getId().equals(booking.getId()));
                             }
                             dto.setHasReviewed(hasReviewed);
+                            
+                            log.debug("Created DTO for booking {}: courtName={}, date={}, startTime={}, endTime={}", 
+                                    booking.getId(), dto.getCourtName(), dto.getDate(), dto.getStartTime(), dto.getEndTime());
                             
                             return dto;
                         } catch (Exception e) {
