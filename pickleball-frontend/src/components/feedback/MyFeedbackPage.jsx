@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../../service/api';
 import StarRating from './StarRating';
 import CourtService from '../../service/CourtService';
 
 const MyFeedbackPage = () => {
   const { currentUser, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,6 +26,7 @@ const MyFeedbackPage = () => {
   const [editingId, setEditingId] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [deletedFeedback, setDeletedFeedback] = useState(null);
   const [feedbackErrorDialog, setFeedbackErrorDialog] = useState({ open: false, message: '' });
 
   useEffect(() => {
@@ -57,7 +60,7 @@ const MyFeedbackPage = () => {
         targetType: feedback.targetType,
         targetId: feedback.targetId,
         rating: feedback.rating,
-        review: feedback.review,
+        review: feedback.review || '',
         tags: feedback.tags || []
       });
       setEditMode(true);
@@ -71,7 +74,13 @@ const MyFeedbackPage = () => {
     setOpenDialog(true);
   };
 
-  const handleCloseDialog = () => setOpenDialog(false);
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
+    setEditMode(false);
+    setEditingId(null);
+    setTagInput('');
+  };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -98,6 +107,23 @@ const MyFeedbackPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!isFormValid()) {
+      setFeedbackErrorDialog({ 
+        open: true, 
+        message: 'Please fill in all required fields (Target Type, Target, Rating, and Review).' 
+      });
+      return;
+    }
+    
+    if (editMode && !isFormChanged()) {
+      setFeedbackErrorDialog({ 
+        open: true, 
+        message: 'No changes detected. Please make changes before updating.' 
+      });
+      return;
+    }
+    
     setSubmitting(true);
     try {
       const payload = {
@@ -107,27 +133,37 @@ const MyFeedbackPage = () => {
         review: formData.review,
         tags: formData.tags
       };
+      
       if (editMode && editingId) {
         await api.put(`/feedback/${editingId}`, payload);
       } else {
         await api.post('/feedback', payload);
       }
-      setOpenDialog(false);
-      setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
-      setEditMode(false);
-      setEditingId(null);
+      
+      handleCloseDialog();
+      
       // Refresh feedback list
       const response = await api.get('/feedback/user');
       setFeedbackList(response.data);
+      
+      // Show success message
+      setFeedbackErrorDialog({ 
+        open: true, 
+        message: editMode ? 'Review updated successfully!' : 'Review submitted successfully!' 
+      });
     } catch (err) {
       // Always show error dialog with backend message if available
-      let msg = 'Failed to submit feedback. You can only review courts you have booked. ';
+      let msg = 'Failed to submit feedback. Please try again.';
       if (err.response && err.response.data) {
         if (typeof err.response.data === 'string') {
           msg = err.response.data;
         } else if (err.response.data.message) {
           msg = err.response.data.message;
+        } else if (err.response.data.error) {
+          msg = err.response.data.error;
         }
+      } else if (err.message) {
+        msg = err.message;
       }
       setFeedbackErrorDialog({ open: true, message: msg });
     } finally {
@@ -135,8 +171,9 @@ const MyFeedbackPage = () => {
     }
   };
 
-  const handleDeleteClick = (id) => {
-    setDeleteId(id);
+  const handleDeleteClick = (feedback) => {
+    setDeleteId(feedback.id);
+    setDeletedFeedback(feedback);
     setDeleteDialogOpen(true);
   };
 
@@ -148,22 +185,33 @@ const MyFeedbackPage = () => {
       // Refresh feedback list
       const response = await api.get('/feedback/user');
       setFeedbackList(response.data);
+      
+      // Show success message with option to review again
+      setFeedbackErrorDialog({ 
+        open: true, 
+        message: 'Review deleted successfully! You can now leave a new review for this booking.' 
+      });
     } catch (err) {
-      alert('Failed to delete feedback.');
+      setError('Failed to delete feedback. Please try again.');
+      setDeleteId(null);
+      setDeletedFeedback(null);
     }
   };
 
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setDeleteId(null);
+    setDeletedFeedback(null);
   };
 
   const styles = {
     container: {
-      maxWidth: '1200px',
+      maxWidth: '1400px',
       margin: '0 auto',
       padding: '20px',
-      fontFamily: 'Arial, sans-serif'
+      fontFamily: 'Arial, sans-serif',
+      minHeight: '100vh',
+      boxSizing: 'border-box'
     },
     header: {
       background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
@@ -207,7 +255,9 @@ const MyFeedbackPage = () => {
       padding: '25px',
       marginBottom: '20px',
       boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-      position: 'relative'
+      position: 'relative',
+      wordWrap: 'break-word',
+      overflowWrap: 'break-word'
     },
     cardHeader: {
       display: 'flex',
@@ -228,13 +278,15 @@ const MyFeedbackPage = () => {
       flexShrink: 0
     },
     cardInfo: {
-      flex: 1
+      flex: 1,
+      minWidth: 0 // 防止flex项目溢出
     },
     cardTitle: {
       fontSize: '1.2rem',
       fontWeight: 'bold',
       marginBottom: '5px',
-      color: '#333'
+      color: '#333',
+      wordBreak: 'break-word'
     },
     cardMeta: {
       display: 'flex',
@@ -242,7 +294,8 @@ const MyFeedbackPage = () => {
       gap: '15px',
       marginBottom: '10px',
       fontSize: '0.9rem',
-      color: '#666'
+      color: '#666',
+      flexWrap: 'wrap'
     },
     chip: {
       background: '#e3f2fd',
@@ -263,6 +316,23 @@ const MyFeedbackPage = () => {
     if (items.length === 0) return 0;
     const sum = items.reduce((acc, item) => acc + (item.rating || 0), 0);
     return (sum / items.length).toFixed(1);
+  };
+
+  const isFormValid = () => {
+    return formData.targetType && formData.targetId && formData.rating > 0 && formData.review.trim();
+  };
+
+  const isFormChanged = () => {
+    if (!editMode || !editingId) return true; // 新建模式总是可以提交
+    
+    const originalFeedback = feedbackList.find(f => f.id === editingId);
+    if (!originalFeedback) return true;
+    
+    return (
+      formData.rating !== originalFeedback.rating ||
+      formData.review !== (originalFeedback.review || '') ||
+      JSON.stringify(formData.tags) !== JSON.stringify(originalFeedback.tags || [])
+    );
   };
 
   if (!isAuthenticated()) {
@@ -302,6 +372,72 @@ const MyFeedbackPage = () => {
           <div>Average Rating</div>
         </div>
       </div>
+
+      {/* Quick Review Again Button */}
+      {deletedFeedback && (
+        <div style={{
+          background: 'linear-gradient(135deg, #e8f5e8, #f0f8f0)',
+          border: '2px solid #4caf50',
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '20px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ color: '#2e7d32', marginBottom: '10px' }}>
+            ✨ Ready to review again?
+          </h3>
+          <p style={{ color: '#388e3c', marginBottom: '15px' }}>
+            You just deleted a review for {deletedFeedback.targetName}. You can now leave a new review!
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+                setDeletedFeedback(null);
+                navigate('/profile/my-bookings');
+              }}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#4caf50',
+                color: 'white',
+                fontWeight: 'bold',
+                fontSize: 14,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.target.style.opacity = '1'}
+            >
+              Leave New Review
+            </button>
+            <button
+              onClick={() => setDeletedFeedback(null)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '2px solid #4caf50',
+                background: 'white',
+                color: '#4caf50',
+                fontWeight: 'bold',
+                fontSize: 14,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#4caf50';
+                e.target.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'white';
+                e.target.style.color = '#4caf50';
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Feedback List */}
       {error && (
@@ -345,20 +481,79 @@ const MyFeedbackPage = () => {
                     ))}
                   </div>
                 )}
+                {/* Edit status indicator */}
+                {editMode && editingId === item.id && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #e8f5e8, #f0f8f0)',
+                    border: '2px solid #4caf50',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    margin: '8px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: '#2e7d32',
+                    fontWeight: '500'
+                  }}>
+                    ✏️ Currently editing this review
+                  </div>
+                )}
                 {/* Edit button only for own feedback */}
                 {currentUser && item.userUsername === currentUser.username && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: 10 }}>
                     <button
-                      style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: '#1976d2', color: 'white', cursor: 'pointer', fontSize: 14 }}
+                      style={{ 
+                        padding: '8px 16px', 
+                        borderRadius: 8, 
+                        border: '2px solid #1976d2', 
+                        background: 'white', 
+                        color: '#1976d2', 
+                        cursor: 'pointer', 
+                        fontSize: 14,
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#1976d2';
+                        e.target.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'white';
+                        e.target.style.color = '#1976d2';
+                      }}
                       onClick={() => handleOpenDialog(item)}
                     >
-                      Edit
+                      ✏️ Edit
                     </button>
                     <button
-                      style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: '#d32f2f', color: 'white', cursor: 'pointer', fontSize: 14 }}
-                      onClick={() => handleDeleteClick(item.id)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        borderRadius: 8, 
+                        border: '2px solid #d32f2f', 
+                        background: 'white', 
+                        color: '#d32f2f', 
+                        cursor: 'pointer', 
+                        fontSize: 14,
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#d32f2f';
+                        e.target.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'white';
+                        e.target.style.color = '#d32f2f';
+                      }}
+                      onClick={() => handleDeleteClick(item)}
                     >
-                      Delete
+                      🗑️ Delete
                     </button>
                   </div>
                 )}
@@ -461,8 +656,41 @@ const MyFeedbackPage = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', marginTop: '30px' }}>
-              <button type="button" onClick={handleCloseDialog} style={{ padding: '12px 24px', border: 'none', borderRadius: '10px', background: '#f5f5f5', color: '#666', fontSize: 16 }}>Cancel</button>
-              <button type="submit" disabled={submitting || !formData.targetType || !formData.targetId || !formData.rating || !formData.review} style={{ padding: '12px 24px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg, #1976d2, #42a5f5)', color: 'white', fontSize: 16 }}>{submitting ? (editMode ? 'Updating...' : 'Submitting...') : (editMode ? 'Update' : 'Submit')}</button>
+              <button 
+                type="button" 
+                onClick={handleCloseDialog} 
+                style={{ 
+                  padding: '12px 24px', 
+                  border: 'none', 
+                  borderRadius: '10px', 
+                  background: '#f5f5f5', 
+                  color: '#666', 
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
+                onMouseLeave={(e) => e.target.style.background = '#f5f5f5'}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={submitting || !isFormValid() || (editMode && !isFormChanged())}
+                style={{ 
+                  padding: '12px 24px', 
+                  border: 'none', 
+                  borderRadius: '10px', 
+                  background: submitting || !isFormValid() || (editMode && !isFormChanged()) ? '#e0e0e0' : 'linear-gradient(135deg, #1976d2, #42a5f5)', 
+                  color: submitting || !isFormValid() || (editMode && !isFormChanged()) ? '#757575' : 'white', 
+                  fontSize: 16,
+                  cursor: submitting || !isFormValid() || (editMode && !isFormChanged()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontWeight: '500'
+                }}
+              >
+                {submitting ? (editMode ? '🔄 Updating...' : '🔄 Submitting...') : (editMode ? '✅ Update' : '📝 Submit')}
+              </button>
             </div>
           </form>
         </div>
@@ -475,7 +703,10 @@ const MyFeedbackPage = () => {
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
         }}>
           <div style={{ background: 'white', borderRadius: 16, padding: 32, minWidth: 320, textAlign: 'center' }}>
-            <h3 style={{ marginBottom: 24 }}>Are you sure you want to delete this feedback?</h3>
+            <h3 style={{ marginBottom: 16 }}>Are you sure you want to delete this feedback?</h3>
+            <p style={{ marginBottom: 24, color: '#666', fontSize: 14 }}>
+              You can leave a new review after deletion.
+            </p>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
               <button
                 onClick={handleDeleteConfirm}
@@ -487,7 +718,7 @@ const MyFeedbackPage = () => {
                 onClick={handleDeleteCancel}
                 style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#f5f5f5', color: '#333', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}
               >
-                Back
+                Cancel
               </button>
             </div>
           </div>
@@ -500,21 +731,111 @@ const MyFeedbackPage = () => {
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000
         }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 32, minWidth: 320, textAlign: 'center', maxWidth: 400 }}>
-            <h3 style={{ marginBottom: 24, color: '#d32f2f' }}>Error</h3>
-            <div style={{ marginBottom: 24 }}>{feedbackErrorDialog.message || 'You must have booked this court before you can leave feedback.'}</div>
-            <button
-              onClick={() => {
-                setFeedbackErrorDialog({ open: false, message: '' });
-                setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] }); // Reset form
-                setEditMode(false);
-                setEditingId(null);
-                // Do NOT close setOpenDialog(false); so the form stays open
-              }}
-              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#1976d2', color: 'white', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}
-            >
-              Back
-            </button>
+          <div style={{ 
+            background: 'white', 
+            borderRadius: 16, 
+            padding: 32, 
+            minWidth: 320, 
+            textAlign: 'center', 
+            maxWidth: 400,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ 
+              marginBottom: 24, 
+              color: feedbackErrorDialog.message.includes('successfully') ? '#2e7d32' : '#d32f2f',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+              {feedbackErrorDialog.message.includes('successfully') ? '✅ Success' : '❌ Error'}
+            </h3>
+            <div style={{ 
+              marginBottom: 24,
+              color: feedbackErrorDialog.message.includes('successfully') ? '#2e7d32' : '#d32f2f',
+              lineHeight: '1.5'
+            }}>
+              {feedbackErrorDialog.message || 'You must have booked this court before you can leave feedback.'}
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {feedbackErrorDialog.message.includes('deleted successfully') && (
+                <>
+                  <button
+                    onClick={() => {
+                      setFeedbackErrorDialog({ open: false, message: '' });
+                      navigate('/profile/my-bookings');
+                    }}
+                    style={{ 
+                      padding: '12px 24px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#1976d2', 
+                      color: 'white', 
+                      fontWeight: 'bold', 
+                      fontSize: 16, 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+                    onMouseLeave={(e) => e.target.style.opacity = '1'}
+                  >
+                    Review Again
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFeedbackErrorDialog({ open: false, message: '' });
+                      setDeletedFeedback(null);
+                    }}
+                    style={{ 
+                      padding: '12px 24px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#4caf50', 
+                      color: 'white', 
+                      fontWeight: 'bold', 
+                      fontSize: 16, 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+                    onMouseLeave={(e) => e.target.style.opacity = '1'}
+                  >
+                    Great!
+                  </button>
+                </>
+              )}
+              {!feedbackErrorDialog.message.includes('deleted successfully') && (
+                <button
+                  onClick={() => {
+                    setFeedbackErrorDialog({ open: false, message: '' });
+                    if (feedbackErrorDialog.message.includes('successfully')) {
+                      // 如果是成功消息，关闭对话框
+                      setOpenDialog(false);
+                    } else {
+                      // 如果是错误消息，保持表单打开
+                      setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
+                      setEditMode(false);
+                      setEditingId(null);
+                    }
+                  }}
+                  style={{ 
+                    padding: '12px 24px', 
+                    borderRadius: 8, 
+                    border: 'none', 
+                    background: feedbackErrorDialog.message.includes('successfully') ? '#4caf50' : '#1976d2', 
+                    color: 'white', 
+                    fontWeight: 'bold', 
+                    fontSize: 16, 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+                >
+                  {feedbackErrorDialog.message.includes('successfully') ? 'Great!' : 'OK'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

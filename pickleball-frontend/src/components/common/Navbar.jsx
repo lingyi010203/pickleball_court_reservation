@@ -223,7 +223,6 @@ function Navbar() {
       <List>
         {(isAdminRoute ? adminNavItems : navItems).map((item) => (
           <ListItem 
-            button 
             key={item.id}
             onClick={() => navigateTo(item.path, item.id)}
             sx={{
@@ -232,6 +231,10 @@ function Navbar() {
                 ? (isAdminRoute ? '#667eea' : '#8e44ad') 
                 : 'text.primary',
               fontWeight: activeTab === item.id ? 'bold' : 'normal',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>

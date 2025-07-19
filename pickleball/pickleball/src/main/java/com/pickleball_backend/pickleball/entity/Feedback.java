@@ -32,6 +32,10 @@ public class Feedback {
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
+    @ManyToOne
+    @JoinColumn(name = "booking_id", referencedColumnName = "id")
+    private Booking booking; // 新增：关联到具体的预订
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @ElementCollection

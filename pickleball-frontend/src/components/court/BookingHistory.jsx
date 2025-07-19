@@ -31,11 +31,13 @@ import {
   Cancel as CancelIcon,
   RateReview as ReviewIcon,
   ArrowBack as BackIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  Visibility as ViewIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import api from '../../api/axiosConfig';
+import ModernBookingDetailsDialog from '../admin/ModernBookingDetailsDialog';
 
 // Modern color palette
 const COLORS = {
@@ -227,6 +229,8 @@ const BookingHistory = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   const fetchBookingHistory = async () => {
     try {
@@ -236,18 +240,46 @@ const BookingHistory = () => {
       const response = await api.get('/member/bookings');
       console.log("API Response:", response.data);
 
-      // 数据规范化处理 - 根据实际API响应调整字段映射
-      const normalizedBookings = response.data.map(booking => ({
-        bookingId: booking.id || booking.bookingId,
-        courtName: booking.venue?.name || booking.courtName || (booking.bookingSlots && booking.bookingSlots[0]?.slot?.courtName) || "AAA Pickleball Court",
-        courtLocation: booking.venue?.address || booking.location || (booking.bookingSlots && booking.bookingSlots[0]?.slot?.courtLocation) || "123 Sports Complex, Kuala Lumpur",
-        slotDate: booking.date, // 修正
-        startTime: booking.startTime, // 修正
-        endTime: booking.endTime, // 修正
-        numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
-        totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
-        status: booking.bookingStatus || booking.status || "CONFIRMED",
-      }));
+            // 数据规范化处理 - 根据实际API响应调整字段映射
+      const normalizedBookings = response.data.map(booking => {
+        console.log('Processing booking:', booking);
+        console.log('Court ID from API:', booking.courtId);
+        
+        const normalizedBooking = {
+          id: booking.id || booking.bookingId, // 确保ID字段正确
+          bookingId: booking.id || booking.bookingId,
+          courtId: booking.courtId, // 直接从API获取
+          courtName: booking.courtName || "AAA Pickleball Court",
+          courtLocation: booking.location || "123 Sports Complex, Kuala Lumpur",
+          slotDate: booking.date, // 修正
+          startTime: booking.startTime, // 修正
+          endTime: booking.endTime, // 修正
+          numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
+          totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
+          status: booking.bookingStatus || booking.status || "CONFIRMED",
+          purpose: booking.purpose || "Recreational",
+          numPaddles: booking.numPaddles || 0,
+          buyBallSet: booking.buyBallSet || false,
+          bookingDate: booking.bookingDate || booking.createdAt,
+          // 支付相关字段
+          paymentMethod: booking.payment?.paymentMethod || booking.paymentMethod || "Wallet",
+          paymentType: booking.payment?.paymentType || booking.paymentType,
+          paymentStatus: booking.payment?.status || booking.paymentStatus || "COMPLETED",
+          transactionId: booking.payment?.transactionId || booking.transactionId,
+          // 会员信息
+          memberId: booking.memberId || booking.member?.id,
+          // 多slot支持
+          bookingSlots: booking.bookingSlots || [],
+          durationHours: booking.durationHours || 1,
+          // 评价状态
+          hasReviewed: booking.hasReviewed || false,
+        };
+        
+        console.log('Normalized booking:', normalizedBooking);
+        console.log('Extracted courtId:', normalizedBooking.courtId);
+        
+        return normalizedBooking;
+      });
 
       console.log("Normalized Bookings:", normalizedBookings);
       setBookings(normalizedBookings);
@@ -323,9 +355,47 @@ const BookingHistory = () => {
     setCancelReason('');
   };
 
-  const handleLeaveReview = (id) => {
-    console.log(`Leave review for booking ${id}`);
-    navigate('/feedback/select');
+  const handleLeaveReview = (booking) => {
+    console.log('=== Review Button Clicked ===');
+    console.log('Booking data:', booking);
+    console.log('Booking ID:', booking.bookingId);
+    console.log('Court Name:', booking.courtName);
+    console.log('Has Reviewed:', booking.hasReviewed);
+    
+    // 检查预订是否包含必要的信息
+    if (!booking.bookingId) {
+      console.error('Missing booking ID');
+      console.log('Falling back to select page');
+      // 如果信息不全，回退到选择页面
+              navigate('/profile/my-bookings');
+      return;
+    }
+
+    const navigationState = {
+      targetType: 'COURT',
+      courtName: booking.courtName,
+      bookingId: String(booking.bookingId), // 确保bookingId是字符串类型
+      isEditing: false, // 新建评价
+      isViewReview: booking.hasReviewed // 如果已经评价过，设置为View Review模式
+    };
+
+    console.log('Navigation state:', navigationState);
+    console.log('Navigating to /feedback...');
+
+    // 直接导航到反馈页面，并传递预订信息
+    navigate('/feedback', {
+      state: navigationState
+    });
+  };
+
+  const handleViewDetails = (booking) => {
+    setSelectedBooking(booking);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsDialogOpen(false);
+    setSelectedBooking(null);
   };
 
   // 日期格式化函数
@@ -642,6 +712,17 @@ const BookingHistory = () => {
                       status={booking.status}
                     />
 
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <ModernButton
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                        startIcon={<ViewIcon />}
+                        onClick={() => handleViewDetails(booking)}
+                      >
+                        Details
+                      </ModernButton>
+
                     {booking.status === 'CONFIRMED' && (
                       cancelStatus[booking.bookingId] === 'processing' ? (
                         <CircularProgress size={24} />
@@ -662,16 +743,29 @@ const BookingHistory = () => {
                     )}
 
                     {booking.status === 'COMPLETED' && (
-                      <ModernButton
-                        variant="outlined"
-                        color="primary"
-                        size="small"
-                        startIcon={<ReviewIcon />}
-                        onClick={() => handleLeaveReview(booking.bookingId)}
-                      >
-                        Review
-                      </ModernButton>
+                      booking.hasReviewed ? (
+                        <ModernButton
+                          variant="outlined"
+                          color="success"
+                          size="small"
+                          startIcon={<ViewIcon />}
+                          onClick={() => handleLeaveReview(booking)}
+                        >
+                          View Review
+                        </ModernButton>
+                      ) : (
+                        <ModernButton
+                          variant="outlined"
+                          color="primary"
+                          size="small"
+                          startIcon={<ReviewIcon />}
+                          onClick={() => handleLeaveReview(booking)}
+                        >
+                          Review
+                        </ModernButton>
+                      )
                     )}
+                    </Box>
                   </Box>
                 </CardContent>
               </GradientCard>
@@ -757,6 +851,16 @@ const BookingHistory = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Booking Details Dialog */}
+      <ModernBookingDetailsDialog
+        open={detailsDialogOpen}
+        onClose={handleCloseDetails}
+        booking={selectedBooking}
+        loading={false}
+        editableRemark={false}
+        isAdmin={false}
+      />
 
       {/* Footer */}
       <Box sx={{ mt: 8, textAlign: 'center', color: COLORS.neutral, opacity: 0.6 }}>

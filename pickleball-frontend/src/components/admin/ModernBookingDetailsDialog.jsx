@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box,
-  Grid, Button, TextField, CircularProgress, Chip, Divider, Avatar
+  Grid, Button, TextField, CircularProgress, Chip, Divider, Avatar, Snackbar, Alert,
+  Menu, MenuItem, ListItemIcon, ListItemText
 } from '@mui/material';
 import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
 import SportsTennisIcon from '@mui/icons-material/SportsTennis';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ShareIcon from '@mui/icons-material/Share';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getStatusChip } from './statusConfig';
 
 const formatDate = (date) => {
@@ -45,9 +50,72 @@ const ModernBookingDetailsDialog = ({
   loading = false,
   editableRemark = false,
   cancellationRequest = null,
+  isAdmin = false,
 }) => {
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [shareMenuAnchor, setShareMenuAnchor] = useState(null);
   const safeBooking = booking || {};
   const safeCancellation = cancellationRequest || safeBooking.cancellationRequest || {};
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const handleShareMenuOpen = (event) => {
+    setShareMenuAnchor(event.currentTarget);
+  };
+
+  const handleShareMenuClose = () => {
+    setShareMenuAnchor(null);
+  };
+
+  // 创建分享文本
+  const createShareText = () => {
+    return `🏓 My Pickleball Booking\n\nCourt: ${safeBooking.courtName}\nLocation: ${safeBooking.courtLocation}\nDate: ${timeInfo.date}\nTime: ${timeInfo.timeRange}\nDuration: ${timeInfo.duration}\nPurpose: ${safeBooking.purpose}\nPlayers: ${safeBooking.numberOfPlayers}${safeBooking.numPaddles > 0 ? `\nPaddles: ${safeBooking.numPaddles}` : ''}${safeBooking.buyBallSet ? '\nBall Set: Yes' : ''}\n\nTotal: RM ${safeBooking.totalAmount?.toFixed(2)}`;
+  };
+
+  // 复制到剪贴板
+  const copyToClipboard = () => {
+    const shareText = createShareText();
+    
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(shareText).then(() => {
+        showSnackbar('Booking details copied to clipboard! 📋', 'success');
+      }).catch(() => {
+        // 如果剪贴板API失败，使用传统方法
+        const textArea = document.createElement('textarea');
+        textArea.value = shareText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showSnackbar('Booking details copied to clipboard! 📋', 'success');
+      });
+    } else {
+      // 传统方法
+      const textArea = document.createElement('textarea');
+      textArea.value = shareText;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSnackbar('Booking details copied to clipboard! 📋', 'success');
+    }
+    handleShareMenuClose();
+  };
+
+  // 分享到WhatsApp
+  const shareToWhatsApp = () => {
+    const shareText = createShareText();
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    window.open(whatsappUrl, '_blank');
+    showSnackbar('Opening WhatsApp... 📱', 'success');
+    handleShareMenuClose();
+  };
 
   // 处理多 slot 预订的时间显示
   const getTimeDisplay = () => {
@@ -102,7 +170,7 @@ const ModernBookingDetailsDialog = ({
       }}
     >
       <DialogTitle sx={{ fontWeight: 700, fontSize: 22, pb: 1, background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-        Booking Details
+        {isAdmin ? 'Booking Details (Admin View)' : 'My Booking Details'}
       </DialogTitle>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
         {/* 预订信息 */}
@@ -121,6 +189,31 @@ const ModernBookingDetailsDialog = ({
               </Box>
             </Box>
             
+            {/* 管理员可以看到的额外信息 */}
+            {isAdmin && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+                  Admin Information
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Booking Date</Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {formatDate(safeBooking.bookingDate)}
+                    </Typography>
+                  </Box>
+                  {safeBooking.paymentId && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Payment ID</Typography>
+                      <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                        {safeBooking.paymentId}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            )}
+            
             {/* 日期和时间 */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
               <EventIcon color="primary" sx={{ mr: 0.5 }} />
@@ -129,8 +222,8 @@ const ModernBookingDetailsDialog = ({
               </Typography>
             </Box>
 
-            {/* 多 slot 详细信息 */}
-            {timeInfo.isMultiSlot && timeInfo.allSlots && (
+            {/* 多 slot 详细信息 - 只在多slot预订时显示 */}
+            {timeInfo.isMultiSlot && timeInfo.allSlots && timeInfo.allSlots.length > 1 && (
               <Box sx={{ mt: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                   All Time Slots:
@@ -174,7 +267,7 @@ const ModernBookingDetailsDialog = ({
               <Box>
                 <Typography variant="caption" color="text.secondary">Payment Method</Typography>
                 <Typography variant="body1" fontWeight={500}>
-                  {safeBooking.paymentMethod || '-'}
+                  {safeBooking.paymentMethod === 'WALLET' ? 'Wallet' : (safeBooking.paymentMethod || '-')}
                 </Typography>
               </Box>
             </Box>
@@ -198,7 +291,15 @@ const ModernBookingDetailsDialog = ({
                     </Typography>
                   </Box>
                 )}
-                {safeBooking.transactionId && (
+                {isAdmin && safeBooking.paymentId && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Payment ID</Typography>
+                    <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                      {safeBooking.paymentId}
+                    </Typography>
+                  </Box>
+                )}
+                {isAdmin && safeBooking.transactionId && (
                   <Box>
                     <Typography variant="caption" color="text.secondary">Transaction ID</Typography>
                     <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
@@ -254,13 +355,63 @@ const ModernBookingDetailsDialog = ({
             </Box>
           </Box>
         )}
+
+        {/* Cost Breakdown - 仅用户端显示 */}
+        {!isAdmin && (safeBooking.numPaddles > 0 || safeBooking.buyBallSet) && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+              Cost Breakdown
+            </Typography>
+            <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Court Rental ({timeInfo.duration})
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  RM {(safeBooking.totalAmount - (safeBooking.numPaddles * 5) - (safeBooking.buyBallSet ? 12 : 0)).toFixed(2)}
+                </Typography>
+              </Box>
+              {safeBooking.numPaddles > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Paddles ({safeBooking.numPaddles} × RM5)
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    RM {(safeBooking.numPaddles * 5).toFixed(2)}
+                  </Typography>
+                </Box>
+              )}
+              {safeBooking.buyBallSet && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Ball Set
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    RM 12.00
+                  </Typography>
+                </Box>
+              )}
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body1" fontWeight={600}>
+                  Total
+                </Typography>
+                <Typography variant="body1" fontWeight={600} color="primary">
+                  RM {safeBooking.totalAmount?.toFixed(2) || '0.00'}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        )}
         
-        {/* 会员信息 */}
+        {/* 会员信息 - 仅管理员可见 */}
+        {isAdmin && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-            Member Info
+              Member Information
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <Avatar sx={{ bgcolor: '#5d3587', width: 48, height: 48 }}>
               <PersonIcon />
             </Avatar>
@@ -269,14 +420,31 @@ const ModernBookingDetailsDialog = ({
                 {safeBooking.memberName || 'N/A'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {safeBooking.memberPhone ? safeBooking.memberPhone : 'N/A'}
+                    Member ID: {safeBooking.memberId || 'N/A'}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    Phone
+                  </Typography>
+                  <Typography variant="body2" fontWeight={500}>
+                    {safeBooking.memberPhone || 'N/A'}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    Email
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {safeBooking.memberEmail ? safeBooking.memberEmail : 'N/A'}
+                  <Typography variant="body2" fontWeight={500}>
+                    {safeBooking.memberEmail || 'N/A'}
               </Typography>
             </Box>
           </Box>
         </Box>
+          </Box>
+        )}
         <Divider sx={{ my: 2 }} />
         {/* 取消信息 */}
         {safeCancellation.reason && (
@@ -289,8 +457,43 @@ const ModernBookingDetailsDialog = ({
             </Typography>
           </Box>
         )}
-        {/* 管理员备注，仅有时显示 */}
-        {safeCancellation.adminRemark && (
+
+        {/* Booking Notes - 仅用户端显示 */}
+        {!isAdmin && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+              Booking Notes
+            </Typography>
+            <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2, border: '1px solid #bbdefb' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                • Please arrive 10 minutes before your booking time ({timeInfo.timeRange})
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                • Bring your own water bottle and comfortable sports attire
+              </Typography>
+              {safeBooking.numPaddles > 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  • {safeBooking.numPaddles} paddle{safeBooking.numPaddles > 1 ? 's' : ''} will be available at the court reception
+                </Typography>
+              )}
+              {safeBooking.buyBallSet && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  • Ball set will be provided at the court
+                </Typography>
+              )}
+              {safeBooking.numberOfPlayers && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  • Booking is for {safeBooking.numberOfPlayers} player{safeBooking.numberOfPlayers > 1 ? 's' : ''}
+                </Typography>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                • For any issues, please contact our support team
+              </Typography>
+            </Box>
+          </Box>
+        )}
+        {/* 管理员备注，仅管理员可见 */}
+        {isAdmin && safeCancellation.adminRemark && (
           <Box>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
               Admin Remark
@@ -313,14 +516,114 @@ const ModernBookingDetailsDialog = ({
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ background: '#fff', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
+      <DialogActions sx={{ background: '#fff', borderBottomLeftRadius: 16, borderBottomRightRadius: 16, flexDirection: 'column', alignItems: 'stretch', p: 2 }}>
+        {/* Quick Actions - 仅用户端显示 */}
+        {!isAdmin && safeBooking.status === 'CONFIRMED' && (
+          <Box sx={{ mb: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
+              Quick Actions
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                startIcon={<CalendarTodayIcon />}
+                onClick={() => {
+                  // 创建日历事件数据
+                  const eventTitle = `Pickleball Booking - ${safeBooking.courtName}`;
+                  const eventDescription = `Court: ${safeBooking.courtName}\nLocation: ${safeBooking.courtLocation}\nPurpose: ${safeBooking.purpose}\nPlayers: ${safeBooking.numberOfPlayers}`;
+                  
+                  // 解析日期和时间
+                  const bookingDate = new Date(safeBooking.slotDate || safeBooking.bookingDate);
+                  const startTime = safeBooking.startTime || '15:00';
+                  const endTime = safeBooking.endTime || '16:00';
+                  
+                  const [startHour, startMinute] = startTime.split(':');
+                  const [endHour, endMinute] = endTime.split(':');
+                  
+                  const startDateTime = new Date(bookingDate);
+                  startDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0);
+                  
+                  const endDateTime = new Date(bookingDate);
+                  endDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0);
+                  
+                  // 创建日历URL
+                  const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(eventTitle)}&details=${encodeURIComponent(eventDescription)}&dates=${startDateTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endDateTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&location=${encodeURIComponent(safeBooking.courtLocation || '')}`;
+                  
+                  // 打开Google Calendar
+                  window.open(calendarUrl, '_blank');
+                  showSnackbar('Calendar event created! 📅', 'success');
+                }}
+              >
+                Add to Calendar
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                startIcon={<ShareIcon />}
+                onClick={handleShareMenuOpen}
+              >
+                Share
+              </Button>
+            </Box>
+          </Box>
+        )}
+        
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
         {loading && <CircularProgress size={24} sx={{ mr: 2 }} />}
         <Button onClick={onClose} color="primary" variant="outlined">
           Close
         </Button>
+        </Box>
       </DialogActions>
+
+      {/* Share Menu */}
+      <Menu
+        anchorEl={shareMenuAnchor}
+        open={Boolean(shareMenuAnchor)}
+        onClose={handleShareMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={shareToWhatsApp}>
+          <ListItemIcon>
+            <WhatsAppIcon sx={{ color: '#25D366' }} />
+          </ListItemIcon>
+          <ListItemText primary="Share via WhatsApp" />
+        </MenuItem>
+        <MenuItem onClick={copyToClipboard}>
+          <ListItemIcon>
+            <ContentCopyIcon />
+          </ListItemIcon>
+          <ListItemText primary="Copy to Clipboard" />
+        </MenuItem>
+      </Menu>
+      
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
-  };
-  
-  export default ModernBookingDetailsDialog;
+};
+
+export default ModernBookingDetailsDialog;

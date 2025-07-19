@@ -37,9 +37,20 @@ public class FeedbackController {
 
     @GetMapping
     public ResponseEntity<List<FeedbackResponseDto>> getFeedbackForTarget(
-            @RequestParam("targetType") String targetType,
-            @RequestParam("targetId") Integer targetId
+            @RequestParam(value = "targetType", required = false) String targetType,
+            @RequestParam(value = "targetId", required = false) Integer targetId,
+            @RequestParam(value = "bookingId", required = false) Integer bookingId
     ) {
+        // 如果提供了bookingId，优先使用bookingId查询
+        if (bookingId != null) {
+            return ResponseEntity.ok(feedbackService.getFeedbackByBookingId(bookingId));
+        }
+        
+        // 否则使用targetType和targetId查询
+        if (targetType == null || targetId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        
         return ResponseEntity.ok(feedbackService.getFeedbackForTarget(
                 Feedback.TargetType.valueOf(targetType.toUpperCase()),
                 targetId
@@ -60,5 +71,10 @@ public class FeedbackController {
     @GetMapping("/user")
     public ResponseEntity<List<FeedbackResponseDto>> getFeedbackByCurrentUser() {
         return ResponseEntity.ok(feedbackService.getFeedbackByCurrentUser());
+    }
+
+    @GetMapping("/reviewable-items")
+    public ResponseEntity<List<ReviewableItemDto>> getReviewableItems() {
+        return ResponseEntity.ok(feedbackService.getReviewableBookings());
     }
 }

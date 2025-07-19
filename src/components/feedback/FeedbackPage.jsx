@@ -285,7 +285,7 @@ const FeedbackPage = () => {
               </label>
               <StarRating 
                 rating={rating} 
-                editable={true} 
+                interactive={true} 
                 onRatingChange={setRating} 
               />
             </div>

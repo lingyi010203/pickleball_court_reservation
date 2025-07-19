@@ -1,13 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../service/api';
 import StarRating from './StarRating';
 import { format } from 'date-fns';
+import {
+  AlertTitle,
+  Container,
+  Typography,
+  Box,
+  Card,
+  CardContent,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Button,
+  Alert,
+  Chip,
+  Divider,
+  Paper,
+  IconButton,
+  CircularProgress
+} from '@mui/material';
+import {
+  Star as StarIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
+  CheckCircle as CheckCircleIcon
+} from '@mui/icons-material';
 
 const FeedbackPage = () => {
   const { currentUser, isAuthenticated } = useAuth();
-  const [targetType, setTargetType] = useState('COURT');
-  const [targetId, setTargetId] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const preFilledData = location.state || {};
+  
+  console.log('=== FeedbackPage Loaded ===');
+  console.log('Location state:', location.state);
+  console.log('Pre-filled data:', preFilledData);
+  
+  // 检查是否是从编辑模式进入的
+  const isEditingMode = preFilledData.isEditing || false;
+  
+  const [targetType, setTargetType] = useState(preFilledData.targetType || 'COURT');
+  const [targetId, setTargetId] = useState(preFilledData.targetId || '');
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
   const [feedbackList, setFeedbackList] = useState([]);
@@ -17,6 +57,13 @@ const FeedbackPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [selectedCourtName, setSelectedCourtName] = useState(preFilledData.courtName || '');
+  
+  // 检查是否只有bookingId（没有targetId）
+  const hasOnlyBookingId = preFilledData.bookingId && !preFilledData.targetId;
+  
+  // 检查是否是从View Review按钮进入的（用户已经评价过）
+  const isViewReviewMode = preFilledData.isViewReview || false;
 
   // Fetch available targets based on selected type
   useEffect(() => {
@@ -27,22 +74,30 @@ const FeedbackPage = () => {
         
         switch(targetType) {
           case 'COURT':
-            endpoint = '/api/member/courts';
+            endpoint = '/member/courts';
             break;
           case 'EVENT':
-            endpoint = '/api/events';
+            endpoint = '/events/published';
             break;
           case 'COACH':
-            endpoint = '/api/coaches';
-            break;
+            setAvailableTargets([]);
+            setLoading(false);
+            return;
           default:
             return;
         }
 
         const response = await api.get(endpoint);
         setAvailableTargets(response.data);
+        
+        if (targetId && targetType === 'COURT') {
+          const court = response.data.find(c => c.id === parseInt(targetId));
+          if (court) {
+            setSelectedCourtName(court.name);
+          }
+        }
       } catch (err) {
-        setError('Failed to fetch available targets');
+        setError('Failed to fetch available targets: ' + (err.response?.data || err.message));
       } finally {
         setLoading(false);
       }
@@ -51,45 +106,186 @@ const FeedbackPage = () => {
     if (isAuthenticated()) {
       fetchTargets();
     }
-  }, [targetType, isAuthenticated]);
+  }, [targetType, isAuthenticated, targetId]);
 
-  // Fetch feedback data when target changes
-  useEffect(() => {
-    const fetchFeedbackData = async () => {
-      if (!targetId || !isAuthenticated()) return;
+  // 加载用户的现有评价数据 (仅编辑模式)
+  const loadUserExistingFeedback = useCallback(async () => {
+    if (!isEditingMode || !preFilledData.bookingId || !currentUser) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccessMessage('');
       
-      try {
-        setLoading(true);
-        
-        // Fetch feedback list
-        const feedbackResponse = await api.get('/api/feedback', {
-          params: { targetType, targetId }
-        });
-        setFeedbackList(feedbackResponse.data);
-        
-        // Fetch stats
-        const statsResponse = await api.get('/api/feedback/stats', {
-          params: { targetType, targetId }
-        });
-        setStats(statsResponse.data);
-        
-        // Check if current user has existing feedback
-        const userFeedback = feedbackResponse.data.find(
+      const response = await api.get('/feedback', {
+        params: { 
+          targetType, 
+          targetId,
+          bookingId: preFilledData.bookingId,
+          userId: currentUser.id
+        }
+      });
+      
+      if (response.data.length > 0) {
+        const userFeedback = response.data[0];
+        setEditingFeedback(userFeedback);
+        setRating(userFeedback.rating);
+        setReview(userFeedback.review || '');
+        setSuccessMessage('Your existing review has been loaded. You can edit it below.');
+      } else {
+        setError('No existing review found for this booking');
+      }
+    } catch (err) {
+      setError('Failed to load your existing review: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  }, [isEditingMode, preFilledData.bookingId, currentUser, targetType, targetId]);
+
+  // 常规加载反馈数据
+  const fetchFeedbackData = useCallback(async () => {
+    if (!targetId || !isAuthenticated() || !currentUser) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccessMessage('');
+      
+      // Fetch feedback list
+      const feedbackResponse = await api.get('/feedback', {
+        params: { targetType, targetId }
+      });
+      setFeedbackList(feedbackResponse.data);
+      
+      // Fetch stats
+      const statsResponse = await api.get('/feedback/stats', {
+        params: { targetType, targetId }
+      });
+      setStats(statsResponse.data);
+      
+      // 检查当前用户是否有现有反馈
+      let userFeedback = null;
+      if (preFilledData.bookingId) {
+        // 检查特定预订的评价
+        userFeedback = feedbackResponse.data.find(
+          feedback => feedback.userName === currentUser.username && 
+                     feedback.bookingId === preFilledData.bookingId
+        );
+      } else {
+        // 检查目标的一般评价
+        userFeedback = feedbackResponse.data.find(
           feedback => feedback.userName === currentUser.username
         );
-        setEditingFeedback(userFeedback || null);
-        
-      } catch (err) {
-        setError('Failed to load feedback data');
-      } finally {
-        setLoading(false);
       }
-    };
-
-    if (isAuthenticated()) {
-      fetchFeedbackData();
+      
+      if (userFeedback) {
+        setEditingFeedback(userFeedback);
+        setRating(userFeedback.rating);
+        setReview(userFeedback.review || '');
+        setSuccessMessage('You have already reviewed this. You can edit your review below.');
+      } else {
+        setEditingFeedback(null);
+        setRating(0);
+        setReview('');
+      }
+      
+    } catch (err) {
+      setError('Failed to load feedback data: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
     }
-  }, [targetId, targetType, isAuthenticated, currentUser]);
+  }, [targetId, targetType, isAuthenticated, currentUser, preFilledData.bookingId]);
+
+  // 加载特定预订的评价数据
+  const loadBookingFeedback = useCallback(async () => {
+    if (!preFilledData.bookingId || !currentUser) return;
+    
+    console.log('=== Loading Booking Feedback ===');
+    console.log('Booking ID:', preFilledData.bookingId);
+    console.log('Current User:', currentUser.username);
+    console.log('Is View Review Mode:', isViewReviewMode);
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccessMessage('');
+      
+      // 获取该预订的所有评价
+      const response = await api.get('/feedback', {
+        params: { 
+          bookingId: preFilledData.bookingId
+        }
+      });
+      
+      console.log('API Response:', response.data);
+      setFeedbackList(response.data);
+      
+      // 检查当前用户是否已经评价过这个预订
+      console.log('All feedback data:', response.data);
+      console.log('Looking for username:', currentUser.username);
+      console.log('Looking for bookingId:', parseInt(preFilledData.bookingId));
+      
+      const userFeedback = response.data.find(feedback => {
+        console.log('Checking feedback:', feedback);
+        console.log('Feedback userId:', feedback.userId);
+        console.log('Feedback userName:', feedback.userName);
+        console.log('Feedback userEmail:', feedback.userEmail);
+        console.log('Feedback bookingId:', feedback.bookingId);
+        console.log('UserName match:', feedback.userName === currentUser.username);
+        console.log('UserEmail match:', feedback.userEmail === currentUser.username);
+        console.log('BookingId match:', feedback.bookingId === parseInt(preFilledData.bookingId));
+        
+        return (feedback.userName === currentUser.username || feedback.userEmail === currentUser.username) && 
+               feedback.bookingId === parseInt(preFilledData.bookingId);
+      });
+      
+      console.log('Found User Feedback:', userFeedback);
+      
+      if (userFeedback) {
+        setEditingFeedback(userFeedback);
+        setRating(userFeedback.rating);
+        setReview(userFeedback.review || '');
+        setSuccessMessage('You have already reviewed this booking. You can edit your review below.');
+        console.log('Set editing feedback:', userFeedback);
+      } else {
+        setEditingFeedback(null);
+        setRating(0);
+        setReview('');
+        console.log('No user feedback found');
+      }
+      
+    } catch (err) {
+      console.error('Error loading booking feedback:', err);
+      setError('Failed to load booking feedback: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  }, [preFilledData.bookingId, currentUser, isViewReviewMode]);
+
+  // 分离编辑模式和普通模式的加载逻辑
+  useEffect(() => {
+    console.log('=== useEffect triggered ===');
+    console.log('isAuthenticated:', isAuthenticated());
+    console.log('currentUser:', currentUser);
+    console.log('hasOnlyBookingId:', hasOnlyBookingId);
+    console.log('isViewReviewMode:', isViewReviewMode);
+    console.log('targetId:', targetId);
+    console.log('isEditingMode:', isEditingMode);
+    
+    if (isAuthenticated() && currentUser) {
+      if (hasOnlyBookingId || isViewReviewMode) {
+        // 如果只有bookingId或者是View Review模式，直接加载该预订的评价
+        console.log('Loading booking feedback...');
+        loadBookingFeedback();
+      } else if (isEditingMode && targetId) {
+        console.log('Loading user existing feedback...');
+        loadUserExistingFeedback();
+      } else if (targetId) {
+        console.log('Fetching feedback data...');
+        fetchFeedbackData();
+      }
+    }
+  }, [isAuthenticated, currentUser, targetId, isEditingMode, hasOnlyBookingId, isViewReviewMode, loadUserExistingFeedback, fetchFeedbackData, loadBookingFeedback]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,6 +300,12 @@ const FeedbackPage = () => {
       return;
     }
     
+    // 编辑模式需要bookingId
+    if (isEditingMode && !preFilledData.bookingId) {
+      setError('Booking information missing for editing');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');
@@ -111,28 +313,29 @@ const FeedbackPage = () => {
       
       const feedbackData = {
         targetType,
-        targetId,
+        targetId: hasOnlyBookingId ? null : targetId, // 如果只有bookingId，targetId为null
         rating,
         review,
-        tags: [] // Add tags if implemented
+        tags: [],
+        bookingId: preFilledData.bookingId
       };
       
       let response;
       
       if (editingFeedback) {
-        // Update existing feedback
+        // 更新现有反馈
         response = await api.put(
-          `/api/feedback/${editingFeedback.id}`, 
+          `/feedback/${editingFeedback.id}`, 
           feedbackData
         );
         setSuccessMessage('Review updated successfully!');
       } else {
-        // Create new feedback
-        response = await api.post('/api/feedback', feedbackData);
+        // 创建新反馈
+        response = await api.post('/feedback', feedbackData);
         setSuccessMessage('Feedback submitted successfully!');
       }
       
-      // Update local state with new/updated feedback
+      // 更新本地状态
       if (editingFeedback) {
         setFeedbackList(feedbackList.map(fb => 
           fb.id === response.data.id ? response.data : fb
@@ -141,19 +344,68 @@ const FeedbackPage = () => {
         setFeedbackList([response.data, ...feedbackList]);
       }
       
-      // Reset form
-      setRating(0);
-      setReview('');
-      setEditingFeedback(null);
+      // 更新本地状态
+      if (editingFeedback) {
+        // 更新现有反馈后，保持编辑状态
+        setEditingFeedback(response.data);
+        setRating(response.data.rating);
+        setReview(response.data.review || '');
+        setSuccessMessage('Review updated successfully!');
+      } else {
+        // 新建反馈后，重置表单
+        setRating(0);
+        setReview('');
+        setEditingFeedback(null);
+        
+        // 如果是通过bookingId直接进入的，提交成功后隐藏表单
+        if (hasOnlyBookingId) {
+          setFeedbackList([response.data, ...feedbackList]);
+        }
+      }
       
-      // Refresh stats
-      const statsResponse = await api.get('/api/feedback/stats', {
-        params: { targetType, targetId }
-      });
-      setStats(statsResponse.data);
+      // 刷新统计 - 只在有targetId时刷新
+      if (targetId && !hasOnlyBookingId) {
+        try {
+          const statsResponse = await api.get('/feedback/stats', {
+            params: { targetType, targetId }
+          });
+          setStats(statsResponse.data);
+        } catch (statsErr) {
+          console.warn('Failed to refresh stats:', statsErr);
+        }
+      }
       
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred');
+      // 检查重复评价错误
+      if (err.response?.data?.message?.includes('already reviewed this booking')) {
+        setError('You have already reviewed this booking. Loading your existing review for editing...');
+        
+        // 尝试获取用户现有的评价
+        try {
+          const feedbackResponse = await api.get('/feedback', {
+            params: { targetType, targetId }
+          });
+          
+          const userFeedback = feedbackResponse.data.find(
+            feedback => feedback.userName === currentUser.username && 
+                       feedback.bookingId === preFilledData.bookingId
+          );
+          
+          if (userFeedback) {
+            setEditingFeedback(userFeedback);
+            setRating(userFeedback.rating);
+            setReview(userFeedback.review || '');
+            setSuccessMessage('Your existing review has been loaded. You can edit it below.');
+            setError('');
+          } else {
+            setError('Error loading your existing review. Please try refreshing the page.');
+          }
+        } catch (loadErr) {
+          setError('Error loading your existing review. Please try refreshing the page.');
+        }
+      } else {
+        setError(err.response?.data?.message || 'An error occurred while submitting feedback');
+      }
     } finally {
       setLoading(false);
     }
@@ -169,19 +421,25 @@ const FeedbackPage = () => {
     
     try {
       setLoading(true);
-      await api.delete(`/api/feedback/${feedbackId}`);
+      await api.delete(`/feedback/${feedbackId}`);
       
-      // Update state
+      // 更新状态
       setFeedbackList(feedbackList.filter(fb => fb.id !== feedbackId));
       setEditingFeedback(null);
       setRating(0);
       setReview('');
       
-      // Refresh stats
-      const statsResponse = await api.get('/api/feedback/stats', {
-        params: { targetType, targetId }
-      });
-      setStats(statsResponse.data);
+      // 刷新统计 - 只在有targetId时刷新
+      if (targetId && !hasOnlyBookingId) {
+        try {
+          const statsResponse = await api.get('/feedback/stats', {
+            params: { targetType, targetId }
+          });
+          setStats(statsResponse.data);
+        } catch (statsErr) {
+          console.warn('Failed to refresh stats:', statsErr);
+        }
+      }
       
       setSuccessMessage('Review deleted successfully');
     } catch (err) {
@@ -195,212 +453,427 @@ const FeedbackPage = () => {
     setEditingFeedback(feedback);
     setRating(feedback.rating);
     setReview(feedback.review || '');
+    setError('');
+    setSuccessMessage('');
+    
+    // 滚动到表单区域
+    setTimeout(() => {
+      const formElement = document.querySelector('form');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
+  const cancelEditing = () => {
+    setEditingFeedback(null);
+    setRating(0);
+    setReview('');
+    setError('');
+    setSuccessMessage('');
+    
+    // 如果是编辑模式，导航回booking history
+    if (isEditingMode) {
+      navigate('/profile/my-bookings', { replace: true });
+    }
+  };
+
+  const isFormChanged = () => {
+    if (!editingFeedback) return false;
+    return rating !== editingFeedback.rating || review !== (editingFeedback.review || '');
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-center mb-8">Rate and Review</h1>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h3" component="h1" align="center" gutterBottom sx={{ 
+        fontWeight: 'bold', 
+        color: '#1976d2',
+        mb: 4
+      }}>
+        Rate and Review
+      </Typography>
       
-      {/* Selection Section */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Select Target</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-gray-700 mb-2">Target Type</label>
-            <select
-              value={targetType}
-              onChange={(e) => setTargetType(e.target.value)}
-              className="w-full p-2 border rounded"
-            >
-              <option value="COURT">Court</option>
-              <option value="EVENT">Event</option>
-              <option value="COACH">Coach</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-gray-700 mb-2">
-              {targetType === 'COURT' ? 'Court' : 
-               targetType === 'EVENT' ? 'Event' : 'Coach'}
-            </label>
-            <select
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className="w-full p-2 border rounded"
-              disabled={loading || !isAuthenticated()}
-            >
-              <option value="">Select {targetType.toLowerCase()}</option>
-              {availableTargets.map(target => (
-                <option key={target.id} value={target.id}>
-                  {target.name || target.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      {/* Stats Section */}
-      {targetId && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Rating Overview</h2>
-          <div className="flex items-center">
-            <div className="text-4xl font-bold mr-4">
-              {stats.averageRating.toFixed(1)}
-            </div>
-            <div>
-              <StarRating rating={stats.averageRating} />
-              <p className="text-gray-600 mt-1">
-                {stats.totalReviews} reviews
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* 编辑模式标识 */}
+      {isEditingMode && (
+        <Alert severity="info" sx={{ mb: 4 }}>
+          <strong>Editing Mode:</strong> You are editing your existing review for this booking.
+        </Alert>
       )}
       
-      {/* Feedback Form */}
-      {targetId && isAuthenticated() && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {editingFeedback ? 'Edit Your Review' : 'Write a Review'}
-          </h2>
-          
-          {error && (
-            <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
-              {error}
-            </div>
-          )}
-          
-          {successMessage && (
-            <div className="bg-green-100 text-green-700 p-3 rounded mb-4">
-              {successMessage}
-            </div>
-          )}
-          
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-gray-700 mb-2">
-                Rating <span className="text-red-500">*</span>
-              </label>
-              <StarRating 
-                rating={rating} 
-                editable={true} 
-                onRatingChange={setRating} 
-              />
-            </div>
+      {/* 预填充信息显示 */}
+      {preFilledData.courtName && (
+        <Paper sx={{ 
+          p: 3, 
+          mb: 4, 
+          background: 'linear-gradient(135deg, #e3f2fd, #f3e5f5)',
+          border: '1px solid #1976d2'
+        }}>
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box>
+              <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+                Reviewing: {preFilledData.courtName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isEditingMode 
+                  ? "You're editing your existing review for this completed booking" 
+                  : "You're reviewing a court from your completed booking"}
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate('/profile/my-bookings', { replace: true })}
+              sx={{ minWidth: 'auto' }}
+            >
+              Choose Different Booking
+            </Button>
+          </Box>
+        </Paper>
+      )}
+      
+      {/* 选择区域 - 只在没有预填充数据时显示 */}
+      {!hasOnlyBookingId && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Select Target
+            </Typography>
             
-            <div className="mb-4">
-              <label className="block text-gray-700 mb-2">Review</label>
-              <textarea
-                value={review}
-                onChange={(e) => setReview(e.target.value)}
-                className="w-full p-2 border rounded"
-                rows="4"
-                placeholder="Share your experience..."
-              />
-            </div>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Target Type</InputLabel>
+                  <Select
+                    value={targetType}
+                    onChange={(e) => setTargetType(e.target.value)}
+                    disabled={preFilledData.targetType}
+                    label="Target Type"
+                  >
+                    <MenuItem value="COURT">Court</MenuItem>
+                    <MenuItem value="EVENT">Event</MenuItem>
+                    <MenuItem value="COACH" disabled>Coach (Coming Soon)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>
+                    {targetType === 'COURT' ? 'Court' : 
+                     targetType === 'EVENT' ? 'Event' : 'Coach'}
+                  </InputLabel>
+                  <Select
+                    value={targetId}
+                    onChange={(e) => setTargetId(e.target.value)}
+                    disabled={loading || !isAuthenticated() || preFilledData.targetId}
+                    label={targetType === 'COURT' ? 'Court' : 
+                           targetType === 'EVENT' ? 'Event' : 'Coach'}
+                  >
+                    <MenuItem value="">
+                      Select {targetType.toLowerCase()}
+                    </MenuItem>
+                    {availableTargets.map(target => (
+                      <MenuItem key={target.id} value={target.id}>
+                        {target.name || target.title}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* 统计区域 - 只在有targetId时显示 */}
+      {targetId && !hasOnlyBookingId && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Rating Overview
+            </Typography>
+            <Box display="flex" alignItems="center">
+              <Typography variant="h2" sx={{ fontWeight: 'bold', mr: 2, color: '#1976d2' }}>
+                {stats.averageRating.toFixed(1)}
+              </Typography>
+              <Box>
+                <StarRating rating={stats.averageRating} />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  {stats.totalReviews} reviews
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* 加载状态指示器 */}
+      {loading && (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress size={60} />
+        </Box>
+      )}
+      
+      {/* 反馈表单 - 显示新建评价或编辑现有评价 */}
+      {(targetId || hasOnlyBookingId) && isAuthenticated() && !loading && (
+        editingFeedback || !isViewReviewMode
+      ) && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h4" component="h1" gutterBottom sx={{ 
+              fontWeight: 'bold', 
+              color: '#1976d2',
+              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+            }}>
+              {isViewReviewMode && editingFeedback ? 'Your Review' : 'Leave a Review'}
+            </Typography>
             
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+            <Alert severity="info" sx={{ mb: 3, maxWidth: 800 }}>
+              <AlertTitle>Review Guidelines</AlertTitle>
+              <Typography variant="body2">
+                • Be honest and constructive in your review<br/>
+                • Share your experience to help other users<br/>
+                • You can only review each booking once<br/>
+                • You can edit your review anytime
+              </Typography>
+            </Alert>
+            
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
+            
+            {successMessage && (
+              <Alert severity="success" sx={{ mb: 3 }} icon={<CheckCircleIcon />}>
+                {successMessage}
+              </Alert>
+            )}
+            
+            <Box component="form" onSubmit={handleSubmit}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Rating <span style={{ color: '#f44336' }}>*</span>
+                </Typography>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Current rating: {rating} (Click stars to rate)
+                  </Typography>
+                </Box>
+                <StarRating 
+                  rating={rating} 
+                  interactive={true} 
+                  onRatingChange={setRating} 
+                />
+              </Box>
+              
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  label="Review"
+                  multiline
+                  rows={4}
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  fullWidth
+                  placeholder="Share your experience..."
+                  variant="outlined"
+                />
+              </Box>
+              
+              <Box display="flex" gap={2} flexWrap="wrap">
+                {(editingFeedback || isEditingMode) ? (
+                  // 编辑模式按钮
+                  <>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={loading || !isFormChanged()}
+                      sx={{
+                        background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #1565c0, #1976d2)'
+                        },
+                        '&:disabled': {
+                          background: '#e0e0e0',
+                          color: '#757575'
+                        }
+                      }}
+                    >
+                      {loading ? 'Updating...' : 'Update Review'}
+                    </Button>
+                    {editingFeedback && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        disabled={loading}
+                        onClick={() => handleDelete(editingFeedback.id)}
+                        startIcon={<DeleteIcon />}
+                      >
+                        Delete Review
+                      </Button>
+                    )}
+                    <Button
+                      variant="outlined"
+                      onClick={cancelEditing}
+                      disabled={loading}
+                    >
+                      Cancel Edit
+                    </Button>
+                  </>
+                ) : (
+                  // 新建模式按钮
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={loading || !rating}
+                    sx={{
+                      background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #1565c0, #1976d2)'
+                      },
+                      '&:disabled': {
+                        background: '#e0e0e0',
+                        color: '#757575'
+                      }
+                    }}
+                  >
+                    {loading ? 'Submitting...' : 'Submit Review'}
+                  </Button>
+                )}
+                
+                {/* View Review模式下的额外按钮 */}
+                {isViewReviewMode && editingFeedback && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => navigate('/profile/my-bookings')}
+                    disabled={loading}
+                    sx={{
+                      borderColor: '#10b981',
+                      color: '#10b981',
+                      '&:hover': {
+                        borderColor: '#059669',
+                        backgroundColor: '#ecfdf5'
+                      }
+                    }}
+                  >
+                    Back to Booking History
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* 成功提交后的显示区域 */}
+      {hasOnlyBookingId && isAuthenticated() && !loading && editingFeedback && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Box textAlign="center" py={4}>
+              <CheckCircleIcon sx={{ fontSize: 60, color: '#4caf50', mb: 2 }} />
+              <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: '#4caf50' }}>
+                Review Submitted Successfully!
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Thank you for your feedback. Your review has been submitted and will help other users.
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/profile/my-bookings')}
+                sx={{
+                  background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #1565c0, #1976d2)'
+                  }
+                }}
               >
-                {editingFeedback ? 'Update Review' : 'Submit Review'}
-              </button>
-              
-              {editingFeedback && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(editingFeedback.id)}
-                  disabled={loading}
-                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  Delete Review
-                </button>
-              )}
-              
-              {(editingFeedback || rating || review) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRating(0);
-                    setReview('');
-                    setEditingFeedback(null);
-                  }}
-                  className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+                Back to Booking History
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
       )}
       
       {targetId && !isAuthenticated() && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-yellow-700">
-                You need to <a href="/login" className="text-blue-600 underline">log in</a> to submit reviews
-              </p>
-            </div>
-          </div>
-        </div>
+        <Alert severity="warning" sx={{ mb: 4 }}>
+          You need to <Button color="primary" onClick={() => navigate('/login')}>log in</Button> to submit reviews
+        </Alert>
       )}
       
-      {/* Reviews List */}
-      {targetId && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Reviews ({feedbackList.length})
-          </h2>
-          
-          {loading ? (
-            <p>Loading reviews...</p>
-          ) : feedbackList.length === 0 ? (
-            <p>No reviews yet. Be the first to review!</p>
-          ) : (
-            <div className="space-y-6">
-              {feedbackList.map(feedback => (
-                <div 
-                  key={feedback.id} 
-                  className="border-b pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold">{feedback.userName}</h3>
-                      <p className="text-gray-500 text-sm">
-                        {format(new Date(feedback.createdAt), 'MMM dd, yyyy')}
-                      </p>
-                    </div>
+      {/* 评论列表 */}
+      {targetId && !loading && (
+        <Card>
+          <CardContent>
+            <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Reviews ({feedbackList.length})
+            </Typography>
+            
+            {feedbackList.length === 0 ? (
+              <Box textAlign="center" py={4}>
+                <Typography variant="body1" color="text.secondary">
+                  No reviews yet. Be the first to review!
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                {feedbackList.map((feedback, index) => (
+                  <Box key={feedback.id}>
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                          {feedback.userName}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {format(new Date(feedback.createdAt), 'MMM dd, yyyy')}
+                        </Typography>
+                      </Box>
+                      
+                      {currentUser && currentUser.username === feedback.userName && (
+                        <Box display="flex" gap={1}>
+                          <IconButton
+                            onClick={() => startEditing(feedback)}
+                            color="primary"
+                            size="small"
+                            sx={{
+                              '&:hover': {
+                                backgroundColor: 'rgba(25, 118, 210, 0.1)'
+                              }
+                            }}
+                            title="Edit your review"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          {editingFeedback && editingFeedback.id === feedback.id && (
+                            <Chip
+                              label="Editing"
+                              color="primary"
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
+                      )}
+                    </Box>
                     
-                    {currentUser && currentUser.username === feedback.userName && (
-                      <button
-                        onClick={() => startEditing(feedback)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
+                    <Box sx={{ mb: 2 }}>
+                      <StarRating rating={feedback.rating} />
+                    </Box>
+                    
+                    {feedback.review && (
+                      <Typography variant="body1" sx={{ mb: 2 }}>
+                        {feedback.review}
+                      </Typography>
                     )}
-                  </div>
-                  
-                  <div className="mb-2">
-                    <StarRating rating={feedback.rating} />
-                  </div>
-                  
-                  {feedback.review && (
-                    <p className="text-gray-700">{feedback.review}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    
+                    {index < feedbackList.length - 1 && <Divider sx={{ my: 3 }} />}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </Container>
   );
 };
 

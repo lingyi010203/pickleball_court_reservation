@@ -113,6 +113,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/user/reviewable-items").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/feedback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/feedback/stats").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/feedback/user").hasRole("USER")
+                        .requestMatchers(HttpMethod.GET, "/api/feedback/reviewable-items").hasRole("USER")
                         .requestMatchers(HttpMethod.POST, "/api/feedback").hasRole("USER")
                         .requestMatchers(HttpMethod.PUT, "/api/feedback/**").hasRole("USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/feedback/**").hasAnyRole("USER", "ADMIN")

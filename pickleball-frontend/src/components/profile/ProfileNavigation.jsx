@@ -36,7 +36,7 @@ const ProfileNavigation = ({ setActiveView }) => {
 
   const handleFeedbackNavigation = () => {
     // Navigate to the feedback selection page
-    navigate('/feedback/select');
+            navigate('/profile/my-bookings');
   };
 
   return (

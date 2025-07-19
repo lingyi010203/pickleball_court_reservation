@@ -66,4 +66,29 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findTop5ByOrderByBookingDateDesc();
 
     boolean existsByMember_User_IdAndBookingSlots_Slot_CourtId(Integer userId, Integer courtId);
+
+    @Query("SELECT COUNT(b) > 0 FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE b.member.user.id = :userId " +
+           "AND s.courtId = :courtId " +
+           "AND b.status = 'COMPLETED'")
+    boolean existsByMember_User_IdAndCompletedBookingForCourt(Integer userId, Integer courtId);
+
+    @Query("SELECT b FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE b.member.user.id = :userId " +
+           "AND b.status = 'COMPLETED' " +
+           "ORDER BY b.bookingDate DESC")
+    List<Booking> findCompletedBookingsByUserId(Integer userId);
+
+    @Query("SELECT b FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE b.member.user.id = :userId " +
+           "AND s.courtId = :courtId " +
+           "AND b.status = 'COMPLETED' " +
+           "ORDER BY b.bookingDate DESC")
+    List<Booking> findCompletedBookingsByUserIdAndCourtId(Integer userId, Integer courtId);
 }

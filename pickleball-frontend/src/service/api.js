@@ -2,7 +2,7 @@ import axios from 'axios';
 import UserService from './UserService';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8081/api'
+  baseURL: '/api'
 });
 
 api.interceptors.request.use(config => {

@@ -36,4 +36,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Integer> {
     List<Feedback> findByUserId(Integer userId);
 
     java.util.List<Feedback> findTop2ByOrderByCreatedAtDesc();
+    
+    // 通过bookingId查找feedback
+    List<Feedback> findByBookingIdOrderByCreatedAtDesc(Integer bookingId);
 }

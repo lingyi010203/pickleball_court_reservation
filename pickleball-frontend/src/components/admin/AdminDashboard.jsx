@@ -433,12 +433,15 @@ const AdminDashboard = () => {
         </Box>
         <List sx={{ flexGrow: 1 }}>
           <ListItem
-            button
             onClick={() => navigate('/admin/dashboard')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'dashboard' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'dashboard' ? '#f0f2f5' : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{
@@ -455,12 +458,15 @@ const AdminDashboard = () => {
             />
           </ListItem>
           <ListItem
-            button
             onClick={() => navigate('/admin/users')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'users' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'users' ? '#f0f2f5' : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -469,12 +475,15 @@ const AdminDashboard = () => {
             <ListItemText primary="User Management" />
           </ListItem>
           <ListItem
-            button
             onClick={() => navigate('/admin/courts')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'courts' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'courts' ? '#f0f2f5' : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -483,12 +492,15 @@ const AdminDashboard = () => {
             <ListItemText primary="Manage Courts" />
           </ListItem>
           <ListItem
-            button
             onClick={() => navigate('/admin/tiers')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'tiers' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'tiers' ? '#f0f2f5' : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -497,12 +509,15 @@ const AdminDashboard = () => {
             <ListItemText primary="Membership Tiers" />
           </ListItem>
           <ListItem
-            button
             onClick={() => navigate('/admin/bookings')}
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'bookings' ? '#f0f2f5' : 'inherit'
+              bgcolor: getCurrentTab() === 'bookings' ? '#f0f2f5' : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
@@ -510,7 +525,13 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Manage Bookings" />
           </ListItem>
-          <ListItem button sx={{ borderRadius: 1 }}>
+          <ListItem sx={{ 
+            borderRadius: 1,
+            cursor: 'pointer',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)'
+            }
+          }}>
             <ListItemIcon sx={{ minWidth: 40 }}>
               <SettingsIcon />
             </ListItemIcon>

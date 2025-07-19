@@ -626,8 +626,8 @@ const AdminManageBookings = () => {
                                   return `${formatSlotDate(firstSlot.date)} ${formatTime(firstSlot.startTime)} - ${formatTime(lastSlot.endTime)} (${slots.length} slot${slots.length > 1 ? 's' : ''})`;
                                 })()
                               : booking.slotDate && booking.startTime && booking.endTime 
-                                ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
-                                : 'No slot info'
+                              ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
+                              : 'No slot info'
                             }
                           </Typography>
                         </Box>
@@ -747,6 +747,7 @@ const AdminManageBookings = () => {
         adminRemark={adminRemark}
         onAdminRemarkChange={setAdminRemark}
         loading={loading}
+        isAdmin={true}
       />
 
       {/* Cancel Booking Dialog */}

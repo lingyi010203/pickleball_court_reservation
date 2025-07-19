@@ -23,4 +23,7 @@ public class FeedbackDto {
 
     private String review;
     private List<String> tags;
+    
+    // 新增：预订ID
+    private Integer bookingId;
 }

@@ -41,7 +41,7 @@ public class AdminModerationService {
     public void removeFeedback(Integer feedbackId) {
         Feedback feedback = feedbackRepository.findById(feedbackId)
                 .orElseThrow(() -> new RuntimeException("Feedback not found"));
-        String userEmail = feedback.getUser().getEmail();
+        String userEmail = feedback.getUser().getUserAccount().getUsername(); // 使用username作为email
         String userName = feedback.getUser().getName();
         String review = feedback.getReview();
         // Send email notification
@@ -78,12 +78,13 @@ public class AdminModerationService {
         dto.setRating(feedback.getRating());
         dto.setReview(feedback.getReview());
         dto.setUserName(feedback.getUser().getName());
-        dto.setUserEmail(feedback.getUser().getEmail());
+        dto.setUserEmail(feedback.getUser().getUserAccount().getUsername()); // 使用username作为email
         dto.setCreatedAt(feedback.getCreatedAt());
         dto.setTags(feedback.getTags());
+        dto.setBookingId(feedback.getBooking() != null ? feedback.getBooking().getId() : null);
         // Set average rating for the target
         Double avg = feedbackRepository.findAverageRatingByTarget(feedback.getTargetType(), feedback.getTargetId());
-        dto.setAverageRating(avg);
+        dto.setAverageRating(avg != null ? avg : 0.0); // 处理null值
         return dto;
     }
 }

@@ -14,6 +14,7 @@ public class AdminBookingDto {
     private double totalAmount;
     private String status;
     private String memberName;
+    private Integer memberId; // 新增：会员ID
     private String courtName;
     private LocalDate slotDate;
     private LocalTime startTime;
@@ -31,6 +32,7 @@ public class AdminBookingDto {
     private String paymentType;
     private String paymentStatus;
     private String transactionId;
+    private Integer paymentId; // 新增：支付ID
     
     // Additional booking details
     private Integer numPaddles;

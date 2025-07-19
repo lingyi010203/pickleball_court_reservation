@@ -37,20 +37,65 @@ public class FeedbackService {
         User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
 
-        // 只針對COURT做檢查
-        if (dto.getTargetType() == Feedback.TargetType.COURT) {
-            boolean hasBooked = bookingRepository.existsByMember_User_IdAndBookingSlots_Slot_CourtId(user.getId(), dto.getTargetId());
-            if (!hasBooked) {
-                throw new ValidationException("You can only review courts you have booked.");
+        // 验证预订是否存在且属于当前用户
+        final Booking booking;
+        if (dto.getBookingId() != null) {
+            booking = bookingRepository.findById(dto.getBookingId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", dto.getBookingId()));
+            
+            // 验证预订是否属于当前用户
+            if (!booking.getMember().getUser().getId().equals(user.getId())) {
+                throw new ValidationException("You can only review your own bookings.");
+            }
+            
+            // 验证预订是否已完成
+            if (!"COMPLETED".equals(booking.getStatus())) {
+                throw new ValidationException("You can only review completed bookings.");
+            }
+            
+            // 检查用户是否已经对这个预订评价过
+            boolean hasReviewed = feedbackRepository.findByUserId(user.getId()).stream()
+                    .anyMatch(feedback -> feedback.getBooking() != null 
+                            && feedback.getBooking().getId().equals(booking.getId()));
+            
+            if (hasReviewed) {
+                throw new ValidationException("You have already reviewed this booking. You can only edit your existing review.");
+            }
+        } else {
+            booking = null;
+        }
+
+        // 如果提供了bookingId，从booking中获取courtId作为targetId
+        Integer finalTargetId = dto.getTargetId();
+        if (booking != null && finalTargetId == null) {
+            // 从booking的slots中获取courtId
+            if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
+                Slot slot = booking.getBookingSlots().get(0).getSlot();
+                if (slot != null) {
+                    finalTargetId = slot.getCourtId();
+                }
+            }
+            
+            if (finalTargetId == null) {
+                throw new ValidationException("Unable to determine court ID from booking.");
+            }
+        }
+
+        // 只針對COURT做檢查 - 改為檢查是否有已完成的預訂
+        if (dto.getTargetType() == Feedback.TargetType.COURT && finalTargetId != null) {
+            boolean hasCompletedBooking = bookingRepository.existsByMember_User_IdAndCompletedBookingForCourt(user.getId(), finalTargetId);
+            if (!hasCompletedBooking) {
+                throw new ValidationException("You can only review courts for completed bookings.");
             }
         }
 
         Feedback feedback = new Feedback();
         feedback.setTargetType(dto.getTargetType());
-        feedback.setTargetId(dto.getTargetId());
+        feedback.setTargetId(finalTargetId);
         feedback.setRating(dto.getRating());
         feedback.setReview(dto.getReview());
         feedback.setUser(user);
+        feedback.setBooking(booking); // 设置预订关联
         feedback.setCreatedAt(LocalDateTime.now());
         feedback.setTags(dto.getTags());
 
@@ -72,6 +117,7 @@ public class FeedbackService {
 
         feedback.setRating(dto.getRating());
         feedback.setReview(dto.getReview());
+        feedback.setTags(dto.getTags()); // 添加tags字段的更新
 
         Feedback updatedFeedback = feedbackRepository.save(feedback);
         return convertToDto(updatedFeedback);
@@ -108,6 +154,15 @@ public class FeedbackService {
                 .collect(Collectors.toList());
     }
 
+    public List<FeedbackResponseDto> getFeedbackByBookingId(Integer bookingId) {
+        List<Feedback> feedbackList = feedbackRepository
+                .findByBookingIdOrderByCreatedAtDesc(bookingId);
+
+        return feedbackList.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
     public FeedbackStatsDto getFeedbackStats(
             Feedback.TargetType targetType,
             Integer targetId
@@ -129,8 +184,33 @@ public class FeedbackService {
         dto.setRating(feedback.getRating());
         dto.setReview(feedback.getReview());
         dto.setUserName(feedback.getUser().getName());
+        dto.setUserEmail(feedback.getUser().getUserAccount().getUsername());
+        dto.setUserId(feedback.getUser().getId()); // 添加用户ID
         dto.setCreatedAt(feedback.getCreatedAt());
         dto.setTags(feedback.getTags());
+        dto.setBookingId(feedback.getBooking() != null ? feedback.getBooking().getId() : null);
+        
+        // Set target name based on target type
+        if (feedback.getTargetType() == Feedback.TargetType.COURT) {
+            Court court = courtRepository.findById(feedback.getTargetId()).orElse(null);
+            dto.setTargetName(court != null ? court.getName() : "Unknown Court");
+        } else if (feedback.getTargetType() == Feedback.TargetType.EVENT) {
+            Event event = eventRepository.findById(feedback.getTargetId()).orElse(null);
+            dto.setTargetName(event != null ? event.getTitle() : "Unknown Event");
+        } else {
+            dto.setTargetName("Unknown Target");
+        }
+        
+        // Calculate average rating for the target
+        if (feedback.getTargetType() == Feedback.TargetType.COURT) {
+            Double avgRating = feedbackRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(Feedback.TargetType.COURT, feedback.getTargetId())
+                    .stream()
+                    .mapToInt(Feedback::getRating)
+                    .average()
+                    .orElse(0.0);
+            dto.setAverageRating(avgRating);
+        }
+        
         return dto;
     }
 
@@ -144,31 +224,53 @@ public class FeedbackService {
         List<Feedback> feedbackList = feedbackRepository.findByUserId(user.getId());
 
         return feedbackList.stream()
-                .map(feedback -> {
-                    FeedbackResponseDto dto = convertToDto(feedback);
-                    // Add target name lookup here (court, event, or coach name)
-                    dto.setTargetName(getTargetName(feedback.getTargetType(), feedback.getTargetId()));
-                    return dto;
-                })
+                .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
-    private String getTargetName(Feedback.TargetType targetType, Integer targetId) {
-        switch (targetType) {
-            case COURT:
-                return courtRepository.findById(targetId)
-                        .map(Court::getName)
-                        .orElse("Court (deleted)");
-            case EVENT:
-                return eventRepository.findById(targetId)
-                        .map(Event::getTitle)
-                        .orElse("Event (deleted)");
-            case COACH:
-                return userRepository.findById(targetId)
-                        .map(User::getName)
-                        .orElse("Coach (deleted)");
-            default:
-                return "Unknown";
-        }
+    public List<ReviewableItemDto> getReviewableBookings() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+
+        User user = userRepository.findByUserAccount_Username(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+
+        List<Booking> completedBookings = bookingRepository.findCompletedBookingsByUserId(user.getId());
+
+        return completedBookings.stream()
+                .map(booking -> {
+                    ReviewableItemDto dto = new ReviewableItemDto();
+                    dto.setBookingId(booking.getId());
+                    dto.setBookingDate(booking.getBookingDate());
+                    
+                    // Get court info from first booking slot
+                    if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
+                        Slot slot = booking.getBookingSlots().get(0).getSlot();
+                        if (slot != null) {
+                            Court court = courtRepository.findById(slot.getCourtId())
+                                    .orElse(null);
+                            if (court != null) {
+                                dto.setCourtId(court.getId());
+                                dto.setCourtName(court.getName());
+                                dto.setCourtLocation(court.getLocation());
+                                dto.setSlotDate(slot.getDate());
+                                dto.setStartTime(slot.getStartTime());
+                                dto.setEndTime(slot.getEndTime());
+                            }
+                        }
+                    }
+                    
+                    // Check if user has already reviewed this booking
+                    final Integer bookingId = booking.getId();
+                    boolean hasReviewed = feedbackRepository.findByUserId(user.getId()).stream()
+                            .anyMatch(feedback -> feedback.getBooking() != null 
+                                    && feedback.getBooking().getId().equals(bookingId));
+                    
+                    dto.setHasReviewed(hasReviewed);
+                    
+                    return dto;
+                })
+                .filter(dto -> dto.getCourtId() != null) // Filter out bookings without valid court info
+                .collect(Collectors.toList());
     }
 }

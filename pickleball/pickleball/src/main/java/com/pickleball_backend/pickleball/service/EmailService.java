@@ -171,6 +171,36 @@ public class EmailService {
         }
     }
 
+    public void sendAdminCancellationNotification(String email, Booking booking, Slot slot, String courtName, String adminRemark) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("Booking Cancelled by Admin");
+
+        String content = String.format(
+                "Your booking #%d has been cancelled by an administrator.\n\n" +
+                        "Court: %s\nDate: %s\nTime: %s - %s\n\n" +
+                        "A full refund has been processed to your account.\n\n" +
+                        (adminRemark != null && !adminRemark.trim().isEmpty() ? 
+                        "Admin Remark: %s\n\n" : "") +
+                        "If you have any questions, please contact our support team.",
+                booking.getId(),
+                courtName,
+                slot.getDate(),
+                slot.getStartTime(),
+                slot.getEndTime(),
+                adminRemark != null ? adminRemark.trim() : ""
+        );
+
+        message.setText(content);
+
+        try {
+            javaMailSender.send(message);
+            log.info("Admin cancellation notification sent to: {}", email);
+        } catch (MailException e) {
+            log.error("Failed to send admin cancellation email: {}", e.getMessage());
+        }
+    }
+
     public void sendCourtDeletionNotification(
             String email,
             String courtName,

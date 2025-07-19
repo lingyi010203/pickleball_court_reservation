@@ -8,6 +8,7 @@ import java.time.LocalTime;
 @Data
 public class BookingHistoryDto {
     private Integer id;
+    private Integer courtId; // 新增：court ID
     private String courtName;
     private String location;
     private LocalDate date;
@@ -19,4 +20,10 @@ public class BookingHistoryDto {
     private String purpose;
     private Integer numberOfPlayers;
     private Integer durationHours;
+    // 新增：球拍和球组信息
+    private Integer numPaddles;
+    private Boolean buyBallSet;
+    
+    // 新增：用户是否已经评价过这个预订
+    private Boolean hasReviewed;
 }
