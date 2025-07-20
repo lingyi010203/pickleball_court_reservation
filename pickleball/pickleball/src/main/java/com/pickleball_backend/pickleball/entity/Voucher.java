@@ -24,22 +24,33 @@ public class Voucher {
     @Column(unique = true)
     private String code;
 
-    // Correctly mapped to snake_case columns
-    @Column(name = "discount_amount", nullable = false)
-    private double discountAmount;
+    @Column(name = "tier_id", nullable = false)
+    private int tierId;
+
+    @Column(name = "discount_type", nullable = false)
+    private String discountType;
+
+    @Column(name = "discount_value", nullable = false)
+    private double discountValue;
 
     @Column(name = "request_points", nullable = false)
     private int requestPoints;
 
-    @Column(name = "expiry_date", nullable = false)
+    @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
+    @Column(name = "discount_amount", nullable = false)
+    private double discountAmount;
+
+    @Column(name = "user_id")
+    private Integer userId;
+
     @ManyToOne
-    @JoinColumn(name = "tier_id", nullable = false)
+    @JoinColumn(name = "tier_id", nullable = false, insertable = false, updatable = false)
     @JsonBackReference
     private MembershipTier tier;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", referencedColumnName = "user_id")
+    @JoinColumn(name = "user_id", referencedColumnName = "user_id", insertable = false, updatable = false)
     private Member member;
 }

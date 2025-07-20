@@ -59,22 +59,47 @@ public class MemberService {
             initializeWallet(member.getId()); // Initialize if missing
         }
 
-        List<Voucher> vouchers = voucherRepository.findByTierId(member.getTier().getId());
+        // Add debug logging
+        System.out.println("=== MemberService Debug ===");
+        System.out.println("Member ID: " + member.getId());
+        System.out.println("Member Tier ID: " + (member.getTier() != null ? member.getTier().getId() : "NULL"));
+        System.out.println("Member Tier Name: " + (member.getTier() != null ? member.getTier().getTierName() : "NULL"));
+        System.out.println("Member Point Balance: " + member.getPointBalance());
+
+        List<Voucher> vouchers = voucherRepository.findByTierIdAndMemberIsNull(member.getTier().getId());
+        
+        System.out.println("Found " + vouchers.size() + " vouchers for tier " + member.getTier().getId());
+        vouchers.forEach(v -> {
+            System.out.println("Voucher ID: " + v.getId() + 
+                             ", Code: " + v.getCode() + 
+                             ", Expiry: " + v.getExpiryDate() + 
+                             ", Points: " + v.getRequestPoints());
+        });
+
+        List<VoucherDto> redeemableVouchers = vouchers.stream()
+                .filter(v -> {
+                    // Handle null or default dates as never expiring
+                    if (v.getExpiryDate() == null) return true;
+                    if (v.getExpiryDate().equals(LocalDate.of(1970, 1, 1))) return true;
+                    return v.getExpiryDate().isAfter(LocalDate.now());
+                })
+                .map(v -> new VoucherDto(
+                        v.getId(),
+                        v.getCode(),
+                        v.getDiscountValue(),  // Changed from getDiscountAmount()
+                        v.getDiscountType(),  // Added discount type
+                        v.getRequestPoints(),
+                        v.getExpiryDate()
+                ))
+                .collect(Collectors.toList());
+        
+        System.out.println("After filtering by expiry date: " + redeemableVouchers.size() + " vouchers");
 
         return new MemberDashboardDto(
                 member.getTier().getTierName(), // 直接返回字符串值
                 member.getPointBalance(),
                 member.getTier().getBenefits(),
-                vouchers.stream()
-                        .filter(v -> v.getExpiryDate() != null && v.getExpiryDate().isAfter(LocalDate.now()))
-                        .map(v -> new VoucherDto(
-                                v.getId(),
-                                v.getCode(),
-                                v.getDiscountAmount(),
-                                v.getRequestPoints(),
-                                v.getExpiryDate()
-                        ))
-                        .collect(Collectors.toList()),
+                redeemableVouchers,
                 member.getTier().getMinPoints(),
                 member.getTier().getMaxPoints()
         );
@@ -114,7 +139,9 @@ public class MemberService {
         if (member.getPointBalance() < voucher.getRequestPoints()) {
             throw new ValidationException("Insufficient points");
         }
-        if (voucher.getExpiryDate() == null || voucher.getExpiryDate().isBefore(LocalDate.now())) {
+        if (voucher.getExpiryDate() != null && 
+            !voucher.getExpiryDate().equals(LocalDate.of(1970, 1, 1)) && 
+            voucher.getExpiryDate().isBefore(LocalDate.now())) {
             throw new ValidationException("Voucher has expired");
         }
 
@@ -131,7 +158,8 @@ public class MemberService {
         // Create redeemed voucher
         Voucher redeemedVoucher = new Voucher();
         redeemedVoucher.setCode(uniqueCode);
-        redeemedVoucher.setDiscountAmount(voucher.getDiscountAmount());
+        redeemedVoucher.setDiscountValue(voucher.getDiscountValue());  // Changed from getDiscountAmount()
+        redeemedVoucher.setDiscountType(voucher.getDiscountType());    // Added discount type
         redeemedVoucher.setRequestPoints(voucher.getRequestPoints());
         redeemedVoucher.setExpiryDate(voucher.getExpiryDate());
         redeemedVoucher.setTier(voucher.getTier());
@@ -201,7 +229,7 @@ public class MemberService {
                 .map(v -> new VoucherDto(
                         v.getId(),
                         v.getCode(),
-                        v.getDiscountAmount(),
+                        v.getDiscountValue(),  // Changed from getDiscountAmount()
                         v.getRequestPoints(),
                         v.getExpiryDate()
                 ))

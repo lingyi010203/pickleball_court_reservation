@@ -14,7 +14,18 @@ import java.time.LocalDate;
 public class VoucherDto {
     private Integer id;
     private String code;
-    private double discountAmount;
+    private double discountValue;  // Changed from discountAmount to discountValue
+    private String discountType;  // Added discount type field
     private int requestPoints;
     private LocalDate expiryDate;
+    
+    // Add constructor without discountType for backward compatibility
+    public VoucherDto(Integer id, String code, double discountValue, int requestPoints, LocalDate expiryDate) {
+        this.id = id;
+        this.code = code;
+        this.discountValue = discountValue;  // Changed from discountAmount
+        this.discountType = "amount"; // Default to amount type
+        this.requestPoints = requestPoints;
+        this.expiryDate = expiryDate;
+    }
 }

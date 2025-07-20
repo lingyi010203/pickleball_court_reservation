@@ -8,4 +8,7 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
     boolean existsByCode(String code);
     List<Voucher> findByTierId(Integer tierId);
     List<Voucher> findByMemberIdIsNotNull();
+    
+    // Find redeemable vouchers (not yet redeemed by any user)
+    List<Voucher> findByTierIdAndMemberIsNull(Integer tierId);
 }

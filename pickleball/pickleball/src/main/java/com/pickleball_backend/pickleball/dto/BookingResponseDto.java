@@ -20,4 +20,6 @@ public class BookingResponseDto {
     private String paymentMethod;
     private String paymentStatus;
     private Double walletBalance;
+    private Integer pointsEarned;  // Points earned from this booking
+    private Integer currentPointBalance;  // Current total point balance
 }

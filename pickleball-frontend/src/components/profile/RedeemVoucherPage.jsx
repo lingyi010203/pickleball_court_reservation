@@ -54,15 +54,28 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
         setDashboardData(dashboardResponse.data);
         
         // Map backend vouchers to frontend format
-        const backendVouchers = dashboardResponse.data.redeemableVouchers.map(voucher => ({
-          id: voucher.id,
-          title: `$${voucher.discountAmount} Discount`,
-          description: "Special offer for members",
-          discount: `${voucher.discountAmount}% OFF`,
-          expiry: voucher.expiryDate,
-          points: voucher.requestPoints,
-          discountAmount: voucher.discountAmount
-        }));
+        const backendVouchers = dashboardResponse.data.redeemableVouchers.map(voucher => {
+          // Handle different discount types
+          let title, discount;
+          if (voucher.discountType === 'percentage') {
+            title = `${voucher.discountValue}% Discount`;
+            discount = `${voucher.discountValue}% OFF`;
+          } else {
+            title = `RM${voucher.discountValue} Discount`;
+            discount = `RM${voucher.discountValue} OFF`;
+          }
+          
+          return {
+            id: voucher.id,
+            title: title,
+            description: "Special offer for members",
+            discount: discount,
+            expiry: voucher.expiryDate,
+            points: voucher.requestPoints,
+            discountValue: voucher.discountValue,  // Changed from discountAmount
+            discountType: voucher.discountType
+          };
+        });
         
         setVouchers(backendVouchers);
       } catch (err) {
@@ -87,7 +100,7 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
       if (!token) return;
 
       const response = await axios.post(
-        `http://localhost:8081/api/member/vouchers/redeem/${voucher.id}`,
+        `http://localhost:8081/api/voucher-redemption/redeem/${voucher.id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -102,15 +115,26 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        const updatedVouchers = dashboardResponse.data.redeemableVouchers.map(v => ({
-          id: v.id,
-          title: `$${v.discountAmount} Discount`,
-          description: "Special offer for members",
-          discount: `${v.discountAmount}% OFF`,
-          expiry: v.expiryDate,
-          points: v.requestPoints,
-          discountAmount: v.discountAmount
-        }));
+        const updatedVouchers = dashboardResponse.data.redeemableVouchers.map(v => {
+          let title, discount;
+          if (v.discountType === 'percentage') {
+            title = `${v.discountValue}% Discount`;
+            discount = `${v.discountValue}% OFF`;
+          } else {
+            title = `RM${v.discountValue} Discount`;
+            discount = `RM${v.discountValue} OFF`;
+          }
+          return {
+            id: v.id,
+            title: title,
+            description: "Special offer for members",
+            discount: discount,
+            expiry: v.expiryDate,
+            points: v.requestPoints,
+            discountValue: v.discountValue,
+            discountType: v.discountType
+          };
+        });
         
         setVouchers(updatedVouchers);
         setDashboardData(dashboardResponse.data);
@@ -212,9 +236,9 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
       ) : (
         <Grid container spacing={3}>
           {vouchers.map((voucher, index) => {
-            const backgroundColor = voucher.discountAmount > 30 
+            const backgroundColor = voucher.discountValue > 30 
               ? '#e8f5e8' 
-              : voucher.discountAmount > 15 
+              : voucher.discountValue > 15 
                 ? '#fff3e0' 
                 : '#f3e5f5';
             
@@ -258,10 +282,10 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
                         left: 10,
                         lineHeight: 1
                       }}>
-                        {voucher.discountAmount}%
+                        {voucher.discountValue}%
                       </Typography>
                       <Typography variant="h2" fontWeight="bold" color="primary.main">
-                        {voucher.discountAmount}%
+                        {voucher.discountValue}%
                       </Typography>
                       <Chip 
                         label="DISCOUNT"

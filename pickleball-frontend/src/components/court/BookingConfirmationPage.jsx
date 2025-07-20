@@ -229,6 +229,52 @@ const BookingConfirmationPage = () => {
                 </Typography>
               </Grid>
             </Grid>
+            
+            {/* Points Reward Section */}
+            {booking.pointsEarned && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ 
+                  p: 2, 
+                  backgroundColor: '#f3e5f5', 
+                  borderRadius: '8px',
+                  border: '1px solid #9c27b0'
+                }}>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    fontWeight: 'bold', 
+                    color: '#9c27b0',
+                    textAlign: 'center'
+                  }}>
+                    🎉 Points Earned!
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Points Earned:
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} textAlign="right">
+                      <Typography variant="body1" fontWeight="bold" color="#9c27b0">
+                        +{booking.pointsEarned} points
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Current Balance:
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} textAlign="right">
+                      <Typography variant="body1" fontWeight="medium">
+                        {booking.currentPointBalance} points
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                    Earn 1 point for every RM1 spent!
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
         

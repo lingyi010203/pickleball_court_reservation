@@ -164,6 +164,12 @@ public class BookingService {
         // 11. Generate receipt
         emailService.sendBookingConfirmation(account.getUser().getEmail(), booking, court, slots.get(0));
 
+        // 11.5. Add points reward (1 point per RM1 spent)
+        int pointsEarned = (int) Math.round(amount);
+        member.setPointBalance(member.getPointBalance() + pointsEarned);
+        memberRepository.save(member);
+        log.info("Added {} points to member {} for booking {}", pointsEarned, member.getId(), booking.getId());
+
         // 12. Create response with updated balance
         BookingResponseDto response = mapToBookingResponse(booking, court, slots.get(0));
         response.setDurationHours(totalDuration);
@@ -255,6 +261,12 @@ public class BookingService {
             response.setPaymentMethod("N/A");
             response.setPaymentStatus("N/A");
         }
+        
+        // Add points information
+        int pointsEarned = (int) Math.round(booking.getTotalAmount());
+        response.setPointsEarned(pointsEarned);
+        response.setCurrentPointBalance(booking.getMember().getPointBalance());
+        
         return response;
     }
 

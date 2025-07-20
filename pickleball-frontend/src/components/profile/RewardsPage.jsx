@@ -29,14 +29,16 @@ import {
   EmojiEvents as RewardsIcon,
   TrendingUp,
   LocalOffer,
-  Diamond
+  Diamond,
+  History as HistoryIcon,
+  CheckCircle as ActiveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import ProfileHeader from './ProfileHeader';
 import RedeemVoucherPage from './RedeemVoucherPage';
-import HistoryIcon from '@mui/icons-material/History';
 import RedeemHistory from './RedeemHistory';
+import ActiveVouchers from './ActiveVouchers';
 
 const RewardsPage = () => {
   const theme = useTheme();
@@ -93,15 +95,28 @@ const RewardsPage = () => {
       setDashboardData(dashboardResponse.data);
 
       // Map backend vouchers to frontend format
-      const backendVouchers = dashboardResponse.data.redeemableVouchers.map(voucher => ({
-        id: voucher.id,
-        title: `${voucher.discountAmount}% Discount`,
-        description: "Special offer for members",
-        discount: `${voucher.discountAmount}% OFF`,
-        expiry: voucher.expiryDate,
-        points: voucher.requestPoints,
-        discountAmount: voucher.discountAmount
-      }));
+      const backendVouchers = dashboardResponse.data.redeemableVouchers.map(voucher => {
+        // Handle different discount types
+        let title, discount;
+        if (voucher.discountType === 'percentage') {
+          title = `${voucher.discountValue}% Discount`;
+          discount = `${voucher.discountValue}% OFF`;
+        } else {
+          title = `RM${voucher.discountValue} Discount`;
+          discount = `RM${voucher.discountValue} OFF`;
+        }
+        
+        return {
+          id: voucher.id,
+          title: title,
+          description: "Special offer for members",
+          discount: discount,
+          expiry: voucher.expiryDate,
+          points: voucher.requestPoints,
+          discountValue: voucher.discountValue,  // Changed from discountAmount
+          discountType: voucher.discountType
+        };
+      });
 
       setVouchers(backendVouchers);
     } catch (err) {
@@ -157,6 +172,11 @@ const RewardsPage = () => {
       icon: <HistoryIcon />,
       label: 'Redeem History',
       view: 'redeemHistory'
+    },
+    {
+      icon: <ActiveIcon />,
+      label: 'Active Vouchers',
+      view: 'activeVouchers'
     }
   ];
 
@@ -473,6 +493,10 @@ const RewardsPage = () => {
 
             {currentView === 'redeemHistory' && (
               <RedeemHistory />
+            )}
+
+            {currentView === 'activeVouchers' && (
+              <ActiveVouchers />
             )}
           </Grid>
         </Grid>

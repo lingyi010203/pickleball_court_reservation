@@ -65,7 +65,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
             member = new Member();
             member.setUser(user);
             member.setTier(defaultTier);
-            member.setPointBalance(0);
+            member.setPointBalance(0);  // Changed back to 0
             member = memberRepository.save(member);
         }
 

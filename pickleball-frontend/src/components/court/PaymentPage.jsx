@@ -112,7 +112,9 @@ const PaymentPage = () => {
             buyBallSet: bookingDetails.buyBallSet,
             numberOfPlayers: bookingDetails.numberOfPlayers,
             courtName: bookingDetails.courtName,
-            courtLocation: bookingDetails.courtLocation
+            courtLocation: bookingDetails.courtLocation,
+            pointsEarned: response.data.pointsEarned,
+            currentPointBalance: response.data.currentPointBalance
           }
         }
       });

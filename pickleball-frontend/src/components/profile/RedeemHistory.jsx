@@ -10,9 +10,19 @@ import {
   Paper,
   Alert,
   useTheme,
-  Chip
+  Chip,
+  Grid,
+  Card,
+  CardContent,
+  alpha
 } from '@mui/material';
-import { LocalOffer as VoucherIcon } from '@mui/icons-material';
+import { 
+  LocalOffer as VoucherIcon,
+  CheckCircle as UsedIcon,
+  Schedule as ActiveIcon,
+  Warning as ExpiredIcon
+} from '@mui/icons-material';
+import axios from 'axios';
 import UserService from '../../service/UserService';
 
 const RedeemHistory = () => {
@@ -25,19 +35,14 @@ const RedeemHistory = () => {
     const fetchHistory = async () => {
       try {
         const token = UserService.getToken();
-        const response = await fetch('http://localhost:8081/api/member/redeem-history', {
+        const response = await axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
           headers: { 
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch redemption history');
-        }
-        
-        const data = await response.json();
-        setHistory(data);
+        setHistory(response.data);
       } catch (err) {
         setError('Failed to load redemption history');
         console.error(err);
@@ -48,6 +53,54 @@ const RedeemHistory = () => {
 
     fetchHistory();
   }, []);
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'ACTIVE':
+        return <ActiveIcon sx={{ color: theme.palette.success.main }} />;
+      case 'USED':
+        return <UsedIcon sx={{ color: theme.palette.info.main }} />;
+      case 'EXPIRED':
+        return <ExpiredIcon sx={{ color: theme.palette.error.main }} />;
+      default:
+        return <VoucherIcon sx={{ color: theme.palette.text.disabled }} />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'ACTIVE':
+        return theme.palette.success.main;
+      case 'USED':
+        return theme.palette.info.main;
+      case 'EXPIRED':
+        return theme.palette.error.main;
+      default:
+        return theme.palette.text.disabled;
+    }
+  };
+
+  const getStatusBackground = (status) => {
+    switch (status) {
+      case 'ACTIVE':
+        return alpha(theme.palette.success.main, 0.1);
+      case 'USED':
+        return alpha(theme.palette.info.main, 0.1);
+      case 'EXPIRED':
+        return alpha(theme.palette.error.main, 0.1);
+      default:
+        return alpha(theme.palette.text.disabled, 0.1);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No expiry date';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   if (loading) {
     return (
@@ -80,51 +133,95 @@ const RedeemHistory = () => {
   }
 
   return (
-    <Paper sx={{ 
-      p: 3, 
-      borderRadius: 3,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-      background: theme.palette.background.paper
-    }}>
-      <Typography variant="h5" fontWeight="bold" gutterBottom>
-        Your Redeemed Vouchers
+    <Box>
+      <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>
+        Redemption History
       </Typography>
-      <List>
-        {history.map((voucher, index) => (
-          <React.Fragment key={voucher.id}>
-            <ListItem>
-              <ListItemText
-                primary={
-                  <Box display="flex" alignItems="center">
-                    <VoucherIcon sx={{ color: theme.palette.primary.main, mr: 2 }} />
+      
+      <Grid container spacing={3}>
+        {history.map((redemption) => (
+          <Grid item xs={12} md={6} lg={4} key={redemption.id}>
+            <Card sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'flex-start',
+                  mb: 2
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <VoucherIcon sx={{ color: theme.palette.primary.main, mr: 1 }} />
                     <Typography variant="h6" fontWeight="bold">
-                      {voucher.code}
-                    </Typography>
-                    <Chip 
-                      label={`${voucher.discountAmount}% OFF`}
-                      color="primary"
-                      size="small"
-                      sx={{ ml: 2 }}
-                    />
-                  </Box>
-                }
-                secondary={
-                  <Box mt={1}>
-                    <Typography variant="body2" color="text.primary">
-                      Points used: {voucher.requestPoints}
-                    </Typography>
-                    <Typography variant="body2" color="text.primary">
-                      Expires: {new Date(voucher.expiryDate).toLocaleDateString()}
+                      {redemption.voucherCode}
                     </Typography>
                   </Box>
-                }
-              />
-            </ListItem>
-            {index < history.length - 1 && <Divider />}
-          </React.Fragment>
+                  {getStatusIcon(redemption.status)}
+                </Box>
+
+                <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
+                  {redemption.voucherTitle}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {redemption.voucherDescription}
+                </Typography>
+
+                <Box sx={{ 
+                  backgroundColor: getStatusBackground(redemption.status),
+                  p: 2,
+                  borderRadius: 2,
+                  mb: 2
+                }}>
+                  <Chip 
+                    label={redemption.status}
+                    size="small"
+                    sx={{ 
+                      backgroundColor: getStatusColor(redemption.status),
+                      color: 'white',
+                      fontWeight: 'bold',
+                      mb: 1
+                    }}
+                  />
+                  
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Redeemed:</strong> {formatDate(redemption.redemptionDate)}
+                  </Typography>
+                  
+                  {redemption.expiryDate && (
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Expires:</strong> {formatDate(redemption.expiryDate)}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  pt: 1,
+                  borderTop: `1px solid ${theme.palette.divider}`
+                }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Discount: {redemption.discountType === 'percentage' ? 
+                      `${redemption.discountValue}%` : 
+                      `RM${redemption.discountValue}`}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
         ))}
-      </List>
-    </Paper>
+      </Grid>
+    </Box>
   );
 };
 

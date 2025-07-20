@@ -140,7 +140,8 @@ public class TierServiceImpl implements TierService {
 
         Voucher voucher = new Voucher();
         voucher.setCode(voucherDto.getCode());
-        voucher.setDiscountAmount(voucherDto.getDiscountAmount());
+        voucher.setDiscountValue(voucherDto.getDiscountValue());  // Changed from getDiscountAmount()
+        voucher.setDiscountType(voucherDto.getDiscountType());    // Added discount type
         voucher.setRequestPoints(voucherDto.getRequestPoints());
         voucher.setExpiryDate(voucherDto.getExpiryDate());
         voucher.setTier(tier);
@@ -248,7 +249,8 @@ public class TierServiceImpl implements TierService {
         }
 
         voucher.setCode(voucherDto.getCode());
-        voucher.setDiscountAmount(voucherDto.getDiscountAmount());
+        voucher.setDiscountValue(voucherDto.getDiscountValue());  // Changed from getDiscountAmount()
+        voucher.setDiscountType(voucherDto.getDiscountType());    // Added discount type
         voucher.setRequestPoints(voucherDto.getRequestPoints());
         voucher.setExpiryDate(voucherDto.getExpiryDate());
 

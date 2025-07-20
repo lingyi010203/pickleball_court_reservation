@@ -108,7 +108,7 @@ public class UserServiceImpl implements UserService {
         Member member = new Member();
         member.setUser(user);
         member.setTier(silverTier);
-        member.setPointBalance(1000);
+        member.setPointBalance(0);  // Changed from 1000 to 0
         memberRepository.save(member);
         user.setMember(member);
         userRepository.save(user);
