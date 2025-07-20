@@ -38,6 +38,7 @@ public class BookingService {
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
     private final FeedbackRepository feedbackRepository;
+    private final TierService tierService;
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private static final String CANCELLED_STATUS = "CANCELLED";
@@ -146,6 +147,13 @@ public class BookingService {
         // 9. Create BookingSlot records
         log.info("Creating {} BookingSlot records for booking {}", slots.size(), booking.getId());
         for (Slot slot : slots) {
+            // Check for existing booking slot to prevent duplicates
+            boolean existingBookingSlot = bookingSlotRepository.existsByBookingIdAndSlotId(booking.getId(), slot.getId());
+            if (existingBookingSlot) {
+                log.warn("BookingSlot already exists for bookingId={}, slotId={}", booking.getId(), slot.getId());
+                continue;
+            }
+            
             BookingSlot bookingSlot = new BookingSlot();
             bookingSlot.setBooking(booking);
             bookingSlot.setSlot(slot);
@@ -166,9 +174,26 @@ public class BookingService {
 
         // 11.5. Add points reward (1 point per RM1 spent)
         int pointsEarned = (int) Math.round(amount);
+        
+        // Store old tier for comparison
+        String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
+        
         member.setPointBalance(member.getPointBalance() + pointsEarned);
         memberRepository.save(member);
         log.info("Added {} points to member {} for booking {}", pointsEarned, member.getId(), booking.getId());
+
+        // Automatic tier upgrade check after booking
+        tierService.recalculateMemberTier(member);
+        
+        // Refresh member data to get updated tier
+        member = memberRepository.findByUserId(member.getUser().getId());
+        String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
+        
+        // Log tier upgrade if it occurred
+        if (!oldTierName.equals(newTierName)) {
+            log.info("🎉 Automatic tier upgrade after booking: {} -> {} (Points: {} -> {})", 
+                    oldTierName, newTierName, member.getPointBalance() - pointsEarned, member.getPointBalance());
+        }
 
         // 12. Create response with updated balance
         BookingResponseDto response = mapToBookingResponse(booking, court, slots.get(0));

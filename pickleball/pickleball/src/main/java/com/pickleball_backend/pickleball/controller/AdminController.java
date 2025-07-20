@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
+import com.pickleball_backend.pickleball.service.TierAutoUpgradeService;
+import com.pickleball_backend.pickleball.repository.MemberRepository;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -32,6 +36,8 @@ public class AdminController {
     private final BookingService bookingService;
     private final TierService tierService;
     private final EmailService emailService;
+    private final MemberRepository memberRepository;
+    private final TierAutoUpgradeService tierAutoUpgradeService;
 
     // User Type Change Management
     @GetMapping("/pending-type-changes")
@@ -294,4 +300,46 @@ public class AdminController {
         return ResponseEntity.ok("Verification status updated");
     }*/
 
+    @PostMapping("/debug/recalculate-tier")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> recalculateTier() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserAccount account = userAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+
+        Member member = memberRepository.findByUserId(account.getUser().getId());
+        if (member == null) {
+            throw new ResourceNotFoundException("Member not found");
+        }
+
+        // Get current tier before recalculation
+        String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
+        
+        // Trigger tier recalculation
+        tierService.recalculateMemberTier(member);
+        
+        // Refresh member data
+        member = memberRepository.findByUserId(account.getUser().getId());
+        String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
+        
+        return ResponseEntity.ok("Tier recalculated: " + oldTierName + " -> " + newTierName);
+    }
+
+    @PostMapping("/tier/upgrade-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> upgradeAllMemberTiers() {
+        tierAutoUpgradeService.manualUpgradeCheck();
+        return ResponseEntity.ok("Manual tier upgrade check completed. Check logs for details.");
+    }
+
+    @PostMapping("/tier/upgrade-member/{memberId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> upgradeSpecificMember(@PathVariable Integer memberId) {
+        boolean upgraded = tierAutoUpgradeService.upgradeSpecificMember(memberId);
+        if (upgraded) {
+            return ResponseEntity.ok("Member " + memberId + " tier upgraded successfully");
+        } else {
+            return ResponseEntity.ok("Member " + memberId + " tier upgrade not needed");
+        }
+    }
 }

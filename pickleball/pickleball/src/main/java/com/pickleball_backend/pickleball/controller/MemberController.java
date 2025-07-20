@@ -25,6 +25,11 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import com.pickleball_backend.pickleball.entity.MembershipTier;
+import com.pickleball_backend.pickleball.repository.MembershipTierRepository;
+import java.util.ArrayList;
+import com.pickleball_backend.pickleball.service.TierService;
 
 @RestController
 @RequestMapping("/api/member")
@@ -37,6 +42,8 @@ public class MemberController {
     private final WalletRepository walletRepository;
     private final UserAccountRepository userAccountRepository;
     private final MemberRepository memberRepository;
+    private final MembershipTierRepository tierRepository;
+    private final TierService tierService;
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasRole('USER')")
@@ -62,6 +69,71 @@ public class MemberController {
     public ResponseEntity<String> addPoints(@RequestParam int points) {
         memberService.addPoints(points);
         return ResponseEntity.ok(points + " points added");
+    }
+
+    @GetMapping("/debug/tier-info")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getTierDebugInfo() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserAccount account = userAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+
+        Member member = memberRepository.findByUserId(account.getUser().getId());
+        if (member == null) {
+            throw new ResourceNotFoundException("Member not found");
+        }
+
+        // Get all tiers for comparison
+        List<MembershipTier> allTiers = tierRepository.findAllByActiveTrueOrderByMinPointsAsc();
+
+        Map<String, Object> debugInfo = new HashMap<>();
+        debugInfo.put("memberId", member.getId());
+        debugInfo.put("pointBalance", member.getPointBalance());
+        debugInfo.put("currentTierId", member.getTier() != null ? member.getTier().getId() : null);
+        debugInfo.put("currentTierName", member.getTier() != null ? member.getTier().getTierName() : null);
+        debugInfo.put("currentTierMinPoints", member.getTier() != null ? member.getTier().getMinPoints() : null);
+        debugInfo.put("currentTierMaxPoints", member.getTier() != null ? member.getTier().getMaxPoints() : null);
+
+        // Add all tiers information
+        List<Map<String, Object>> tiersInfo = new ArrayList<>();
+        for (MembershipTier tier : allTiers) {
+            Map<String, Object> tierInfo = new HashMap<>();
+            tierInfo.put("id", tier.getId());
+            tierInfo.put("name", tier.getTierName());
+            tierInfo.put("minPoints", tier.getMinPoints());
+            tierInfo.put("maxPoints", tier.getMaxPoints());
+            tierInfo.put("active", tier.isActive());
+            tierInfo.put("benefits", tier.getBenefits());
+            tiersInfo.add(tierInfo);
+        }
+        debugInfo.put("allTiers", tiersInfo);
+
+        return ResponseEntity.ok(debugInfo);
+    }
+
+    @PostMapping("/debug/recalculate-tier")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<String> recalculateTier() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserAccount account = userAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+
+        Member member = memberRepository.findByUserId(account.getUser().getId());
+        if (member == null) {
+            throw new ResourceNotFoundException("Member not found");
+        }
+
+        // Get current tier before recalculation
+        String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
+        
+        // Trigger tier recalculation
+        tierService.recalculateMemberTier(member);
+        
+        // Refresh member data
+        member = memberRepository.findByUserId(account.getUser().getId());
+        String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
+        
+        return ResponseEntity.ok("Tier recalculated: " + oldTierName + " -> " + newTierName);
     }
 
     @GetMapping("/courts/availability")

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Data
@@ -28,8 +29,8 @@ public class Slot {
     @Column(name = "is_available")
     private boolean isAvailable;
 
-    @OneToOne(mappedBy = "slot", cascade = CascadeType.ALL)
-    private BookingSlot bookingSlot;
+    @OneToMany(mappedBy = "slot", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<BookingSlot> bookingSlots;
 
     @Column(name = "status")
     private String status;

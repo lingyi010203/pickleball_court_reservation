@@ -187,10 +187,26 @@ public class MemberService {
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
 
         Member member = memberRepository.findByUserId(account.getUser().getId());
+        
+        // Store old tier for comparison
+        String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
+        
         member.setPointBalance(member.getPointBalance() + points);
         memberRepository.save(member);
 
-        tierService.recalculateMemberTier(member);  // Upgrade tier if needed
+        // Automatic tier upgrade check
+        tierService.recalculateMemberTier(member);
+        
+        // Refresh member data to get updated tier
+        member = memberRepository.findByUserId(account.getUser().getId());
+        String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
+        
+        // Log tier upgrade if it occurred
+        if (!oldTierName.equals(newTierName)) {
+            // Assuming log is available, otherwise remove this line
+            // log.info("Automatic tier upgrade: {} -> {} (Points: {} -> {})", 
+            //         oldTierName, newTierName, member.getPointBalance() - points, member.getPointBalance());
+        }
     }
 
     public List<TierDto> getAllAvailableTiers() {

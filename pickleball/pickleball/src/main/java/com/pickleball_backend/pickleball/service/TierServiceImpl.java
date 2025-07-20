@@ -170,18 +170,34 @@ public class TierServiceImpl implements TierService {
         int userPoints = member.getPointBalance();
         MembershipTier newTier = null;
 
+        // Debug logging
+        logger.info("=== Tier Recalculation Debug ===");
+        logger.info("Member ID: {}", member.getId());
+        logger.info("Member Points: {}", userPoints);
+        logger.info("Current Tier: {}", member.getTier() != null ? member.getTier().getTierName() : "NULL");
+        logger.info("Active Tiers Count: {}", activeTiers.size());
+
         for (MembershipTier tier : activeTiers) {
+            logger.info("Checking tier: {} (min: {}, max: {})", 
+                tier.getTierName(), tier.getMinPoints(), tier.getMaxPoints());
+            
             if (userPoints >= tier.getMinPoints() &&
                     (tier.getMaxPoints() == Integer.MAX_VALUE ||
                             userPoints <= tier.getMaxPoints())) {
                 newTier = tier;
+                logger.info("Found matching tier: {}", tier.getTierName());
                 break;
             }
         }
 
         if (newTier == null && !activeTiers.isEmpty()) {
             newTier = activeTiers.get(activeTiers.size() - 1);
+            logger.info("No matching tier found, using highest tier: {}", newTier.getTierName());
         }
+
+        logger.info("Selected new tier: {}", newTier != null ? newTier.getTierName() : "NULL");
+        logger.info("Current tier: {}", member.getTier() != null ? member.getTier().getTierName() : "NULL");
+        logger.info("Tiers equal: {}", newTier != null && newTier.equals(member.getTier()));
 
         if (newTier != null && !newTier.equals(member.getTier())) {
             sendTierUpgradeEmail(member, newTier);
@@ -193,6 +209,8 @@ public class TierServiceImpl implements TierService {
                     member.getTier() != null ? member.getTier().getTierName() : "NONE",
                     newTier.getTierName() // 直接使用字符串
             );
+        } else {
+            logger.info("No tier update needed");
         }
     }
 

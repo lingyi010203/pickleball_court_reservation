@@ -2,28 +2,28 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
-  Grid,
+  Typography,
   Card,
   CardContent,
-  Typography,
-  LinearProgress,
-  Chip,
+  Grid,
   Button,
+  Chip,
+  LinearProgress,
+  Fade,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Tabs,
+  Tab,
   Paper,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
-  alpha,
-  CircularProgress,
-  Alert,
-  Snackbar,
-  Grow,
-  Fade,
-  useTheme
+  Divider
 } from '@mui/material';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
   ConfirmationNumber as VoucherIcon,
   EmojiEvents as RewardsIcon,
@@ -31,7 +31,10 @@ import {
   LocalOffer,
   Diamond,
   History as HistoryIcon,
-  CheckCircle as ActiveIcon
+  CheckCircle as ActiveIcon,
+  TrendingUp as UpgradeIcon,
+  Refresh as RefreshIcon,
+  EmojiEvents as TrophyIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
@@ -49,6 +52,12 @@ const RewardsPage = () => {
   const [loading, setLoading] = useState(true);
   const [vouchers, setVouchers] = useState([]);
   const [currentView, setCurrentView] = useState('rewards');
+  
+  // Tier upgrade states
+  const [tierInfo, setTierInfo] = useState(null);
+  const [upgrading, setUpgrading] = useState(false);
+  const [tierError, setTierError] = useState(null);
+  const [tierSuccess, setTierSuccess] = useState(null);
 
   // Tier configuration with gradient colors
   const tierConfig = {
@@ -125,6 +134,86 @@ const RewardsPage = () => {
     }
   };
 
+  // Fetch tier information
+  const fetchTierInfo = async () => {
+    try {
+      setTierError(null);
+      
+      const token = UserService.getToken();
+      const response = await axios.get('http://localhost:8081/api/member/debug/tier-info', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setTierInfo(response.data);
+    } catch (err) {
+      console.error('Error fetching tier info:', err);
+      setTierError('Failed to load tier information');
+    }
+  };
+
+  // Handle manual tier upgrade
+  const handleManualUpgrade = async () => {
+    try {
+      setUpgrading(true);
+      setTierError(null);
+      setTierSuccess(null);
+      
+      const token = UserService.getToken();
+      const response = await axios.post('http://localhost:8081/api/member/debug/recalculate-tier', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setTierSuccess(response.data);
+      
+      // Refresh tier info and dashboard data after upgrade
+      setTimeout(() => {
+        fetchTierInfo();
+        fetchDashboardData();
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error during tier upgrade:', err);
+      setTierError('Failed to upgrade tier: ' + (err.response?.data || err.message));
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  // Get tier color function
+  const getTierColor = (tierName) => {
+    switch (tierName?.toUpperCase()) {
+      case 'SILVER':
+        return '#C0C0C0';
+      case 'GOLD':
+        return '#FFD700';
+      case 'PLATINUM':
+        return '#E5E4E2';
+      case 'VIP':
+        return '#FF6B6B';
+      default:
+        return '#6c757d';
+    }
+  };
+
+  // Get next tier info
+  const getNextTierInfo = () => {
+    if (!tierInfo?.allTiers) return null;
+    
+    const currentTier = tierInfo.allTiers.find(t => t.id === tierInfo.currentTierId);
+    if (!currentTier) return null;
+    
+    const currentIndex = tierInfo.allTiers.findIndex(t => t.id === tierInfo.currentTierId);
+    const nextTier = tierInfo.allTiers[currentIndex + 1];
+    
+    if (!nextTier) return null;
+    
+    return {
+      name: nextTier.name,
+      minPoints: nextTier.minPoints,
+      pointsNeeded: nextTier.minPoints - tierInfo.pointBalance
+    };
+  };
+
   // Fetch user data and dashboard data
   useEffect(() => {
     const fetchData = async () => {
@@ -143,8 +232,11 @@ const RewardsPage = () => {
           profileImage: profileResponse.data.profileImage
         });
 
-        // Fetch dashboard data
-        await fetchDashboardData();
+        // Fetch dashboard data and tier info
+        await Promise.all([
+          fetchDashboardData(),
+          fetchTierInfo()
+        ]);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please try again later.');
@@ -220,13 +312,41 @@ const RewardsPage = () => {
 
   // Use dashboard data if available
   const currentPoints = dashboardData?.pointBalance || 0;
-  const nextTierPoints = 5000; // This should come from backend or config
-  const pointsToNext = nextTierPoints - currentPoints;
-  const progressToNextTier = Math.min((currentPoints / nextTierPoints) * 100, 100);
-
-  // Use tier from dashboard if available
-  const memberTier = dashboardData?.tierName || 'GOLD';
+  
+  // Use tier from tierInfo if available, otherwise fallback to dashboard
+  const memberTier = tierInfo?.currentTierName || dashboardData?.tierName || 'GOLD';
   const currentTier = tierConfig[memberTier.toUpperCase()] || tierConfig.GOLD;
+  
+  // Calculate progress based on actual tier data
+  const nextTier = getNextTierInfo();
+  const pointsToNext = nextTier ? nextTier.pointsNeeded : 0;
+  
+  // Calculate progress percentage
+  const calculateProgress = () => {
+    if (!tierInfo || !nextTier) return 0;
+    
+    const currentTierMinPoints = tierInfo.currentTierMinPoints || 0;
+    const nextTierMinPoints = nextTier.minPoints;
+    const currentPoints = tierInfo.pointBalance || 0;
+    
+    if (nextTierMinPoints <= currentTierMinPoints) return 100;
+    
+    const progress = ((currentPoints - currentTierMinPoints) / (nextTierMinPoints - currentTierMinPoints)) * 100;
+    const finalProgress = Math.min(Math.max(progress, 0), 100);
+    
+    // Debug logging
+    console.log('Progress Calculation:', {
+      currentPoints,
+      currentTierMinPoints,
+      nextTierMinPoints,
+      progress: progress.toFixed(2),
+      finalProgress: finalProgress.toFixed(2)
+    });
+    
+    return finalProgress;
+  };
+  
+  const progressToNextTier = calculateProgress();
 
   const handleCloseSnackbar = () => {
     setError('');
@@ -343,7 +463,19 @@ const RewardsPage = () => {
             {/* Main Content */}
             {currentView === 'rewards' && (
               <>
-                {/* Points Card */}
+                {/* Tier Error/Success Alerts */}
+                {tierError && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {tierError}
+                  </Alert>
+                )}
+                {tierSuccess && (
+                  <Alert severity="success" sx={{ mb: 2 }}>
+                    {tierSuccess}
+                  </Alert>
+                )}
+
+                {/* Enhanced Points Card with Tier Upgrade */}
                 <Fade in timeout={900}>
                   <Card sx={{
                     mb: 4,
@@ -364,6 +496,7 @@ const RewardsPage = () => {
                     }
                   }}>
                     <CardContent sx={{ p: 3 }}>
+                      {/* Header with Points and Tier */}
                       <Box display="flex" alignItems="center" mb={2}>
                         <Box sx={{
                           width: 60,
@@ -377,7 +510,7 @@ const RewardsPage = () => {
                         }}>
                           <Diamond sx={{ color: 'white', fontSize: 30 }} />
                         </Box>
-                        <Box>
+                        <Box sx={{ flex: 1 }}>
                           <Typography variant="h4" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
                             {currentPoints.toLocaleString()}
                             <Typography component="span" variant="body1" color="text.secondary" sx={{ ml: 1 }}>
@@ -388,31 +521,124 @@ const RewardsPage = () => {
                             {currentTier.name} Tier
                           </Typography>
                         </Box>
-                      </Box>
-
-                      <Box sx={{ mb: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                          <Typography variant="body2" fontWeight="medium">
-                            Progress to Platinum
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {pointsToNext > 0 ? `${pointsToNext} points to go` : 'Max level'}
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={progressToNextTier}
+                        {/* Tier Upgrade Button */}
+                        <Button
+                          variant="contained"
+                          startIcon={upgrading ? <CircularProgress size={20} /> : <UpgradeIcon />}
+                          onClick={handleManualUpgrade}
+                          disabled={upgrading}
                           sx={{
-                            height: 10,
-                            borderRadius: 5,
-                            bgcolor: alpha(currentTier.color, 0.15),
-                            '& .MuiLinearProgress-bar': {
-                              borderRadius: 5,
-                              background: currentTier.gradient
+                            background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                            '&:hover': {
+                              background: 'linear-gradient(45deg, #4ECDC4, #FF6B6B)'
                             }
                           }}
-                        />
+                        >
+                          {upgrading ? 'Checking...' : 'Check Upgrade'}
+                        </Button>
                       </Box>
+
+                      {/* Enhanced Progress Section */}
+                      <Box sx={{ mb: 2 }}>
+                        {(() => {
+                          const nextTier = getNextTierInfo();
+                          if (nextTier) {
+                            return (
+                              <>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    Progress to {nextTier.name}
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {nextTier.pointsNeeded} points to go
+                                  </Typography>
+                                </Box>
+                                {/* Debug info - remove in production */}
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                  Debug: {tierInfo?.pointBalance || 0} / {nextTier.minPoints} points ({progressToNextTier.toFixed(1)}%)
+                                </Typography>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={progressToNextTier}
+                                  sx={{
+                                    height: 10,
+                                    borderRadius: 5,
+                                    bgcolor: alpha(currentTier.color, 0.15),
+                                    '& .MuiLinearProgress-bar': {
+                                      borderRadius: 5,
+                                      background: currentTier.gradient
+                                    }
+                                  }}
+                                />
+                              </>
+                            );
+                          } else {
+                            return (
+                              <>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    Max Level Achieved!
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    VIP Tier
+                                  </Typography>
+                                </Box>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={100}
+                                  sx={{
+                                    height: 10,
+                                    borderRadius: 5,
+                                    bgcolor: alpha(currentTier.color, 0.15),
+                                    '& .MuiLinearProgress-bar': {
+                                      borderRadius: 5,
+                                      background: currentTier.gradient
+                                    }
+                                  }}
+                                />
+                              </>
+                            );
+                          }
+                        })()}
+                      </Box>
+
+                      {/* Tier Information Grid */}
+                      {tierInfo?.allTiers && (
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                            <TrophyIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                            All Available Tiers
+                          </Typography>
+                          <Grid container spacing={1}>
+                            {tierInfo.allTiers.map((tier) => (
+                              <Grid item xs={12} sm={6} md={3} key={tier.id}>
+                                <Card sx={{ 
+                                  opacity: tier.id === tierInfo.currentTierId ? 1 : 0.7,
+                                  border: tier.id === tierInfo.currentTierId ? `2px solid ${getTierColor(tier.name)}` : 'none',
+                                  background: tier.id === tierInfo.currentTierId ? `${getTierColor(tier.name)}20` : 'transparent'
+                                }}>
+                                  <CardContent sx={{ p: 2 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                      {tier.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {tier.minPoints} - {tier.maxPoints === 2147483647 ? '∞' : tier.maxPoints} points
+                                    </Typography>
+                                    {tier.id === tierInfo.currentTierId && (
+                                      <Chip
+                                        label="Current"
+                                        size="small"
+                                        color="primary"
+                                        sx={{ mt: 1 }}
+                                      />
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      )}
                     </CardContent>
                   </Card>
                 </Fade>
@@ -440,7 +666,7 @@ const RewardsPage = () => {
                     }
                   ].map((stat, index) => (
                     <Grid item xs={12} md={4} key={stat.label}>
-                      <Grow in timeout={index * 300 + 1000}>
+                      <Fade in timeout={index * 300 + 1000}>
                         <Paper sx={{
                           p: 3,
                           textAlign: 'center',
@@ -473,7 +699,7 @@ const RewardsPage = () => {
                             {stat.label}
                           </Typography>
                         </Paper>
-                      </Grow>
+                      </Fade>
                     </Grid>
                   ))}
                 </Grid>
