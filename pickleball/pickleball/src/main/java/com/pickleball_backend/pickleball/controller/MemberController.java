@@ -209,7 +209,7 @@ public class MemberController {
 
             Wallet wallet = new Wallet();
             wallet.setMember(member);
-            wallet.setBalance(100.00); // Initial balance
+            wallet.setBalance(0.00); // Initial balance
             walletRepository.save(wallet);
 
             return ResponseEntity.ok("Wallet initialized successfully");

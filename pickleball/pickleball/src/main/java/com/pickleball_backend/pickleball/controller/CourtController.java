@@ -15,10 +15,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.pickleball_backend.pickleball.entity.Venue;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.VenueRepository;
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.*;
+import com.pickleball_backend.pickleball.entity.CourtImage;
+import com.pickleball_backend.pickleball.repository.CourtImageRepository;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin/courts")
@@ -29,6 +35,8 @@ public class CourtController {
     private CourtRepository courtRepository;
     @Autowired
     private VenueRepository venueRepository;
+    @Autowired
+    private CourtImageRepository courtImageRepository;
 
     @PostMapping
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -144,5 +152,46 @@ public class CourtController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error retrieving courts");
         }
+    }
+
+    @PostMapping("/{courtId}/images")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> uploadCourtImage(
+            @PathVariable Integer courtId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("File is empty");
+            }
+            // 保存文件到 uploads 目录
+            String uploadsDir = "uploads/";
+            Path uploadPath = Paths.get(uploadsDir).toAbsolutePath().normalize();
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String filename = UUID.randomUUID().toString() + extension;
+            Path filePath = uploadPath.resolve(filename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 保存到 court_image 表
+            CourtImage courtImage = new CourtImage();
+            courtImage.setCourtId(courtId);
+            courtImage.setImagePath("/uploads/" + filename);
+            courtImage.setUploadedAt(LocalDateTime.now());
+            courtImageRepository.save(courtImage);
+
+            return ResponseEntity.ok().body(courtImage);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to upload image: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{courtId}/images")
+    public ResponseEntity<?> getCourtImages(@PathVariable Integer courtId) {
+        List<CourtImage> images = courtImageRepository.findByCourtId(courtId);
+        return ResponseEntity.ok(images);
     }
 }

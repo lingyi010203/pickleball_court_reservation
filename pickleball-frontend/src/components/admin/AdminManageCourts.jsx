@@ -17,6 +17,8 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
+import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
+
 
 const AdminManageCourts = () => {
   const [courts, setCourts] = useState([]);
@@ -64,6 +66,7 @@ const AdminManageCourts = () => {
   const [selectedVenueId, setSelectedVenueId] = useState('');
   const [showAddVenue, setShowAddVenue] = useState(false);
   const [newVenue, setNewVenue] = useState({ name: '', address: '' });
+  const [courtImages, setCourtImages] = useState([]);
 
   const daysOptions = [
     'Mon', 'Tue', 'Wed',
@@ -431,6 +434,28 @@ const AdminManageCourts = () => {
       setSelectedVenueId(e.target.value);
       if (formErrors.venueId) setFormErrors(prev => ({ ...prev, venueId: '' }));
     }
+  };
+
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!currentCourt || !currentCourt.id) {
+      alert('请先保存球场基本信息，再上传图片');
+      return;
+    }
+    for (let file of files) {
+      try {
+        await uploadCourtImage(currentCourt.id, file);
+      } catch (err) {
+        alert('图片上传失败: ' + err.message);
+      }
+    }
+    // 上传后刷新图片
+    fetchCourtImages(currentCourt.id);
+  };
+
+  const fetchCourtImages = async (courtId) => {
+    const images = await getCourtImages(courtId);
+    setCourtImages(images);
   };
 
   if (loading && !courts.length) {
@@ -857,6 +882,27 @@ const AdminManageCourts = () => {
                 error={!!formErrors.dailyPrice}
                 helperText={formErrors.dailyPrice}
               />
+            </Grid>
+            {/* 图片上传控件 */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" sx={{ mb: 1 }}>Court Images</Typography>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageChange}
+                style={{ marginBottom: 8 }}
+              />
+              <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                {courtImages && courtImages.length > 0 && courtImages.map(img => (
+                  <img
+                    key={img.id || img.imagePath}
+                    src={img.imagePath}
+                    alt="court"
+                    style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
+                  />
+                ))}
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

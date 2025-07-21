@@ -7,6 +7,7 @@
 
 import axios from 'axios';
 
+
 // Base URL for backend API
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
 
@@ -89,6 +90,35 @@ const CourtService = {
       throw error;
     }
   }
+};
+
+/**
+ * 上传球场图片
+ * @param {number} courtId
+ * @param {File} file
+ * @returns {Promise<Object>}
+ */
+export const uploadCourtImage = async (courtId, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('adminToken');
+  const response = await api.post(`/api/admin/courts/${courtId}/images`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+/**
+ * 获取球场图片
+ * @param {number} courtId
+ * @returns {Promise<Array>}
+ */
+export const getCourtImages = async (courtId) => {
+  const token = localStorage.getItem('adminToken');
+  const response = await api.get(`/api/admin/courts/${courtId}/images`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
 };
 
 export default CourtService;

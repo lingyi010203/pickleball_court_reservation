@@ -215,7 +215,7 @@ public class UserServiceImpl implements UserService {
         if (member != null && walletRepository.findByMemberId(member.getId()).isEmpty()) {
             Wallet wallet = new Wallet();
             wallet.setMember(member);
-            wallet.setBalance(100.00);
+            wallet.setBalance(0.00);
             walletRepository.save(wallet);
             log.info("Created wallet for member: {}", member.getId());
         }

@@ -12,7 +12,7 @@ public class Wallet {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, columnDefinition = "DECIMAL(10,2) DEFAULT 100.00")
+    @Column(nullable = false, columnDefinition = "DECIMAL(10,2) DEFAULT 0.00")
     private double balance;
 
     @Column(name = "frozen_balance", nullable = false, columnDefinition = "DECIMAL(10,2) DEFAULT 0.00")

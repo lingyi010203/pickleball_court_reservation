@@ -147,8 +147,8 @@ public class WalletService {
                 log.info("Creating new wallet for member: {}", member.getId());
                 Wallet newWallet = new Wallet();
                 newWallet.setMember(member);
-                newWallet.setBalance(100.00);
-                newWallet.setTotalDeposited(100.00);
+                newWallet.setBalance(0.00);
+                newWallet.setTotalDeposited(0.00);
 
                 try {
                     Wallet savedWallet = walletRepository.save(newWallet);
@@ -302,8 +302,8 @@ public class WalletService {
                 .orElseGet(() -> {
                     Wallet newWallet = new Wallet();
                     newWallet.setMember(member);
-                    newWallet.setBalance(100.00);
-                    newWallet.setTotalDeposited(100.00);
+                    newWallet.setBalance(0.00);
+                    newWallet.setTotalDeposited(0.00);
                     return walletRepository.save(newWallet);
                 });
     }

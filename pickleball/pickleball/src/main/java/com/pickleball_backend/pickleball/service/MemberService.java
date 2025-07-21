@@ -255,7 +255,7 @@ public class MemberService {
     @Transactional
     public void initializeWallet(Integer memberId) {
         Wallet wallet = new Wallet();
-        wallet.setBalance(100.00); // Initial balance
+        wallet.setBalance(0.00); // Initial balance
         wallet.setMember(memberRepository.findById(memberId).orElseThrow());
         walletRepository.save(wallet);
     }
