@@ -5,6 +5,7 @@ import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.entity.Payment;
 import com.pickleball_backend.pickleball.entity.Slot;
 import com.pickleball_backend.pickleball.entity.Event;
+import lombok.Data;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,6 +24,7 @@ import javax.annotation.PostConstruct;
 
 @Service
 @Slf4j
+@Data
 public class EmailService {
     @Autowired
     private final JavaMailSender javaMailSender;
