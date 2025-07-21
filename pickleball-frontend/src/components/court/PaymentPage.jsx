@@ -14,9 +14,18 @@ import {
   FormControl,
   FormLabel,
   CircularProgress,
-  Alert
+  Alert,
+  Chip,
+  Paper
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PaymentIcon from '@mui/icons-material/Payment';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import SportsIcon from '@mui/icons-material/Sports';
+import GroupIcon from '@mui/icons-material/Group';
 import api from '../../api/axiosConfig.js';
 import { getWalletBalance, initializeWallet } from '../../service/WalletService';
 import { useAuth } from '../../context/AuthContext';
@@ -39,10 +48,10 @@ const PaymentPage = () => {
         let balance;
 
         try {
-          balance = await getWalletBalance(); // 直接调用
+          balance = await getWalletBalance();
         } catch (getError) {
           console.warn('Wallet not found, initializing...', getError);
-          await initializeWallet(); // 直接调用
+          await initializeWallet();
           balance = await getWalletBalance();
         }
 
@@ -68,36 +77,20 @@ const PaymentPage = () => {
       setIsProcessing(true);
 
       const bookingRequest = {
-        // 移除 slotId，只使用 slotIds 来支持多 slot 预订
         slotIds: bookingDetails.slotIds,
         purpose: bookingDetails.purpose,
         numberOfPlayers: bookingDetails.numberOfPlayers,
-        numPaddles: bookingDetails.numPaddles, // 新增
-        buyBallSet: bookingDetails.buyBallSet, // 新增
+        numPaddles: bookingDetails.numPaddles,
+        buyBallSet: bookingDetails.buyBallSet,
         durationHours: bookingDetails.durationHours,
         useWallet: paymentMethod === 'wallet'
       };
 
-      // 使用配置好的api实例代替axios
       const response = await api.post('/member/bookings', bookingRequest);
 
-      // 添加调试日志
       console.log('=== PaymentPage Debug ===');
       console.log('API Response:', response.data);
       console.log('Booking Details:', bookingDetails);
-      console.log('Final booking object:', {
-        ...response.data,
-        slotDate: bookingDetails.date,
-        startTime: bookingDetails.startTime,
-        endTime: bookingDetails.endTime,
-        durationHours: bookingDetails.durationHours,
-        totalAmount: bookingDetails.price,
-        numPaddles: bookingDetails.numPaddles,
-        buyBallSet: bookingDetails.buyBallSet,
-        numberOfPlayers: bookingDetails.numberOfPlayers,
-        courtName: bookingDetails.courtName,
-        courtLocation: bookingDetails.courtLocation
-      });
 
       navigate('/booking/confirmation', {
         state: {
@@ -113,6 +106,8 @@ const PaymentPage = () => {
             numberOfPlayers: bookingDetails.numberOfPlayers,
             courtName: bookingDetails.courtName,
             courtLocation: bookingDetails.courtLocation,
+            venueName: bookingDetails.venueName,
+            venueLocation: bookingDetails.venueLocation,
             pointsEarned: response.data.pointsEarned,
             currentPointBalance: response.data.currentPointBalance
           }
@@ -149,234 +144,290 @@ const PaymentPage = () => {
       { hour: '2-digit', minute: '2-digit' });
   };
 
+  const PADDLE_PRICE = 5;
+  const BALL_SET_PRICE = 12;
+
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Card sx={{
-        p: 4,
-        borderRadius: '16px',
-        boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)'
-      }}>
-        <Typography variant="h5" gutterBottom sx={{
-          fontWeight: 'bold',
-          mb: 3,
-          textAlign: 'center'
-        }}>
-          Complete Your Booking
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box sx={{ textAlign: 'center', mb: 4 }}>
+        <PaymentIcon sx={{ fontSize: 48, color: '#1976d2', mb: 2 }} />
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+          Complete Payment
         </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Review your booking and choose payment method
+        </Typography>
+      </Box>
 
-        <Box sx={{
-          border: '1px solid #e0e0e0',
-          borderRadius: '8px',
-          mb: 4,
-          textAlign: 'left',
-          backgroundColor: '#f9f9f9'
-        }}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Booking Summary
-            </Typography>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', md: 'row' }, 
+        gap: 3, 
+        minHeight: '600px' 
+      }}>
+        {/* Left Column - Booking Summary */}
+        <Box sx={{ flex: { xs: 'none', md: 1 } }}>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2', mb: 3 }}>
+                📋 Booking Summary
+              </Typography>
 
-            <Grid container spacing={2} sx={{ mb: 1 }}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Court:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {bookingDetails.courtName}
-                </Typography>
-              </Grid>
+              {/* Court & Venue Info */}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <SportsIcon sx={{ color: '#1976d2', mr: 1, fontSize: 28 }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                    {bookingDetails.courtName}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {bookingDetails.venueName}{bookingDetails.venueLocation ? `，${bookingDetails.venueLocation}` : ''}
+                  </Typography>
+                </Box>
+              </Box>
 
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Location:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {bookingDetails.courtLocation}
-                </Typography>
-              </Grid>
+              {/* Date & Time */}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <AccessTimeIcon sx={{ color: '#1976d2', mr: 1, fontSize: 28 }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    {bookingDetails.date}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatTime(bookingDetails.startTime)} - {formatTime(bookingDetails.endTime)} ({bookingDetails.durationHours}h)
+                  </Typography>
+                </Box>
+              </Box>
 
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Date:
-                </Typography>
+              {/* Players & Equipment */}
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#424242' }}>
+                👥 Players & Equipment
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ textAlign: 'center', p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                    <GroupIcon sx={{ color: '#1976d2', fontSize: 32, mb: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {bookingDetails.numberOfPlayers}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Players
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ textAlign: 'center', p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                    <SportsIcon sx={{ color: '#9c27b0', fontSize: 32, mb: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {bookingDetails.numPaddles}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Paddles (RM{PADDLE_PRICE} each)
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ textAlign: 'center', p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                    <SportsIcon sx={{ color: '#4caf50', fontSize: 32, mb: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {bookingDetails.buyBallSet ? 'Yes' : 'No'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Ball Set (RM{BALL_SET_PRICE})
+                    </Typography>
+                  </Box>
+                </Grid>
               </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {bookingDetails.date}
-                </Typography>
-              </Grid>
-
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Time:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {formatTime(bookingDetails.startTime)} - {formatTime(bookingDetails.endTime)}
-                </Typography>
-              </Grid>
-
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Duration:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {bookingDetails.durationHours} hours
-                </Typography>
-              </Grid>
-
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Number of Players:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2">{bookingDetails.numberOfPlayers}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Paddles to Rent:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2">{bookingDetails.numPaddles} (RM5 each)</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Buy Ball Set (4 balls, RM12)
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2">{bookingDetails.buyBallSet ? 'Yes' : 'No'}</Typography>
-              </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 2 }} />
-
-            <Grid container>
-              <Grid item xs={6}>
-                <Typography variant="body1" fontWeight="bold">
-                  Total Amount:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body1" fontWeight="bold" color="#2e7d32">
-                  RM{bookingDetails.price.toFixed(2)}
-                </Typography>
-              </Grid>
-            </Grid>
-          </Box>
+            </CardContent>
+          </Card>
         </Box>
 
-        <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
-          <FormLabel component="legend" sx={{ mb: 2, fontWeight: 'bold' }}>
-            Select Payment Method
-          </FormLabel>
-          <RadioGroup
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-          >
-            <Card variant="outlined" sx={{ mb: 2, borderRadius: '8px' }}>
-              <FormControlLabel
-                value="wallet"
-                control={<Radio />}
-                label={
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography>Wallet Balance</Typography>
-                    {isLoading ? (
-                      <CircularProgress size={20} />
-                    ) : error ? (
-                      <Typography color="error">Error</Typography>
-                    ) : (
-                      <Typography fontWeight="bold">
-                        RM{walletBalance.toFixed(2)}
-                      </Typography>
-                    )}
-                  </Box>
-                }
-                sx={{ p: 2, width: '100%' }}
-              />
-            </Card>
+        {/* Right Column - Payment */}
+        <Box sx={{ flex: { xs: 'none', md: 1 } }}>
+          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#2e7d32', mb: 3 }}>
+                💳 Payment Details
+              </Typography>
 
-            <Card variant="outlined" sx={{ borderRadius: '8px' }}>
-              <FormControlLabel
-                value="card"
-                control={<Radio />}
-                label="Credit/Debit Card"
-                sx={{ p: 2, width: '100%' }}
-              />
-            </Card>
-          </RadioGroup>
-        </FormControl>
-
-        {paymentMethod === 'wallet' && walletBalance < bookingDetails.price && !isLoading && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            Insufficient wallet balance. Please add RM{(bookingDetails.price - walletBalance).toFixed(2)} or choose another payment method.
-            <Box sx={{ mt: 2 }}>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => navigate('/wallet/topup')}
-                sx={{
-                  backgroundColor: '#ff9800',
-                  '&:hover': {
-                    backgroundColor: '#f57c00'
-                  }
+              {/* Total Amount */}
+              <Paper 
+                elevation={0}
+                sx={{ 
+                  background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                  p: 3,
+                  mb: 3,
+                  borderRadius: 2,
+                  border: '2px solid #4caf50'
                 }}
               >
-                Top Up Wallet
-              </Button>
-            </Box>
-          </Alert>
-        )}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    Total Amount:
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    RM{bookingDetails.price.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Paper>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+              {/* Payment Method Selection */}
+              <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
+                <FormLabel component="legend" sx={{ mb: 2, fontWeight: 'bold', color: '#424242' }}>
+                  Select Payment Method
+                </FormLabel>
+                <RadioGroup
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  {/* Wallet Option */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      mb: 2, 
+                      borderRadius: 2,
+                      border: paymentMethod === 'wallet' ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                      backgroundColor: paymentMethod === 'wallet' ? '#f3f8ff' : 'transparent'
+                    }}
+                  >
+                    <FormControlLabel
+                      value="wallet"
+                      control={<Radio color="primary" />}
+                      label={
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', p: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AccountBalanceWalletIcon sx={{ color: '#1976d2', mr: 1 }} />
+                            <Typography sx={{ fontWeight: 'bold' }}>SuperBadge Wallet</Typography>
+                          </Box>
+                          {isLoading ? (
+                            <CircularProgress size={20} />
+                          ) : error ? (
+                            <Typography color="error">Error</Typography>
+                          ) : (
+                            <Typography fontWeight="bold" color="#1976d2">
+                              RM{walletBalance.toFixed(2)}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                      sx={{ p: 2, width: '100%' }}
+                    />
+                  </Card>
 
-        <Button
-          variant="contained"
-          fullWidth
-          size="large"
-          onClick={handlePayment}
-          disabled={
-            isProcessing ||
-            (paymentMethod === 'wallet' && walletBalance < bookingDetails.price) ||
-            isLoading
-          }
-          sx={{
-            py: 1.5,
-            backgroundColor: '#4caf50',
-            '&:hover': {
-              backgroundColor: '#2e7d32'
-            },
-            '&:disabled': {
-              backgroundColor: '#e0e0e0'
-            }
-          }}
-        >
-          {isProcessing ? <CircularProgress size={24} color="inherit" /> : 'Pay Now'}
-        </Button>
+                  {/* Credit Card Option */}
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      borderRadius: 2,
+                      border: paymentMethod === 'card' ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                      backgroundColor: paymentMethod === 'card' ? '#f3f8ff' : 'transparent'
+                    }}
+                  >
+                    <FormControlLabel
+                      value="card"
+                      control={<Radio color="primary" />}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', p: 1 }}>
+                          <CreditCardIcon sx={{ color: '#1976d2', mr: 1 }} />
+                          <Typography sx={{ fontWeight: 'bold' }}>Credit/Debit Card</Typography>
+                        </Box>
+                      }
+                      sx={{ p: 2, width: '100%' }}
+                    />
+                  </Card>
+                </RadioGroup>
+              </FormControl>
 
-        <Button
-          variant="outlined"
-          fullWidth
-          size="large"
-          onClick={() => navigate(-1)}
-          sx={{ mt: 2, py: 1.5 }}
-        >
-          Back to Booking
-        </Button>
-      </Card>
+              {/* Insufficient Balance Warning */}
+              {paymentMethod === 'wallet' && walletBalance < bookingDetails.price && !isLoading && (
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    Insufficient wallet balance. You need RM{(bookingDetails.price - walletBalance).toFixed(2)} more.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => navigate('/wallet/topup')}
+                    sx={{
+                      backgroundColor: '#ff9800',
+                      '&:hover': {
+                        backgroundColor: '#f57c00'
+                      }
+                    }}
+                  >
+                    Top Up Wallet
+                  </Button>
+                </Alert>
+              )}
+
+              {/* Error Alert */}
+              {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {error}
+                </Alert>
+              )}
+
+              {/* Action Buttons */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  onClick={handlePayment}
+                  disabled={
+                    isProcessing ||
+                    (paymentMethod === 'wallet' && walletBalance < bookingDetails.price) ||
+                    isLoading
+                  }
+                  sx={{
+                    py: 2,
+                    backgroundColor: '#4caf50',
+                    borderRadius: 2,
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold',
+                    '&:hover': {
+                      backgroundColor: '#2e7d32'
+                    },
+                    '&:disabled': {
+                      backgroundColor: '#e0e0e0'
+                    }
+                  }}
+                >
+                  {isProcessing ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    `Pay RM${bookingDetails.price.toFixed(2)}`
+                  )}
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="large"
+                  onClick={() => navigate(-1)}
+                  sx={{ 
+                    py: 2, 
+                    borderRadius: 2,
+                    borderColor: '#757575',
+                    color: '#757575',
+                    '&:hover': {
+                      borderColor: '#424242',
+                      backgroundColor: '#f5f5f5'
+                    }
+                  }}
+                >
+                  Back to Booking
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
     </Container>
   );
 };

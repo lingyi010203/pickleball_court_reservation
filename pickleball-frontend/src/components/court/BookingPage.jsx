@@ -11,7 +11,9 @@ import {
   Divider,
   Stack,
   IconButton,
+  TextField,
   Snackbar,
+  MenuItem,
   Alert
 } from '@mui/material';
 import {
@@ -54,35 +56,35 @@ const BookingPage = () => {
   // 日历数据结构
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const tabs = ['Today', 'Tomorrow', 'This Week', 'Custom Date'];
-  
+
   // 生成日历数据
   const generateCalendar = () => {
     const startOfMonth = dayjs().startOf('month');
     const endOfMonth = dayjs().endOf('month');
     const startDate = startOfMonth.startOf('week');
     const endDate = endOfMonth.endOf('week');
-    
+
     const calendar = [];
     let week = [];
     let current = startDate;
-    
+
     while (current.isBefore(endDate) || current.isSame(endDate, 'day')) {
       if (week.length === 7) {
         calendar.push(week);
         week = [];
       }
-      
+
       week.push(current.month() === dayjs().month() ? current.date() : null);
       current = current.add(1, 'day');
     }
-    
+
     if (week.length > 0) {
       calendar.push(week);
     }
-    
+
     return calendar;
   };
-  
+
   const calendar = generateCalendar();
 
   // 检查日期是否可用
@@ -118,7 +120,7 @@ const BookingPage = () => {
   useEffect(() => {
     if (selectedDate) {
       let filtered = slots.filter(slot => slot.date === selectedDate.format('YYYY-MM-DD'));
-      
+
       if (selectedDate.isSame(dayjs(), 'day')) {
         const nowPlus2h = dayjs().add(2, 'hour');
         filtered = filtered.filter(slot => {
@@ -126,7 +128,7 @@ const BookingPage = () => {
           return slotDateTime.isAfter(nowPlus2h);
         });
       }
-      
+
       setAvailableSlots(filtered);
       setSelectedSlots([]);
     }
@@ -137,19 +139,19 @@ const BookingPage = () => {
       setSelectedSlots(selectedSlots.filter(s => s.id !== slot.id));
       return;
     }
-    
+
     if (selectedSlots.length > 0 && slot.date !== selectedSlots[0].date) return;
-    
+
     const allSlots = [...selectedSlots, slot].sort((a, b) => a.startTime.localeCompare(b.startTime));
     let isConsecutive = true;
-    
+
     for (let i = 1; i < allSlots.length; i++) {
       if (allSlots[i].startTime !== allSlots[i - 1].endTime) {
         isConsecutive = false;
         break;
       }
     }
-    
+
     if (!isConsecutive) return;
     setSelectedSlots(allSlots);
   };
@@ -160,6 +162,8 @@ const BookingPage = () => {
       slotIds: selectedSlots.map(s => s.id),
       courtName: court.name,
       courtLocation: court.location,
+      venueName: court.venue?.name,
+      venueLocation: court.venue?.location,
       date: selectedDate.format('YYYY-MM-DD'),
       startTime: selectedSlots[0].startTime,
       endTime: selectedSlots[selectedSlots.length - 1].endTime,
@@ -202,7 +206,6 @@ const BookingPage = () => {
 
   const renderBookingSummary = () => {
     if (!court) return null;
-    
     return (
       <Card sx={{
         position: 'sticky',
@@ -217,541 +220,532 @@ const BookingPage = () => {
           <Typography variant="h6" fontWeight="bold" gutterBottom>
             Booking Summary
           </Typography>
+          <Divider sx={{ mb: 2 }} />
 
+          {/* 场地和场馆 */}
           <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight={600}>
-              {court.name}
-            </Typography>
+            <Typography variant="subtitle2" color="text.secondary">Court</Typography>
+            <Typography variant="body1" fontWeight="bold">{court.name}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {court.location}
+              {court.venue?.name || court.location}{court.venue?.location ? `，${court.venue.location}` : ''}
             </Typography>
           </Box>
 
-          <Divider sx={{ my: 2 }} />
-
+          {/* 日期和时间 */}
           {selectedDate && (
-            <Stack spacing={1} sx={{ mb: 2 }}>
-              <Typography variant="body1">
-                <strong>Date:</strong> {selectedDate.format('dddd, MMMM D, YYYY')}
-              </Typography>
-
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">Date</Typography>
+              <Typography variant="body1">{selectedDate.format('dddd, MMMM D, YYYY')}</Typography>
               {selectedSlots.length > 0 && (
                 <>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>Time</Typography>
                   <Typography variant="body1">
-                    <strong>Time:</strong> {formatTime(selectedSlots[0].startTime)} - {formatTime(selectedSlots[selectedSlots.length - 1].endTime)}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Duration:</strong> {totalDuration} hours
+                    {formatTime(selectedSlots[0].startTime)} - {formatTime(selectedSlots[selectedSlots.length - 1].endTime)}
+                    <span style={{ marginLeft: 8, fontSize: 13, color: '#888' }}>({totalDuration}h)</span>
                   </Typography>
                 </>
               )}
-            </Stack>
+            </Box>
           )}
 
-          {selectedSlots.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 2 }} />
 
-              {/* 新增：Purpose 选择 */}
-              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Purpose:
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} textAlign="right">
-                  <select
-                    value={purpose}
-                    onChange={e => setPurpose(e.target.value)}
-                    style={{ width: 120, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
-                  >
-                    <option value="Recreational">Recreational</option>
-                    <option value="Training">Training</option>
-                    <option value="Competition">Competition</option>
-                    <option value="Social">Social</option>
-                    <option value="Practice">Practice</option>
-                    <option value="Tournament">Tournament</option>
-                  </select>
-                </Grid>
-              </Grid>
-              {/* 新增：人数选择 */}
-              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Number of Players:
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} textAlign="right">
-                  <input
+          {/* 玩家和装备 */}
+          {selectedSlots.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Grid container spacing={2}>
+                {/* Players */}
+                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" color="text.secondary">Players</Typography>
+                  <TextField
                     type="number"
-                    min={2}
-                    max={8}
+                    size="small"
+                    inputProps={{ min: 2, max: 8, style: { textAlign: 'right' } }}
                     value={numPlayers}
                     onChange={e => setNumPlayers(Math.max(2, Math.min(8, Number(e.target.value))))}
-                    style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #ccc', textAlign: 'right' }}
+                    sx={{ width: 80 }}
                   />
                 </Grid>
-              </Grid>
-              {/* 新增：paddle 租借 */}
-              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Paddles to Rent:
-                  </Typography>
+                {/* Paddles */}
+                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" color="text.secondary">Paddles</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      inputProps={{ min: 0, max: 8, style: { textAlign: 'right' } }}
+                      value={numPaddles}
+                      onChange={e => setNumPaddles(Math.max(0, Math.min(8, Number(e.target.value))))}
+                      sx={{ width: 80 }}
+                    />
+                    <Typography variant="caption" sx={{ ml: 1 }}>
+                      RM{PADDLE_PRICE} each
+                    </Typography>
+                  </Box>
                 </Grid>
-                <Grid item xs={6} textAlign="right">
-                  <input
-                    type="number"
-                    min={0}
-                    max={8}
-                    value={numPaddles}
-                    onChange={e => setNumPaddles(Math.max(0, Math.min(8, Number(e.target.value))))}
-                    style={{ width: 60, padding: 4, borderRadius: 4, border: '1px solid #ccc', textAlign: 'right' }}
-                  />
-                  <Typography variant="caption" sx={{ ml: 1 }}>
-                    RM{PADDLE_PRICE} each
-                  </Typography>
+                {/* Ball Set */}
+                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" color="text.secondary">Ball Set</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={buyBallSet}
+                      onChange={e => setBuyBallSet(e.target.checked)}
+                      style={{ transform: 'scale(1.3)' }}
+                      aria-label="Buy Ball Set"
+                    />
+                    <Typography variant="caption" sx={{ ml: 1 }}>
+                      {buyBallSet ? `Yes (RM${BALL_SET_PRICE})` : 'No'}
+                    </Typography>
+                  </Box>
                 </Grid>
-              </Grid>
-              {/* 新增：ball set 购买 */}
-              <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-                <Grid item xs={8}>
-                  <Typography variant="body2" color="text.secondary">
-                    Buy Ball Set (4 balls, RM{BALL_SET_PRICE})
-                  </Typography>
-                </Grid>
-                <Grid item xs={4} textAlign="right">
-                  <input
-                    type="checkbox"
-                    checked={buyBallSet}
-                    onChange={e => setBuyBallSet(e.target.checked)}
-                    style={{ transform: 'scale(1.3)' }}
-                  />
-                </Grid>
-              </Grid>
-
-              {/* 价格详情 */}
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Pricing Details:
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  Off-peak: RM{court.offPeakHourlyPrice || 50}/hour
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  Peak: RM{court.peakHourlyPrice || 80}/hour
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  Paddles: RM{PADDLE_PRICE} each
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  Ball Set: RM{BALL_SET_PRICE} (set of 4)
-                </Typography>
-              </Box>
-
-              <Divider sx={{ my: 2 }} />
-              <Grid container>
-                <Grid item xs={6}>
-                  <Typography variant="body1" fontWeight="bold">
-                    Total Amount:
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} textAlign="right">
-                  <Typography variant="body1" fontWeight="bold" color="#2e7d32">
-                    RM{total.toFixed(2)}
-                  </Typography>
+                {/* Purpose */}
+                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" color="text.secondary">Purpose</Typography>
+                  <TextField
+                    select
+                    size="small"
+                    value={purpose}
+                    onChange={e => setPurpose(e.target.value)}
+                    sx={{ width: 140 }}
+                  >
+                    <MenuItem value="Recreational">Recreational</MenuItem>
+                    <MenuItem value="Training">Training</MenuItem>
+                    <MenuItem value="Competition">Competition</MenuItem>
+                    <MenuItem value="Social">Social</MenuItem>
+                    <MenuItem value="Practice">Practice</MenuItem>
+                    <MenuItem value="Tournament">Tournament</MenuItem>
+                  </TextField>
                 </Grid>
               </Grid>
-
-              {/* Book Now 按钮 */}
-              <Box sx={{ mt: 3, textAlign: 'center' }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  disabled={!selectedSlots.length || !court}
-                  onClick={handleBookNow}
-                  sx={{ px: 6, py: 1.5, fontWeight: 600, fontSize: '1.1rem', borderRadius: 2 }}
-                >
-                  Book Now
-                </Button>
-              </Box>
-            </>
+            </Box>
           )}
 
-          {!selectedSlots.length && selectedDate && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Select a time slot to complete your booking
+        {/* 价格详情 */}
+        {selectedSlots.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Pricing Details:
             </Typography>
-          )}
-
-          {!selectedDate && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Select a date to see available time slots
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              Off-peak: RM{court.offPeakHourlyPrice || 50}/hour
             </Typography>
-          )}
-        </CardContent>
-      </Card>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              Peak: RM{court.peakHourlyPrice || 80}/hour
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              Paddles: RM{PADDLE_PRICE} each
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              Ball Set: RM{BALL_SET_PRICE} (set of 4)
+            </Typography>
+          </Box>
+        )}
+
+        {/* 总价 */}
+        {selectedSlots.length > 0 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Grid container>
+              <Grid item xs={7}>
+                <Typography variant="body1" fontWeight="bold">
+                  Total Amount:
+                </Typography>
+              </Grid>
+              <Grid item xs={5} textAlign="right">
+                <Typography variant="body1" fontWeight="bold" color="#2e7d32">
+                  RM{total.toFixed(2)}
+                </Typography>
+              </Grid>
+            </Grid>
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                disabled={!selectedSlots.length || !court}
+                onClick={handleBookNow}
+                sx={{ px: 6, py: 1.5, fontWeight: 600, fontSize: '1.1rem', borderRadius: 2 }}
+              >
+                Book Now
+              </Button>
+            </Box>
+          </>
+        )}
+
+        {!selectedSlots.length && selectedDate && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Select a time slot to complete your booking
+          </Typography>
+        )}
+
+        {!selectedDate && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Select a date to see available time slots
+          </Typography>
+        )}
+      </CardContent>
+      </Card >
     );
   };
 
-  if (loading || !court) {
-    return (
-      <Container style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress size={60} />
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container sx={{ py: 4, textAlign: 'center' }}>
-        <Typography variant="h5" color="error" gutterBottom>
-          {error}
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => window.location.reload()}
-          sx={{ mt: 2 }}
-        >
-          Retry
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => navigate('/courts')}
-          sx={{ mt: 2, ml: 2 }}
-        >
-          Back to Courts
-        </Button>
-      </Container>
-    );
-  }
-
+if (loading || !court) {
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Button
-        variant="text"
-        onClick={() => navigate(`/courts/${courtId}`)}
-        sx={{
-          mb: 3,
-          display: 'flex',
-          alignItems: 'center',
-          textTransform: 'none',
-          fontWeight: 500,
-          color: '#1976d2',
-          '&:hover': {
-            backgroundColor: 'transparent',
-            textDecoration: 'underline'
-          }
-        }}
-        startIcon={<BackIcon />}
-      >
-        Back to Court
-      </Button>
-
-      <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, color: '#333' }}>
-        Book Court: {court.name}
-      </Typography>
-
-      <Typography variant="body1" sx={{ mb: 4, color: '#666' }}>
-        {court.location}
-      </Typography>
-
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={8}>
-          <Card sx={{ 
-            borderRadius: 3, 
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
-            mb: 4,
-            background: 'linear-gradient(135deg, #f8f9ff, #ffffff)'
-          }}>
-            <CardContent sx={{ p: 4 }}>
-              {/* 头部 */}
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
-                  Book Court
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Reserve a pickleball court for your next game
-                </Typography>
-              </Box>
-
-              {/* Tab导航 */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 1, 
-                mb: 4,
-                p: 0.5, 
-                bgcolor: 'rgba(0, 0, 0, 0.03)',
-                borderRadius: '12px',
-                width: 'fit-content'
-              }}>
-                {tabs.map((tab) => (
-                  <Button
-                    key={tab}
-                    variant={activeTab === tab ? "contained" : "outlined"}
-                    onClick={() => {
-                      setActiveTab(tab);
-                      switch (tab) {
-                        case 'Today':
-                          setSelectedDate(dayjs());
-                          break;
-                        case 'Tomorrow':
-                          setSelectedDate(dayjs().add(1, 'day'));
-                          break;
-                        case 'This Week':
-                          setSelectedDate(dayjs().add(7, 'day'));
-                          break;
-                        case 'Custom Date':
-                          // Keep current date for custom selection
-                          break;
-                      }
-                    }}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                      px: 3,
-                      py: 1,
-                      ...(activeTab === tab && {
-                        background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
-                        color: 'white',
-                        boxShadow: '0 4px 8px rgba(37, 117, 252, 0.25)'
-                      })
-                    }}
-                  >
-                    {tab}
-                  </Button>
-                ))}
-              </Box>
-
-              {/* 日历头部 */}
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                mb: 4
-              }}>
-                <IconButton
-                  onClick={() => {
-                    const newMonth = dayjs().subtract(1, 'month');
-                    setCurrentMonth(newMonth.format('MMMM YYYY'));
-                  }}
-                  sx={{ 
-                    p: 1.5,
-                    borderRadius: '50%',
-                    background: 'rgba(0, 0, 0, 0.03)',
-                    '&:hover': {
-                      background: 'rgba(0, 0, 0, 0.08)'
-                    }
-                  }}
-                >
-                  <ChevronLeft />
-                </IconButton>
-                
-                <Typography variant="h6" fontWeight="bold">
-                  {currentMonth}
-                </Typography>
-                
-                <IconButton
-                  onClick={() => {
-                    const newMonth = dayjs().add(1, 'month');
-                    setCurrentMonth(newMonth.format('MMMM YYYY'));
-                  }}
-                  sx={{ 
-                    p: 1.5,
-                    borderRadius: '50%',
-                    background: 'rgba(0, 0, 0, 0.03)',
-                    '&:hover': {
-                      background: 'rgba(0, 0, 0, 0.08)'
-                    }
-                  }}
-                >
-                  <ChevronRight />
-                </IconButton>
-              </Box>
-
-              {/* 日历网格 */}
-              <Box sx={{ mb: 4 }}>
-                {/* 星期标题 */}
-                <Grid container spacing={0} sx={{ mb: 2 }}>
-                  {daysOfWeek.map((day) => (
-                    <Grid item xs key={day}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          textAlign: 'center',
-                          fontWeight: 600,
-                          color: 'text.secondary',
-                          py: 1
-                        }}
-                      >
-                        {day}
-                      </Typography>
-                    </Grid>
-                  ))}
-                </Grid>
-                
-                {/* 日期网格 */}
-                <Grid container spacing={1}>
-                  {calendar.map((week, weekIndex) => (
-                    <React.Fragment key={weekIndex}>
-                      {week.map((date, dateIndex) => (
-                        <Grid item xs key={`${weekIndex}-${dateIndex}`}>
-                          {date ? (
-                            <Button
-                              fullWidth
-                              variant={selectedDate?.date() === date ? "contained" : "outlined"}
-                              onClick={() => {
-                                if (isDateAvailable(date)) {
-                                  const newDate = dayjs().date(date);
-                                  setSelectedDate(newDate);
-                                }
-                              }}
-                              disabled={!isDateAvailable(date)}
-                              sx={{
-                                height: 56,
-                                minWidth: 0,
-                                borderRadius: '12px',
-                                fontWeight: 600,
-                                ...(selectedDate?.date() === date && {
-                                  background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
-                                  color: 'white',
-                                  boxShadow: '0 4px 12px rgba(37, 117, 252, 0.3)'
-                                }),
-                                ...(isDateAvailable(date) ? {} : {
-                                  border: '2px solid #f44336',
-                                  color: '#f44336',
-                                  opacity: 0.7,
-                                  '&:hover': {
-                                    border: '2px solid #f44336',
-                                    backgroundColor: 'rgba(244, 67, 54, 0.1)'
-                                  }
-                                })
-                              }}
-                            >
-                              {date}
-                            </Button>
-                          ) : (
-                            <Box sx={{ height: 56 }} />
-                          )}
-                        </Grid>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </Grid>
-              </Box>
-              
-              {/* 时间槽位 */}
-              <Card sx={{ 
-                borderRadius: 3,
-                background: 'white',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
-              }}>
-                <CardContent>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    mb: 3 
-                  }}>
-                    <AccessTime sx={{ 
-                      color: 'text.secondary', 
-                      mr: 1.5 
-                    }} />
-                    <Typography variant="h6" fontWeight="bold">
-                      Available Time Slots - {selectedDate?.format('dddd, MMMM D, YYYY')}
-                    </Typography>
-                  </Box>
-                  
-                  <Grid container spacing={1.5}>
-                    {availableSlots.length > 0 ? (
-                      availableSlots.map((slot) => (
-                        <Grid item xs={6} sm={4} md={3} key={slot.id}>
-                          <Button
-                            fullWidth
-                            variant={
-                              selectedSlots.some(s => s.id === slot.id) 
-                                ? "contained" 
-                                : slot.status === 'BOOKED' 
-                                  ? "outlined" 
-                                  : "outlined"
-                            }
-                            onClick={() => handleSlotSelect(slot)}
-                            disabled={slot.status === 'BOOKED'}
-                            sx={{
-                              py: 1.5,
-                              borderRadius: '12px',
-                              fontWeight: 600,
-                              ...(selectedSlots.some(s => s.id === slot.id) ? {
-                                 background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
-                                 color: 'white',
-                                 boxShadow: '0 4px 8px rgba(37, 117, 252, 0.3)'
-                               } : {}),
-                               ...(slot.status === 'BOOKED' ? {
-                                 borderColor: '#e53935',
-                                 color: '#e53935',
-                                 opacity: 0.7
-                               } : {})
-                            }}
-                          >
-                            {formatTime(slot.startTime)}
-                          </Button>
-                        </Grid>
-                      ))
-                    ) : (
-                      <Grid item xs={12}>
-                        <Box sx={{ 
-                          textAlign: 'center', 
-                          py: 4,
-                          color: 'text.secondary'
-                        }}>
-                          <AccessTime sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }} />
-                          <Typography variant="body1">
-                            No available time slots for this date
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    )}
-                  </Grid>
-                </CardContent>
-              </Card>
-              
-              {/* 价格信息 */}
-              {court && (
-                <Box sx={{ 
-                  mt: 3, 
-                  p: 2, 
-                  bgcolor: 'rgba(46, 125, 50, 0.1)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(46, 125, 50, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
-                  <Typography variant="body2" fontWeight="600" color="success.main">
-                    RM{court.offPeakHourlyPrice || 50}-{court.peakHourlyPrice || 80}/hour
-                  </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          {renderBookingSummary()}
-        </Grid>
-      </Grid>
-
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
-      >
-        <Alert onClose={() => setSnackbarOpen(false)} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
+    <Container style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <CircularProgress size={60} />
     </Container>
   );
+}
+
+if (error) {
+  return (
+    <Container sx={{ py: 4, textAlign: 'center' }}>
+      <Typography variant="h5" color="error" gutterBottom>
+        {error}
+      </Typography>
+      <Button
+        variant="contained"
+        onClick={() => window.location.reload()}
+        sx={{ mt: 2 }}
+      >
+        Retry
+      </Button>
+      <Button
+        variant="outlined"
+        onClick={() => navigate('/courts')}
+        sx={{ mt: 2, ml: 2 }}
+      >
+        Back to Courts
+      </Button>
+    </Container>
+  );
+}
+
+return (
+  <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Button
+      variant="text"
+      onClick={() => navigate(`/courts/${courtId}`)}
+      sx={{
+        mb: 3,
+        display: 'flex',
+        alignItems: 'center',
+        textTransform: 'none',
+        fontWeight: 500,
+        color: '#1976d2',
+        '&:hover': {
+          backgroundColor: 'transparent',
+          textDecoration: 'underline'
+        }
+      }}
+      startIcon={<BackIcon />}
+    >
+      Back to Court
+    </Button>
+
+    <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, color: '#333' }}>
+      Book Court: {court.name}
+    </Typography>
+
+    <Typography variant="body1" sx={{ mb: 4, color: '#666' }}>
+      {court.location}
+    </Typography>
+
+    <Grid container spacing={4}>
+      <Grid item xs={12} md={8}>
+        <Card sx={{
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+          mb: 4,
+          background: 'linear-gradient(135deg, #f8f9ff, #ffffff)'
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            {/* 头部 */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
+                Book Court
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Reserve a pickleball court for your next game
+              </Typography>
+            </Box>
+
+            {/* Tab导航 */}
+            <Box sx={{
+              display: 'flex',
+              gap: 1,
+              mb: 4,
+              p: 0.5,
+              bgcolor: 'rgba(0, 0, 0, 0.03)',
+              borderRadius: '12px',
+              width: 'fit-content'
+            }}>
+              {tabs.map((tab) => (
+                <Button
+                  key={tab}
+                  variant={activeTab === tab ? "contained" : "outlined"}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    switch (tab) {
+                      case 'Today':
+                        setSelectedDate(dayjs());
+                        break;
+                      case 'Tomorrow':
+                        setSelectedDate(dayjs().add(1, 'day'));
+                        break;
+                      case 'This Week':
+                        setSelectedDate(dayjs().add(7, 'day'));
+                        break;
+                      case 'Custom Date':
+                        // Keep current date for custom selection
+                        break;
+                    }
+                  }}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    px: 3,
+                    py: 1,
+                    ...(activeTab === tab && {
+                      background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                      color: 'white',
+                      boxShadow: '0 4px 8px rgba(37, 117, 252, 0.25)'
+                    })
+                  }}
+                >
+                  {tab}
+                </Button>
+              ))}
+            </Box>
+
+            {/* 日历头部 */}
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 4
+            }}>
+              <IconButton
+                onClick={() => {
+                  const newMonth = dayjs().subtract(1, 'month');
+                  setCurrentMonth(newMonth.format('MMMM YYYY'));
+                }}
+                sx={{
+                  p: 1.5,
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.03)',
+                  '&:hover': {
+                    background: 'rgba(0, 0, 0, 0.08)'
+                  }
+                }}
+              >
+                <ChevronLeft />
+              </IconButton>
+
+              <Typography variant="h6" fontWeight="bold">
+                {currentMonth}
+              </Typography>
+
+              <IconButton
+                onClick={() => {
+                  const newMonth = dayjs().add(1, 'month');
+                  setCurrentMonth(newMonth.format('MMMM YYYY'));
+                }}
+                sx={{
+                  p: 1.5,
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.03)',
+                  '&:hover': {
+                    background: 'rgba(0, 0, 0, 0.08)'
+                  }
+                }}
+              >
+                <ChevronRight />
+              </IconButton>
+            </Box>
+
+            {/* 日历网格 */}
+            <Box sx={{ mb: 4 }}>
+              {/* 星期标题 */}
+              <Grid container spacing={0} sx={{ mb: 2 }}>
+                {daysOfWeek.map((day) => (
+                  <Grid item xs key={day}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: 'text.secondary',
+                        py: 1
+                      }}
+                    >
+                      {day}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* 日期网格 */}
+              <Grid container spacing={1}>
+                {calendar.map((week, weekIndex) => (
+                  <React.Fragment key={weekIndex}>
+                    {week.map((date, dateIndex) => (
+                      <Grid item xs key={`${weekIndex}-${dateIndex}`}>
+                        {date ? (
+                          <Button
+                            fullWidth
+                            variant={selectedDate?.date() === date ? "contained" : "outlined"}
+                            onClick={() => {
+                              if (isDateAvailable(date)) {
+                                const newDate = dayjs().date(date);
+                                setSelectedDate(newDate);
+                              }
+                            }}
+                            disabled={!isDateAvailable(date)}
+                            sx={{
+                              height: 56,
+                              minWidth: 0,
+                              borderRadius: '12px',
+                              fontWeight: 600,
+                              ...(selectedDate?.date() === date && {
+                                background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                                color: 'white',
+                                boxShadow: '0 4px 12px rgba(37, 117, 252, 0.3)'
+                              }),
+                              ...(isDateAvailable(date) ? {} : {
+                                border: '2px solid #f44336',
+                                color: '#f44336',
+                                opacity: 0.7,
+                                '&:hover': {
+                                  border: '2px solid #f44336',
+                                  backgroundColor: 'rgba(244, 67, 54, 0.1)'
+                                }
+                              })
+                            }}
+                          >
+                            {date}
+                          </Button>
+                        ) : (
+                          <Box sx={{ height: 56 }} />
+                        )}
+                      </Grid>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </Grid>
+            </Box>
+
+            {/* 时间槽位 */}
+            <Card sx={{
+              borderRadius: 3,
+              background: 'white',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+            }}>
+              <CardContent>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  mb: 3
+                }}>
+                  <AccessTime sx={{
+                    color: 'text.secondary',
+                    mr: 1.5
+                  }} />
+                  <Typography variant="h6" fontWeight="bold">
+                    Available Time Slots - {selectedDate?.format('dddd, MMMM D, YYYY')}
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={1.5}>
+                  {availableSlots.length > 0 ? (
+                    availableSlots.map((slot) => (
+                      <Grid item xs={6} sm={4} md={3} key={slot.id}>
+                        <Button
+                          fullWidth
+                          variant={
+                            selectedSlots.some(s => s.id === slot.id)
+                              ? "contained"
+                              : slot.status === 'BOOKED'
+                                ? "outlined"
+                                : "outlined"
+                          }
+                          onClick={() => handleSlotSelect(slot)}
+                          disabled={slot.status === 'BOOKED'}
+                          sx={{
+                            py: 1.5,
+                            borderRadius: '12px',
+                            fontWeight: 600,
+                            ...(selectedSlots.some(s => s.id === slot.id) ? {
+                              background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                              color: 'white',
+                              boxShadow: '0 4px 8px rgba(37, 117, 252, 0.3)'
+                            } : {}),
+                            ...(slot.status === 'BOOKED' ? {
+                              borderColor: '#e53935',
+                              color: '#e53935',
+                              opacity: 0.7
+                            } : {})
+                          }}
+                        >
+                          {formatTime(slot.startTime)}
+                        </Button>
+                      </Grid>
+                    ))
+                  ) : (
+                    <Grid item xs={12}>
+                      <Box sx={{
+                        textAlign: 'center',
+                        py: 4,
+                        color: 'text.secondary'
+                      }}>
+                        <AccessTime sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }} />
+                        <Typography variant="body1">
+                          No available time slots for this date
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* 价格信息 */}
+            {court && (
+              <Box sx={{
+                mt: 3,
+                p: 2,
+                bgcolor: 'rgba(46, 125, 50, 0.1)',
+                borderRadius: '12px',
+                border: '1px solid rgba(46, 125, 50, 0.2)',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Typography variant="body2" fontWeight="600" color="success.main">
+                  RM{court.offPeakHourlyPrice || 50}-{court.peakHourlyPrice || 80}/hour
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={4}>
+        {renderBookingSummary()}
+      </Grid>
+    </Grid>
+
+    <Snackbar
+      open={snackbarOpen}
+      autoHideDuration={6000}
+      onClose={() => setSnackbarOpen(false)}
+    >
+      <Alert onClose={() => setSnackbarOpen(false)} severity="error" sx={{ width: '100%' }}>
+        {error}
+      </Alert>
+    </Snackbar>
+  </Container>
+);
 };
 
 export default BookingPage;

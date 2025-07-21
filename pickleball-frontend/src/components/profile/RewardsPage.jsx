@@ -116,12 +116,12 @@ const RewardsPage = () => {
         }
         
         return {
-          id: voucher.id,
+        id: voucher.id,
           title: title,
-          description: "Special offer for members",
+        description: "Special offer for members",
           discount: discount,
-          expiry: voucher.expiryDate,
-          points: voucher.requestPoints,
+        expiry: voucher.expiryDate,
+        points: voucher.requestPoints,
           discountValue: voucher.discountValue,  // Changed from discountAmount
           discountType: voucher.discountType
         };
@@ -312,7 +312,7 @@ const RewardsPage = () => {
 
   // Use dashboard data if available
   const currentPoints = dashboardData?.pointBalance || 0;
-  
+
   // Use tier from tierInfo if available, otherwise fallback to dashboard
   const memberTier = tierInfo?.currentTierName || dashboardData?.tierName || 'GOLD';
   const currentTier = tierConfig[memberTier.toUpperCase()] || tierConfig.GOLD;
@@ -545,31 +545,31 @@ const RewardsPage = () => {
                           if (nextTier) {
                             return (
                               <>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                  <Typography variant="body2" fontWeight="medium">
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2" fontWeight="medium">
                                     Progress to {nextTier.name}
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight="medium">
+                          </Typography>
+                          <Typography variant="body2" fontWeight="medium">
                                     {nextTier.pointsNeeded} points to go
-                                  </Typography>
-                                </Box>
+                          </Typography>
+                        </Box>
                                 {/* Debug info - remove in production */}
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                                   Debug: {tierInfo?.pointBalance || 0} / {nextTier.minPoints} points ({progressToNextTier.toFixed(1)}%)
                                 </Typography>
-                                <LinearProgress
-                                  variant="determinate"
-                                  value={progressToNextTier}
-                                  sx={{
-                                    height: 10,
-                                    borderRadius: 5,
-                                    bgcolor: alpha(currentTier.color, 0.15),
-                                    '& .MuiLinearProgress-bar': {
-                                      borderRadius: 5,
-                                      background: currentTier.gradient
-                                    }
-                                  }}
-                                />
+                        <LinearProgress
+                          variant="determinate"
+                          value={progressToNextTier}
+                          sx={{
+                            height: 10,
+                            borderRadius: 5,
+                            bgcolor: alpha(currentTier.color, 0.15),
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 5,
+                              background: currentTier.gradient
+                            }
+                          }}
+                        />
                               </>
                             );
                           } else {

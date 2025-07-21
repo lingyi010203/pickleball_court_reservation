@@ -353,10 +353,10 @@ const FeedbackPage = () => {
         setSuccessMessage('Review updated successfully!');
       } else {
         // 新建反馈后，重置表单
-        setRating(0);
-        setReview('');
-        setEditingFeedback(null);
-        
+      setRating(0);
+      setReview('');
+      setEditingFeedback(null);
+      
         // 如果是通过bookingId直接进入的，提交成功后隐藏表单
         if (hasOnlyBookingId) {
           setFeedbackList([response.data, ...feedbackList]);
@@ -366,10 +366,10 @@ const FeedbackPage = () => {
       // 刷新统计 - 只在有targetId时刷新
       if (targetId && !hasOnlyBookingId) {
         try {
-          const statsResponse = await api.get('/feedback/stats', {
-            params: { targetType, targetId }
-          });
-          setStats(statsResponse.data);
+      const statsResponse = await api.get('/feedback/stats', {
+        params: { targetType, targetId }
+      });
+      setStats(statsResponse.data);
         } catch (statsErr) {
           console.warn('Failed to refresh stats:', statsErr);
         }
@@ -432,10 +432,10 @@ const FeedbackPage = () => {
       // 刷新统计 - 只在有targetId时刷新
       if (targetId && !hasOnlyBookingId) {
         try {
-          const statsResponse = await api.get('/feedback/stats', {
-            params: { targetType, targetId }
-          });
-          setStats(statsResponse.data);
+      const statsResponse = await api.get('/feedback/stats', {
+        params: { targetType, targetId }
+      });
+      setStats(statsResponse.data);
         } catch (statsErr) {
           console.warn('Failed to refresh stats:', statsErr);
         }
@@ -558,56 +558,56 @@ const FeedbackPage = () => {
       
       {/* 选择区域 - 只在没有预填充数据时显示 */}
       {!hasOnlyBookingId && (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Select Target
-            </Typography>
-            
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Target Type</InputLabel>
-                  <Select
-                    value={targetType}
-                    onChange={(e) => setTargetType(e.target.value)}
-                    disabled={preFilledData.targetType}
-                    label="Target Type"
-                  >
-                    <MenuItem value="COURT">Court</MenuItem>
-                    <MenuItem value="EVENT">Event</MenuItem>
-                    <MenuItem value="COACH" disabled>Coach (Coming Soon)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>
-                    {targetType === 'COURT' ? 'Court' : 
-                     targetType === 'EVENT' ? 'Event' : 'Coach'}
-                  </InputLabel>
-                  <Select
-                    value={targetId}
-                    onChange={(e) => setTargetId(e.target.value)}
-                    disabled={loading || !isAuthenticated() || preFilledData.targetId}
-                    label={targetType === 'COURT' ? 'Court' : 
-                           targetType === 'EVENT' ? 'Event' : 'Coach'}
-                  >
-                    <MenuItem value="">
-                      Select {targetType.toLowerCase()}
-                    </MenuItem>
-                    {availableTargets.map(target => (
-                      <MenuItem key={target.id} value={target.id}>
-                        {target.name || target.title}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
+            Select Target
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Target Type</InputLabel>
+                <Select
+                  value={targetType}
+                  onChange={(e) => setTargetType(e.target.value)}
+                  disabled={preFilledData.targetType}
+                  label="Target Type"
+                >
+                  <MenuItem value="COURT">Court</MenuItem>
+                  <MenuItem value="EVENT">Event</MenuItem>
+                  <MenuItem value="COACH" disabled>Coach (Coming Soon)</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
-          </CardContent>
-        </Card>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>
+                  {targetType === 'COURT' ? 'Court' : 
+                   targetType === 'EVENT' ? 'Event' : 'Coach'}
+                </InputLabel>
+                <Select
+                  value={targetId}
+                  onChange={(e) => setTargetId(e.target.value)}
+                  disabled={loading || !isAuthenticated() || preFilledData.targetId}
+                  label={targetType === 'COURT' ? 'Court' : 
+                         targetType === 'EVENT' ? 'Event' : 'Coach'}
+                >
+                  <MenuItem value="">
+                    Select {targetType.toLowerCase()}
+                  </MenuItem>
+                  {availableTargets.map(target => (
+                    <MenuItem key={target.id} value={target.id}>
+                      {target.name || target.title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
       )}
       
       {/* 统计区域 - 只在有targetId时显示 */}

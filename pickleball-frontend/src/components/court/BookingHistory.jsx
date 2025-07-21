@@ -246,31 +246,31 @@ const BookingHistory = () => {
         console.log('Court ID from API:', booking.courtId);
         
         const normalizedBooking = {
-          id: booking.id || booking.bookingId, // 确保ID字段正确
-          bookingId: booking.id || booking.bookingId,
+        id: booking.id || booking.bookingId, // 确保ID字段正确
+        bookingId: booking.id || booking.bookingId,
           courtId: booking.courtId, // 直接从API获取
           courtName: booking.courtName || "AAA Pickleball Court",
           courtLocation: booking.location || "123 Sports Complex, Kuala Lumpur",
           slotDate: booking.date, // 使用API中的date字段
           startTime: booking.startTime, // 使用API中的startTime字段
           endTime: booking.endTime, // 使用API中的endTime字段
-          numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
-          totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
-          status: booking.bookingStatus || booking.status || "CONFIRMED",
-          purpose: booking.purpose || "Recreational",
-          numPaddles: booking.numPaddles || 0,
-          buyBallSet: booking.buyBallSet || false,
-          bookingDate: booking.bookingDate || booking.createdAt,
-          // 支付相关字段
-          paymentMethod: booking.payment?.paymentMethod || booking.paymentMethod || "Wallet",
-          paymentType: booking.payment?.paymentType || booking.paymentType,
-          paymentStatus: booking.payment?.status || booking.paymentStatus || "COMPLETED",
-          transactionId: booking.payment?.transactionId || booking.transactionId,
-          // 会员信息
-          memberId: booking.memberId || booking.member?.id,
-          // 多slot支持
-          bookingSlots: booking.bookingSlots || [],
-          durationHours: booking.durationHours || 1,
+        numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
+        totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
+        status: booking.bookingStatus || booking.status || "CONFIRMED",
+        purpose: booking.purpose || "Recreational",
+        numPaddles: booking.numPaddles || 0,
+        buyBallSet: booking.buyBallSet || false,
+        bookingDate: booking.bookingDate || booking.createdAt,
+        // 支付相关字段
+        paymentMethod: booking.payment?.paymentMethod || booking.paymentMethod || "Wallet",
+        paymentType: booking.payment?.paymentType || booking.paymentType,
+        paymentStatus: booking.payment?.status || booking.paymentStatus || "COMPLETED",
+        transactionId: booking.payment?.transactionId || booking.transactionId,
+        // 会员信息
+        memberId: booking.memberId || booking.member?.id,
+        // 多slot支持
+        bookingSlots: booking.bookingSlots || [],
+        durationHours: booking.durationHours || 1,
           // 评价状态
           hasReviewed: booking.hasReviewed || false,
         };
@@ -767,15 +767,15 @@ const BookingHistory = () => {
                           View Review
                         </ModernButton>
                       ) : (
-                        <ModernButton
-                          variant="outlined"
-                          color="primary"
-                          size="small"
-                          startIcon={<ReviewIcon />}
+                      <ModernButton
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                        startIcon={<ReviewIcon />}
                           onClick={() => handleLeaveReview(booking)}
-                        >
-                          Review
-                        </ModernButton>
+                      >
+                        Review
+                      </ModernButton>
                       )
                     )}
                     </Box>

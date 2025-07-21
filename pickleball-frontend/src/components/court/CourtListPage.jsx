@@ -271,12 +271,6 @@ const CourtListPage = () => {
         </>
       )}
 
-      {/* Footer */}
-      <Box sx={{ mt: 8, textAlign: 'center', color: 'text.secondary' }}>
-        <Typography variant="body2">
-          © {new Date().getFullYear()} Pickleball Pro. All rights reserved.
-        </Typography>
-      </Box>
     </Container>
   );
 };

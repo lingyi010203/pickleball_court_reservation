@@ -1,31 +1,59 @@
-body {
+/* Base Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  scroll-behavior: smooth;
+  background-color: #f9f9f9;
+  color: #333;
 }
 
-#root, .App {
+/* Dark mode (auto) */
+@media (prefers-color-scheme: dark) {
+  html, body {
+    background-color: #121212;
+    color: #eee;
+  }
+}
+
+/* App Layout */
+#root,
+.App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* Main content container */
 .content {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding: 1rem;
 }
 
-.MuiInputBase-root {
-  height: 50px;
+/* Footer Stickiness (Optional) */
+.footer {
+  margin-top: auto;
+  text-align: center;
+  padding: 1rem 0;
+  font-size: 0.875rem;
+  color: #666;
 }
 
+/* MUI Theme Overrides */
 .MuiInputLabel-root.Mui-focused {
   color: #615EF0 !important;
 }
@@ -38,12 +66,57 @@ body {
   color: #615EF0 !important;
 }
 
+/* Sticky Top Padding for Navbar */
 body {
-  padding-top: 70px; /* Default for desktop */
+  padding-top: 70px;
 }
 
 @media (max-width: 768px) {
   body {
-    padding-top: 56px; /* For mobile */
+    padding-top: 56px;
   }
+}
+
+/* Scrollbar Styling (optional) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+/* Utility Classes (Optional Helpers) */
+.text-center {
+  text-align: center;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.btn-primary {
+  background-color: #615EF0;
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: #4a47d3;
+}
+
+/* Accessibility */
+:focus {
+  outline: 2px dashed #615EF0;
+  outline-offset: 2px;
 }

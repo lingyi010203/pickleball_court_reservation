@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  Container, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Box, 
+import {
+  Container,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Box,
   Grid,
+  Paper,
   Divider
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -38,7 +39,7 @@ const BookingConfirmationPage = () => {
 
   const formatTime = (time) => {
     if (!time) return '';
-    return new Date(`1970-01-01T${time}:00`).toLocaleTimeString([], 
+    return new Date(`1970-01-01T${time}:00`).toLocaleTimeString([],
       { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -62,258 +63,210 @@ const BookingConfirmationPage = () => {
 
   return (
     <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Card sx={{ 
-        textAlign: 'center', 
-        p: 4,
-        borderRadius: '16px',
-        boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)'
-      }}>
-        <CheckCircleIcon sx={{ 
-          fontSize: 80, 
-          color: '#4caf50', 
-          mb: 2,
-          backgroundColor: '#e8f5e9',
-          borderRadius: '50%',
-          padding: '10px'
-        }} />
-        
-        <Typography variant="h4" gutterBottom sx={{ 
-          fontWeight: 'bold',
-          color: '#2e7d32',
-          mb: 2
-        }}>
+      <Card
+        sx={{
+          textAlign: 'center',
+          p: 4,
+          borderRadius: '16px',
+          boxShadow: '0 8px 24px rgba(149, 157, 165, 0.2)',
+        }}
+      >
+        <CheckCircleIcon
+          sx={{
+            fontSize: 80,
+            color: '#4caf50',
+            mb: 2,
+            backgroundColor: '#e8f5e9',
+            borderRadius: '50%',
+            padding: '10px',
+          }}
+        />
+  
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
+            fontWeight: 'bold',
+            color: '#2e7d32',
+            mb: 2,
+          }}
+        >
           Booking Confirmed!
         </Typography>
-        
+  
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
           Your booking at {booking.courtName} has been confirmed
         </Typography>
-        
-        <Box sx={{ 
-          border: '1px solid #e0e0e0',
-          borderRadius: '8px',
-          mb: 4,
-          textAlign: 'left',
-          backgroundColor: '#f9f9f9'
-        }}>
+  
+        <Box
+          sx={{
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            mb: 4,
+            textAlign: 'left',
+            backgroundColor: '#f9f9f9',
+          }}
+        >
           <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
               Booking Summary
             </Typography>
-            {/* 显示：人数、paddle、ball set 选择 */}
-            <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Number of Players:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2">{numPlayers}</Typography>
-              </Grid>
-            </Grid>
-            <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Paddles to Rent:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2">{numPaddles} (RM{PADDLE_PRICE} each)</Typography>
-              </Grid>
-            </Grid>
-            <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
-              <Grid item xs={8}>
-                <Typography variant="body2" color="text.secondary">
-                  Buy Ball Set (4 balls, RM{BALL_SET_PRICE})
-                </Typography>
-              </Grid>
-              <Grid item xs={4} textAlign="right">
-                <Typography variant="body2">{buyBallSet ? 'Yes' : 'No'}</Typography>
-              </Grid>
-            </Grid>
-            {/* 原有 summary ... */}
-            <Grid container spacing={2} sx={{ mb: 1 }}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Court:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {booking.courtName}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Location:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {booking.courtLocation}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Date:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {formatDate(booking.slotDate)}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Time:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary">
-                  Duration:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body2" fontWeight="medium">
-                  {booking.durationHours} hours
-                </Typography>
-              </Grid>
-            </Grid>
-            
-            <Divider sx={{ my: 2 }} />
-            
-            <Grid container>
-              <Grid item xs={6}>
-                <Typography variant="body1" fontWeight="bold">
-                  Total Amount:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body1" fontWeight="bold" color="#2e7d32">
-                  RM{total.toFixed(2)}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body1" fontWeight="bold">
-                  Payment Method:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body1" fontWeight="medium">
-                  {booking.paymentMethod === 'WALLET' ? 'Wallet' : 'Credit Card'}
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6}>
-                <Typography variant="body1" fontWeight="bold">
-                  Payment Status:
-                </Typography>
-              </Grid>
-              <Grid item xs={6} textAlign="right">
-                <Typography variant="body1" fontWeight="medium" 
-                  sx={{ 
-                    color: booking.paymentStatus === 'COMPLETED' ? '#2e7d32' : '#ff9800',
-                    fontWeight: 'bold'
-                  }}>
-                  {booking.paymentStatus}
-                </Typography>
-              </Grid>
-            </Grid>
-            
-            {/* Points Reward Section */}
+  
+            <Card variant="outlined" sx={{ mb: 2 }}>
+              <CardContent>
+                <SummaryRow label="Number of Players" value={numPlayers} />
+                <SummaryRow
+                  label="Paddles to Rent"
+                  value={`${numPaddles} (RM${PADDLE_PRICE} each)`}
+                />
+                <SummaryRow
+                  label={`Buy Ball Set (RM${BALL_SET_PRICE})`}
+                  value={buyBallSet ? 'Yes' : 'No'}
+                  isLast
+                />
+              </CardContent>
+            </Card>
+  
+            <Card variant="outlined" sx={{ mb: 2 }}>
+              <CardContent>
+                <SummaryRow label="Court" value={booking.courtName} bold />
+                <SummaryRow label="Location" value={booking.courtLocation} />
+                <SummaryRow label="Date" value={formatDate(booking.slotDate)} />
+                <SummaryRow
+                  label="Time"
+                  value={`${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`}
+                />
+                <SummaryRow
+                  label="Duration"
+                  value={`${booking.durationHours} hours`}
+                  isLast
+                />
+              </CardContent>
+            </Card>
+  
+            <Card variant="outlined" sx={{ mb: 2 }}>
+              <CardContent>
+                <SummaryRow
+                  label="Total Amount"
+                  value={`RM${total.toFixed(2)}`}
+                  bold
+                  color="#2e7d32"
+                />
+                <SummaryRow
+                  label="Payment Method"
+                  value={booking.paymentMethod === 'WALLET' ? 'Wallet' : 'Credit Card'}
+                />
+                <SummaryRow
+                  label="Payment Status"
+                  value={booking.paymentStatus}
+                  color={booking.paymentStatus === 'COMPLETED' ? '#2e7d32' : '#ff9800'}
+                  bold
+                  isLast
+                />
+              </CardContent>
+            </Card>
+  
             {booking.pointsEarned && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <Box sx={{ 
-                  p: 2, 
-                  backgroundColor: '#f3e5f5', 
+              <Paper
+                elevation={2}
+                sx={{
+                  p: 2,
+                  backgroundColor: '#f3e5f5',
+                  border: '1px solid #ce93d8',
                   borderRadius: '8px',
-                  border: '1px solid #9c27b0'
-                }}>
-                  <Typography variant="h6" gutterBottom sx={{ 
-                    fontWeight: 'bold', 
-                    color: '#9c27b0',
-                    textAlign: 'center'
-                  }}>
-                    🎉 Points Earned!
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Points Earned:
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6} textAlign="right">
-                      <Typography variant="body1" fontWeight="bold" color="#9c27b0">
-                        +{booking.pointsEarned} points
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Current Balance:
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6} textAlign="right">
-                      <Typography variant="body1" fontWeight="medium">
-                        {booking.currentPointBalance} points
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                    Earn 1 point for every RM1 spent!
-                  </Typography>
-                </Box>
-              </>
+                  mt: 2,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  color="#9c27b0"
+                  textAlign="center"
+                  gutterBottom
+                >
+                  🎉 Points Earned!
+                </Typography>
+  
+                <SummaryRow
+                  label="Points Earned"
+                  value={`+${booking.pointsEarned}`}
+                  bold
+                  color="#9c27b0"
+                />
+                <SummaryRow
+                  label="Current Balance"
+                  value={`${booking.currentPointBalance} points`}
+                  isLast
+                />
+  
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  textAlign="center"
+                  sx={{ mt: 1 }}
+                >
+                  Earn 1 point for every RM1 spent!
+                </Typography>
+              </Paper>
             )}
           </Box>
         </Box>
-        
+  
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             onClick={() => navigate('/profile/my-bookings')}
-            sx={{ 
+            sx={{
               px: 4,
               py: 1.5,
               borderColor: '#4caf50',
               color: '#4caf50',
               '&:hover': {
                 backgroundColor: '#e8f5e9',
-                borderColor: '#2e7d32'
-              }
+                borderColor: '#2e7d32',
+              },
             }}
           >
             View My Bookings
           </Button>
-          
-          <Button 
-            variant="contained" 
+  
+          <Button
+            variant="contained"
             onClick={() => navigate('/courts')}
-            sx={{ 
+            sx={{
               px: 4,
               py: 1.5,
               backgroundColor: '#ff6f00',
               '&:hover': {
-                backgroundColor: '#e65100'
-              }
+                backgroundColor: '#e65100',
+              },
             }}
           >
             Book Another Court
           </Button>
         </Box>
-      </Card>
-    </Container>
-  );
-};
+              </Card>
+      </Container>
+    );
+  };
+  
+const SummaryRow = ({ label, value, bold = false, color, isLast = false }) => (
+  <Grid container spacing={1} sx={{ mb: isLast ? 0 : 1 }}>
+    <Grid item xs={6}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+    </Grid>
+    <Grid item xs={6} textAlign="right">
+      <Typography
+        variant="body2"
+        fontWeight={bold ? 'bold' : 'normal'}
+        sx={{ color: color || 'inherit' }}
+      >
+        {value}
+      </Typography>
+    </Grid>
+  </Grid>
+);
 
 export default BookingConfirmationPage;
