@@ -1,11 +1,27 @@
 // src/components/court/CourtCard.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardMedia, CardContent, CardActions, Typography, Button, Chip, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { getCourtImagesPublic } from '../../service/CourtService';
 
 const CourtCard = ({ court }) => {
   const navigate = useNavigate();
-  
+  const [imageUrl, setImageUrl] = useState(null);
+
+  useEffect(() => {
+    if (court && court.id) {
+      getCourtImagesPublic(court.id)
+        .then(images => {
+          if (images && images.length > 0) {
+            setImageUrl(images[0].imagePath);
+          } else {
+            setImageUrl(null);
+          }
+        })
+        .catch(() => setImageUrl(null));
+    }
+  }, [court]);
+
   const handleViewDetails = () => {
     navigate(`/courts/${court.id}`);
   };
@@ -30,7 +46,7 @@ const CourtCard = ({ court }) => {
       <CardMedia
         component="img"
         height="180"
-        image={court.imageUrl || '/default-court.jpg'}
+        image={imageUrl || '/default-court.jpg'}
         alt={court.name}
         sx={{ 
           objectFit: 'cover',

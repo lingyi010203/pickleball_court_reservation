@@ -194,4 +194,11 @@ public class CourtController {
         List<CourtImage> images = courtImageRepository.findByCourtId(courtId);
         return ResponseEntity.ok(images);
     }
+
+    // 允许所有人访问的球场图片接口
+    @GetMapping("/public/{courtId}/images")
+    public ResponseEntity<?> getCourtImagesPublic(@PathVariable Integer courtId) {
+        List<CourtImage> images = courtImageRepository.findByCourtId(courtId);
+        return ResponseEntity.ok(images);
+    }
 }

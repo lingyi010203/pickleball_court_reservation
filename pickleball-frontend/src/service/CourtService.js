@@ -121,4 +121,10 @@ export const getCourtImages = async (courtId) => {
   return response.data;
 };
 
+export const getCourtImagesPublic = async (courtId) => {
+  const response = await api.get(`/api/admin/courts/public/${courtId}/images`);
+  return response.data;
+};
+
+
 export default CourtService;

@@ -38,4 +38,12 @@ public class UserAccount {
     public boolean isLocked() {
         return lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
     }
+
+    public String getProfileImage() {
+        return profileImage;
+    }
+
+    public void setProfileImage(String profileImage) {
+        this.profileImage = profileImage;
+    }
 }

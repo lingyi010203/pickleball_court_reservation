@@ -62,6 +62,10 @@ public class User {
         return (userAccount != null) ? userAccount.getProfileImage() : null;
     }
 
+    public Integer getId() {
+        return id;
+    }
+
     @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Message> sentMessages;
 
