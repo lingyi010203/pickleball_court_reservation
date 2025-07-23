@@ -99,8 +99,6 @@ function App() {
             </ProtectedRoute>
           } />
 
-
-
           {/* Feedback form page */}
           <Route path="feedback" element={
             <ProtectedRoute>

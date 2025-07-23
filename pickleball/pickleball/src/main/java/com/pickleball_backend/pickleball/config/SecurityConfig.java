@@ -66,7 +66,8 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
-
+                        // 允许公开访问球场图片
+                        .requestMatchers("/api/admin/courts/public/**").permitAll()
                         // Tier Management Endpoints
                         .requestMatchers(HttpMethod.POST, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/admin/*/vouchers").hasAuthority("ROLE_ADMIN")

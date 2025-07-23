@@ -458,7 +458,11 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         byte[] bytes;
         String ext;
         String contentType;
-        switch (request.getFormat().toLowerCase()) {
+        String format = request.getFormat();
+        if (format == null) {
+            format = "pdf";
+        }
+        switch (format.toLowerCase()) {
             case "excel":
                 bytes = generateExcelReport(bookings, filters);
                 ext = "xlsx";
@@ -475,7 +479,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 contentType = "application/pdf";
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported format: " + request.getFormat());
+                throw new IllegalArgumentException("Unsupported format: " + format);
         }
         String filename = "report." + ext;
         InputStreamResource resource = new InputStreamResource(new java.io.ByteArrayInputStream(bytes));

@@ -35,6 +35,8 @@ import axios from 'axios';
 import { Chart } from 'chart.js/auto';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import ReportGenerator from './ReportGenerator';
+
 dayjs.extend(relativeTime);
 
 const AdminDashboard = () => {
@@ -62,15 +64,6 @@ const AdminDashboard = () => {
     averageRatingChange: 0
   });
 
-  const [reportType, setReportType] = useState('bookings');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [exportFormat, setExportFormat] = useState('pdf');
-  const [filters, setFilters] = useState({
-    includeUsers: true,
-    includeBookings: true,
-    includeRevenue: true
-  });
 
   const [bookingTimeRange, setBookingTimeRange] = useState('7d');
   const [revenueTimeRange, setRevenueTimeRange] = useState('7d');
@@ -343,17 +336,17 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
-  const generateReport = async () => {
+  const generateReport = async (report) => {
     try {
       const token = UserService.getAdminToken();
       const res = await axios.post(
         'http://localhost:8081/api/admin/dashboard/generate-report',
         {
-          type: reportType,
-          startDate,
-          endDate,
-          format: exportFormat,
-          filters
+          type: report.type,
+          startDate: report.startDate,
+          endDate: report.endDate,
+          format: report.format,
+          filters: report.filters
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -363,20 +356,13 @@ const AdminDashboard = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `report.${exportFormat === 'excel' ? 'xlsx' : exportFormat}`);
+      link.setAttribute('download', `report.${report.format === 'excel' ? 'xlsx' : report.format}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (err) {
       alert('Failed to generate report');
     }
-  };
-
-  const handleFilterChange = (filter) => (event) => {
-    setFilters({
-      ...filters,
-      [filter]: event.target.checked
-    });
   };
 
   const usernameInitial = adminUsername.charAt(0).toUpperCase();
@@ -525,7 +511,7 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Manage Bookings" />
           </ListItem>
-          <ListItem sx={{ 
+          <ListItem sx={{
             borderRadius: 1,
             cursor: 'pointer',
             '&:hover': {
@@ -795,9 +781,9 @@ const AdminDashboard = () => {
                             <Box>
                               <Typography fontWeight="bold">
                                 {item.type === 'booking' ? 'New Booking' :
-                                 item.type === 'user' ? 'New User Registration' :
-                                 item.type === 'cancellation' ? 'Booking Cancellation' :
-                                 'New Review'}
+                                  item.type === 'user' ? 'New User Registration' :
+                                    item.type === 'cancellation' ? 'Booking Cancellation' :
+                                      'New Review'}
                               </Typography>
                               <Typography variant="body2">{item.user} {item.detail}</Typography>
                               <Typography variant="caption" color="text.secondary">
@@ -824,9 +810,9 @@ const AdminDashboard = () => {
                               <Box>
                                 <Typography fontWeight="bold">
                                   {item.type === 'booking' ? 'New Booking' :
-                                   item.type === 'user' ? 'New User Registration' :
-                                   item.type === 'cancellation' ? 'Booking Cancellation' :
-                                   'New Review'}
+                                    item.type === 'user' ? 'New User Registration' :
+                                      item.type === 'cancellation' ? 'Booking Cancellation' :
+                                        'New Review'}
                                 </Typography>
                                 <Typography variant="body2">{item.user} {item.detail}</Typography>
                                 <Typography variant="caption" color="text.secondary">
@@ -843,275 +829,8 @@ const AdminDashboard = () => {
                 </Paper>
               </Grid>
 
-              {/* Report Section - 美化版 */}
-              {/* 在您的 AdminDashboard.jsx 文件中替换现有的报告生成部分 */}
               <Grid item xs={12} md={8}>
-                <Paper sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
-                  background: 'linear-gradient(145deg, #ffffff, #f8f9ff)',
-                  border: '1px solid rgba(100, 110, 230, 0.15)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&:before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: '100%',
-                    height: '4px',
-                    background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                  }
-                }}>
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    mb: 2.5,
-                    position: 'relative'
-                  }}>
-                    <BarChartIcon sx={{
-                      color: '#667eea',
-                      fontSize: 28,
-                      mr: 1.5,
-                      bgcolor: 'rgba(102, 126, 234, 0.1)',
-                      p: 1,
-                      borderRadius: 1
-                    }} />
-                    <Typography variant="h6" sx={{
-                      fontWeight: 700,
-                      color: '#2d3748'
-                    }}>
-                      Generate Reports
-                    </Typography>
-                  </Box>
-
-                  <Grid container spacing={2.5}>
-                    <Grid item xs={12}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel sx={{ fontWeight: 500 }}>Report Type</InputLabel>
-                        <Select
-                          value={reportType}
-                          onChange={(e) => setReportType(e.target.value)}
-                          label="Report Type"
-                          sx={{
-                            '& .MuiSelect-select': {
-                              py: 1.2,
-                              fontWeight: 500
-                            }
-                          }}
-                        >
-                          <MenuItem value="bookings" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <EventNoteIcon sx={{ color: '#667eea', mr: 1.5 }} />
-                              <span>Booking Report</span>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="users" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <PeopleIcon sx={{ color: '#667eea', mr: 1.5 }} />
-                              <span>User Report</span>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="revenue" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <AttachMoneyIcon sx={{ color: '#667eea', mr: 1.5 }} />
-                              <span>Revenue Report</span>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="analytics" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <AnalyticsIcon sx={{ color: '#667eea', mr: 1.5 }} />
-                              <span>Analytics Report</span>
-                            </Box>
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-
-                    <Grid item xs={12}>
-
-                      <Grid container spacing={1.5}>
-                        <Grid item xs={5}>
-                          <TextField
-                            fullWidth
-                            type="date"
-                            size="small"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            InputProps={{
-                              sx: {
-                                py: 1.2,
-                                fontWeight: 500
-                              }
-                            }}
-                            label="Start Date"
-                          />
-                        </Grid>
-                        <Grid item xs={2} sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <ArrowForwardIcon sx={{ color: '#a0aec0' }} />
-                        </Grid>
-                        <Grid item xs={5}>
-                          <TextField
-                            fullWidth
-                            type="date"
-                            size="small"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            InputProps={{
-                              sx: {
-                                py: 1.2,
-                                fontWeight: 500
-                              }
-                            }}
-                            label="End Date"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel sx={{ fontWeight: 500 }}>Export Format</InputLabel>
-                        <Select
-                          value={exportFormat}
-                          onChange={(e) => setExportFormat(e.target.value)}
-                          label="Export Format"
-                          sx={{
-                            '& .MuiSelect-select': {
-                              py: 1.2,
-                              fontWeight: 500
-                            }
-                          }}
-                        >
-                          <MenuItem value="pdf" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <PictureAsPdfIcon sx={{ color: '#e53e3e', mr: 1.5 }} />
-                              <span>PDF Document</span>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="excel" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <TableChartIcon sx={{ color: '#38a169', mr: 1.5 }} />
-                              <span>Excel Spreadsheet</span>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="csv" sx={{ py: 1.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <GridOnIcon sx={{ color: '#3182ce', mr: 1.5 }} />
-                              <span>CSV File</span>
-                            </Box>
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle1" sx={{
-                        fontWeight: 600,
-                        mb: 1.5,
-                        color: '#4a5568'
-                      }}>
-                        Report Options
-                      </Typography>
-                      <Paper sx={{
-                        p: 1.5,
-                        borderRadius: 1.5,
-                        bgcolor: '#f8f9ff',
-                        border: '1px solid rgba(102, 126, 234, 0.15)'
-                      }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={filters.includeUsers}
-                              onChange={handleFilterChange('includeUsers')}
-                              size="small"
-                              color="primary"
-                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
-                            />
-                          }
-                          label={
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              Include User Details
-                            </Typography>
-                          }
-                          sx={{ mb: 1.2 }}
-                        />
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={filters.includeBookings}
-                              onChange={handleFilterChange('includeBookings')}
-                              size="small"
-                              color="primary"
-                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
-                            />
-                          }
-                          label={
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              Include Booking Details
-                            </Typography>
-                          }
-                          sx={{ mb: 1.2 }}
-                        />
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={filters.includeRevenue}
-                              onChange={handleFilterChange('includeRevenue')}
-                              size="small"
-                              color="primary"
-                              sx={{ '& .MuiSvgIcon-root': { fontSize: 20 } }}
-                            />
-                          }
-                          label={
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              Include Revenue Data
-                            </Typography>
-                          }
-                        />
-                      </Paper>
-                    </Grid>
-
-                    <Grid item xs={12} sx={{ mt: 1 }}>
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        onClick={generateReport}
-                        startIcon={<FileDownloadIcon />}
-                        sx={{
-                          py: 1.5,
-                          fontWeight: 600,
-                          fontSize: '0.95rem',
-                          letterSpacing: '0.5px',
-                          borderRadius: 1.5,
-                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                          background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                          '&:hover': {
-                            boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
-                            background: 'linear-gradient(90deg, #5c6bc0, #6a45a2)'
-                          }
-                        }}
-                      >
-                        Generate Report
-                      </Button>
-                      <Typography variant="caption" sx={{
-                        display: 'block',
-                        textAlign: 'center',
-                        mt: 1.5,
-                        color: '#718096'
-                      }}>
-                        Reports are generated and will be downloaded soon.
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <ReportGenerator onGenerateReport={generateReport} companyInfo={{ name: 'Pickleball Club' }} />
               </Grid>
 
             </Grid>

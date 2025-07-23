@@ -46,13 +46,15 @@ const CourtCard = ({ court }) => {
       <CardMedia
         component="img"
         height="180"
-        image={imageUrl || '/default-court.jpg'}
-        alt={court.name}
-        sx={{ 
+        sx={{
+          width: '100%',
+          height: '180px',
           objectFit: 'cover',
           borderTopLeftRadius: '16px',
           borderTopRightRadius: '16px'
         }}
+        image={imageUrl || '/default-court.jpg'}
+        alt={court.name}
       />
       <CardContent sx={{ flexGrow: 1, px: 2.5, py: 2 }}>
         <Typography gutterBottom variant="h6" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>

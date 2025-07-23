@@ -5,8 +5,23 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0c3ded6e-9290-4208-bf86-f2c4e1aa2374" name="Changes" comment="court image uploaded">
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/entity/User.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/EmailService.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/EmailService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Footer.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Footer.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Navbar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Navbar.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtCard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtCard.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtPage.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/constants.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/constants.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/27f52b55-41f8-44ab-8cbd-d47a2d962392.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/3bedbb3e-77b8-45c1-a279-ca51afc830f4.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/42577260-bd0b-44a7-8097-644a091cdd65.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/44e4c2d9-6af3-4e8e-891e-243ca977a050.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/64cbf76d-b713-4162-a776-ae84d86f359c.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/707d3281-1df4-4f17-81d3-af34fc08b7b3.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/c1f8869b-6300-42d6-ab40-86c3c117f9b6.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/de49cf46-3614-464a-a8a8-016bc33cad84.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/uploads/e47f9a47-17e7-42f3-af77-3c967cc53f3d.jpg" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -40,6 +55,9 @@
     &quot;accountId&quot;: &quot;9f485822-26e4-4c6b-9a46-fe7d37d48793&quot;
   }
 }</component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 3
 }</component>
@@ -217,7 +235,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753128005836</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="court image uploaded">
+      <option name="closed" value="true" />
+      <created>1753128125937</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1753128125937</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

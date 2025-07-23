@@ -7,6 +7,7 @@ import {
 import { FilterList, Search, SportsTennis } from '@mui/icons-material';
 import CourtService from '../../service/CourtService';
 import CourtCard from './CourtCard';
+import Footer from '../common/Footer';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 
@@ -245,12 +246,7 @@ const CourtPage = () => {
         </Grid>
       )}
 
-      {/* Footer */}
-      <Box sx={{ mt: 8, textAlign: 'center', color: 'text.secondary' }}>
-        <Typography variant="body2">
-          © {new Date().getFullYear()} Pickleball Pro. All rights reserved.
-        </Typography>
-      </Box>
+      <Footer />
     </Container>
   );
 };
