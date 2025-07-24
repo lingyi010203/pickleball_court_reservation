@@ -14,7 +14,8 @@ import {
   CalendarMonth as CalendarIcon,
   EmojiEvents as EventsIcon,
   Group as GroupIcon,
-  AccountBalanceWallet as WalletIcon
+  AccountBalanceWallet as WalletIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 
 const QUICK_ACTIONS = [
@@ -49,6 +50,14 @@ const QUICK_ACTIONS = [
     description: 'Add funds to your account', 
     path: '/wallet/topup',
     color: 'secondary'
+  },
+  {
+    id: 'court-availability',
+    Icon: SearchIcon,
+    title: 'Find Available Courts',
+    description: 'Quickly search all available courts by date and time',
+    path: '/court-availability',
+    color: 'info'
   },
 ];
 

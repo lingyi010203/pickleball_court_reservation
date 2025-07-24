@@ -89,6 +89,25 @@ const CourtService = {
       console.error('[CourtService] Error in getBookedCourts:', error);
       throw error;
     }
+  },
+
+  /**
+   * Fetch available courts for a given date and time range.
+   * @param {string} date - yyyy-MM-dd
+   * @param {string} startTime - HH:mm
+   * @param {string} endTime - HH:mm
+   * @returns {Promise<Array>} List of available court objects
+   */
+  getAvailableCourts: async (date, startTime, endTime) => {
+    try {
+      const response = await api.get('/api/member/courts/available', {
+        params: { date, startTime, endTime }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[CourtService] Error in getAvailableCourts:', error);
+      throw error;
+    }
   }
 };
 
