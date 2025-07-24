@@ -1,170 +1,54 @@
 import React, { useState } from 'react';
-import PropTypes from 'prop-types';
 import {
-  Paper,
-  Typography,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  FormControlLabel,
-  Checkbox,
-  Button,
-  Box,
-  CircularProgress,
-  Alert,
-  Collapse,
-  IconButton,
-  Divider
+  Paper, Typography, Grid, FormControl, InputLabel, Select, MenuItem, TextField,
+  FormControlLabel, Checkbox, Button, Box, CircularProgress, IconButton, Divider
 } from '@mui/material';
 import {
-  BarChart as BarChartIcon,
-  EventNote as EventNoteIcon,
-  People as PeopleIcon,
-  AttachMoney as AttachMoneyIcon,
-  Analytics as AnalyticsIcon,
-  ArrowForward as ArrowForwardIcon,
-  PictureAsPdf as PictureAsPdfIcon,
-  TableChart as TableChartIcon,
-  GridOn as GridOnIcon,
-  FileDownload as FileDownloadIcon,
-  Close as CloseIcon,
-  Business as BusinessIcon,
-  DateRange as DateRangeIcon,
-  PieChart as PieChartIcon,
-  Visibility as VisibilityIcon,
-  InsertChart as InsertChartIcon
+  BarChart as BarChartIcon, EventNote as EventNoteIcon, People as PeopleIcon,
+  AttachMoney as AttachMoneyIcon, Analytics as AnalyticsIcon, ArrowForward as ArrowForwardIcon,
+  PictureAsPdf as PictureAsPdfIcon, TableChart as TableChartIcon, GridOn as GridOnIcon,
+  FileDownload as FileDownloadIcon, Close as CloseIcon, Business as BusinessIcon,
+  PieChart as PieChartIcon, Visibility as VisibilityIcon, InsertChart as InsertChartIcon
 } from '@mui/icons-material';
 
-// Enhanced Report Configuration
+// 配置
 const REPORT_CONFIG = {
   types: [
-    { 
-      value: 'executive', 
-      label: 'Executive Summary', 
-      icon: <AnalyticsIcon />,
-      description: 'High-level KPIs and trends for management'
-    },
-    { 
-      value: 'operational', 
-      label: 'Operational Report', 
-      icon: <EventNoteIcon />,
-      description: 'Detailed day-to-day operations analysis'
-    },
-    { 
-      value: 'financial', 
-      label: 'Financial Report', 
-      icon: <AttachMoneyIcon />,
-      description: 'Revenue, costs, and profitability metrics'
-    }
+    { value: 'executive', label: 'Executive Summary', icon: <AnalyticsIcon />, description: 'High-level KPIs and trends for management' },
+    { value: 'operational', label: 'Operational Report', icon: <EventNoteIcon />, description: 'Detailed day-to-day operations analysis' },
+    { value: 'financial', label: 'Financial Report', icon: <AttachMoneyIcon />, description: 'Revenue, costs, and profitability metrics' }
   ],
   formats: [
-    { 
-      value: 'pdf', 
-      label: 'PDF (Formal)', 
-      icon: <PictureAsPdfIcon />, 
-      color: '#e53e3e',
-      features: ['Formatted layout', 'Print-ready']
-    },
-    { 
-      value: 'excel', 
-      label: 'Excel (Analytical)', 
-      icon: <TableChartIcon />, 
-      color: '#38a169',
-      features: ['Raw data', 'Pivot tables']
-    },
-    { 
-      value: 'powerpoint', 
-      label: 'PowerPoint (Presentation)', 
-      icon: <TableChartIcon />, 
-      color: '#d97706',
-      features: ['Slide deck', 'Visualizations']
-    }
-  ],
-  dataOptions: [
-    { 
-      name: 'includeTrends', 
-      label: 'Trend Analysis', 
-      description: 'Year-over-year and period comparisons'
-    },
-    { 
-      name: 'includeForecasts', 
-      label: 'Forecast Projections', 
-      description: 'Predictive models and future estimates'
-    },
-    { 
-      name: 'includeBenchmarks', 
-      label: 'Industry Benchmarks', 
-      description: 'Comparison against industry standards'
-    }
+    { value: 'pdf', label: 'PDF (Formal)', icon: <PictureAsPdfIcon />, color: '#e53e3e' },
+    { value: 'excel', label: 'Excel (Analytical)', icon: <TableChartIcon />, color: '#38a169' },
+    { value: 'csv', label: 'CSV (Raw Data)', icon: <GridOnIcon />, color: '#3182ce' }
   ],
   visualizationOptions: [
-    {
-      value: 'bar',
-      label: 'Bar Charts',
-      icon: <BarChartIcon />
-    },
-    {
-      value: 'line',
-      label: 'Line Charts',
-      icon: <InsertChartIcon />
-    },
-    {
-      value: 'pie',
-      label: 'Pie Charts',
-      icon: <PieChartIcon />
-    }
+    { value: 'bar', label: 'Bar Charts', icon: <BarChartIcon /> },
+    { value: 'line', label: 'Line Charts', icon: <InsertChartIcon /> },
+    { value: 'pie', label: 'Pie Charts', icon: <PieChartIcon /> }
   ],
   sections: [
-    {
-      name: 'executiveSummary',
-      label: 'Executive Summary',
-      default: true
-    },
-    {
-      name: 'financialHighlights',
-      label: 'Financial Highlights',
-      default: true
-    },
-    {
-      name: 'departmentBreakdown',
-      label: 'Department Breakdown',
-      default: false
-    },
-    {
-      name: 'recommendations',
-      label: 'Recommendations',
-      default: true
-    }
+    { name: 'executiveSummary', label: 'Executive Summary', default: true },
+    { name: 'financialHighlights', label: 'Financial Highlights', default: true },
+    { name: 'departmentBreakdown', label: 'Department Breakdown', default: false },
+    { name: 'recommendations', label: 'Recommendations', default: true }
   ],
   formattingOptions: [
-    {
-      name: 'includeHeaderFooter',
-      label: 'Header & Footer',
-      description: 'Include company header and page numbers'
-    },
-    {
-      name: 'useBrandColors',
-      label: 'Brand Colors',
-      description: 'Use company colors in charts and tables'
-    },
-    {
-      name: 'includeAppendix',
-      label: 'Data Appendix',
-      description: 'Include raw data tables in appendix'
-    }
+    { name: 'includeHeaderFooter', label: 'Header & Footer', description: 'Include company header and page numbers' },
+    { name: 'useBrandColors', label: 'Brand Colors', description: 'Use company colors in charts and tables' },
+    { name: 'includeAppendix', label: 'Data Appendix', description: 'Include raw data tables in appendix' }
+  ],
+  dataOptions: [
+    { name: 'includeTrends', label: 'Trend Analysis', description: 'Year-over-year and period comparisons' },
+    { name: 'includeForecasts', label: 'Forecast Projections', description: 'Predictive models and future estimates' },
+    { name: 'includeBenchmarks', label: 'Industry Benchmarks', description: 'Comparison against industry standards' }
   ]
 };
 
 const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
-  // State management
+  // State
   const [reportType, setReportType] = useState('executive');
-  const [dateRange, setDateRange] = useState({
-    start: getDefaultDate(-1), // Default: 1 month ago
-    end: getDefaultDate(0)     // Default: today
-  });
   const [exportFormat, setExportFormat] = useState('pdf');
   const [visualizationType, setVisualizationType] = useState('bar');
   const [dataOptions, setDataOptions] = useState({
@@ -187,53 +71,9 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   const [error, setError] = useState(null);
   const [reportTitle, setReportTitle] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // Helper functions
-  function getDefaultDate(monthOffset) {
-    const date = new Date();
-    date.setMonth(date.getMonth() + monthOffset);
-    return date.toISOString().split('T')[0];
-  }
-
-  const handleOptionChange = (option) => (event) => {
-    setDataOptions(prev => ({
-      ...prev,
-      [option]: event.target.checked
-    }));
-  };
-
-  const generateReportData = () => {
-    const selectedSections = Object.keys(reportSections)
-      .filter(key => reportSections[key])
-      .map(key => REPORT_CONFIG.sections.find(s => s.name === key).label);
-
-    return {
-      metadata: {
-        title: reportTitle || `${REPORT_CONFIG.types.find(t => t.value === reportType).label} - ${(companyInfo?.name || 'Company')}`,
-        company: companyInfo,
-        generatedAt: new Date().toISOString(),
-        period: dateRange,
-        sections: selectedSections,
-        visualization: visualizationType,
-        formatting: formattingOptions
-      },
-      configuration: {
-        type: reportType,
-        format: exportFormat || 'pdf',
-        dataOptions
-      },
-      content: {
-        summary: generateExecutiveSummary(),
-        financials: generateFinancialData(),
-        trends: dataOptions.includeTrends ? generateTrendAnalysis() : null,
-        forecasts: dataOptions.includeForecasts ? generateForecasts() : null,
-        benchmarks: dataOptions.includeBenchmarks ? generateBenchmarks() : null,
-        recommendations: generateRecommendations()
-      }
-    };
-  };
-
-  // Data generation functions
+  // 内容生成函数
   const generateExecutiveSummary = () => ({
     keyMetrics: [
       { name: 'Revenue Growth', value: '12%', change: '+3% YoY' },
@@ -309,20 +149,50 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
     'Consider strategic partnerships to enter new markets'
   ];
 
+  // 生成报表数据
+  const generateReportData = () => {
+    const selectedSections = Object.keys(reportSections)
+      .filter(key => reportSections[key])
+      .map(key => REPORT_CONFIG.sections.find(s => s.name === key).label);
+
+    return {
+      metadata: {
+        title: reportTitle || `${REPORT_CONFIG.types.find(t => t.value === reportType).label} - ${(companyInfo?.name || 'Company')}`,
+        company: companyInfo,
+        generatedAt: new Date().toISOString(),
+        period: dateRange,
+        sections: selectedSections,
+        visualization: visualizationType,
+        formatting: formattingOptions
+      },
+      configuration: {
+        type: reportType,
+        format: exportFormat || 'pdf',
+        dataOptions
+      },
+      content: {
+        summary: generateExecutiveSummary(),
+        financials: generateFinancialData(),
+        trends: dataOptions.includeTrends ? generateTrendAnalysis() : null,
+        forecasts: dataOptions.includeForecasts ? generateForecasts() : null,
+        benchmarks: dataOptions.includeBenchmarks ? generateBenchmarks() : null,
+        recommendations: generateRecommendations()
+      }
+    };
+  };
+
+  // 生成报表
   const handleGenerate = async () => {
     if (!dateRange.start || !dateRange.end) {
       setError('Please select a valid date range');
       return;
     }
-    
     if (new Date(dateRange.start) > new Date(dateRange.end)) {
       setError('End date must be after start date');
       return;
     }
-
     setIsGenerating(true);
     setError(null);
-
     try {
       const reportData = generateReportData();
       await onGenerateReport(reportData);
@@ -334,34 +204,32 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
     }
   };
 
+  // 预览
   const handlePreview = () => {
     if (!dateRange.start || !dateRange.end) {
       setError('Please select a valid date range');
       return;
     }
-    
     if (new Date(dateRange.start) > new Date(dateRange.end)) {
       setError('End date must be after start date');
       return;
     }
-    
     setShowPreview(true);
   };
 
+  // 渲染
   return (
-    <Paper sx={styles.paper}>
-      <Box sx={styles.header}>
-        <BusinessIcon sx={styles.icon} />
-        <Typography variant="h5" sx={styles.title}>
+    <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
+        <BusinessIcon sx={{ color: '#667eea', fontSize: 28, mr: 1.5 }} />
+        <Typography variant="h6" sx={{ fontWeight: 700, color: '#2d3748' }}>
           Advanced Report Generator
         </Typography>
       </Box>
-
       <Divider sx={{ my: 2 }} />
 
-      {/* Report Configuration Section */}
       <Grid container spacing={3}>
-        {/* Report Title */}
+        {/* 标题 */}
         <Grid item xs={12}>
           <TextField
             fullWidth
@@ -371,8 +239,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             placeholder={`${companyInfo?.name || 'Company'} - ${new Date().getFullYear()} Report`}
           />
         </Grid>
-
-        {/* Report Type and Format */}
+        {/* 类型/格式/可视化 */}
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Report Type</InputLabel>
@@ -385,19 +252,13 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 <MenuItem key={type.value} value={type.value}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <Box sx={{ mr: 2 }}>{type.icon}</Box>
-                    <Box>
-                      <Typography>{type.label}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {type.description}
-                      </Typography>
-                    </Box>
+                    <Typography>{type.label}</Typography>
                   </Box>
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
-
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Export Format</InputLabel>
@@ -406,23 +267,17 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
               onChange={(e) => setExportFormat(e.target.value)}
               label="Export Format"
             >
-              {REPORT_CONFIG.formats.map((format) => (
-                <MenuItem key={format.value} value={format.value}>
+              {REPORT_CONFIG.formats.map((fmt) => (
+                <MenuItem key={fmt.value} value={fmt.value}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ mr: 2, color: format.color }}>{format.icon}</Box>
-                    <Box>
-                      <Typography>{format.label}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {format.features.join(', ')}
-                      </Typography>
-                    </Box>
+                    <Box sx={{ mr: 2 }}>{fmt.icon}</Box>
+                    <Typography>{fmt.label}</Typography>
                   </Box>
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
-
         <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel>Visualization Style</InputLabel>
@@ -442,55 +297,40 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             </Select>
           </FormControl>
         </Grid>
-
-        {/* Date Range */}
+        {/* 日期范围 */}
         <Grid item xs={12}>
-          <Typography variant="subtitle1" gutterBottom>
-            <DateRangeIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-            Report Period
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={5}>
+          <Grid container spacing={1.5}>
+            <Grid item xs={5}>
               <TextField
                 fullWidth
                 type="date"
-                label="Start Date"
+                size="small"
                 value={dateRange.start}
-                onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                 InputLabelProps={{ shrink: true }}
+                label="Start Date"
               />
             </Grid>
-            <Grid item xs={12} sm={5}>
+            <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowForwardIcon sx={{ color: '#a0aec0' }} />
+            </Grid>
+            <Grid item xs={5}>
               <TextField
                 fullWidth
                 type="date"
-                label="End Date"
+                size="small"
                 value={dateRange.end}
-                onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                 InputLabelProps={{ shrink: true }}
+                label="End Date"
               />
-            </Grid>
-            <Grid item xs={12} sm={2}>
-              <Button 
-                fullWidth 
-                variant="outlined"
-                onClick={() => {
-                  setDateRange({
-                    start: getDefaultDate(-1),
-                    end: getDefaultDate(0)
-                  });
-                }}
-              >
-                Last Month
-              </Button>
             </Grid>
           </Grid>
         </Grid>
-
-        {/* Data Options */}
+        {/* 数据选项 */}
         <Grid item xs={12}>
-          <Typography variant="subtitle1" gutterBottom>
-            Data Processing Options
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: '#4a5568' }}>
+            Data Options
           </Typography>
           <Paper sx={{ p: 2 }}>
             <Grid container spacing={2}>
@@ -500,7 +340,10 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                     control={
                       <Checkbox
                         checked={dataOptions[option.name]}
-                        onChange={handleOptionChange(option.name)}
+                        onChange={(e) => setDataOptions({
+                          ...dataOptions,
+                          [option.name]: e.target.checked
+                        })}
                         color="primary"
                       />
                     }
@@ -518,8 +361,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             </Grid>
           </Paper>
         </Grid>
-
-        {/* Report Sections */}
+        {/* 报表部分 */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" gutterBottom>
             Report Sections
@@ -546,8 +388,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             </Grid>
           </Paper>
         </Grid>
-
-        {/* Formatting Options */}
+        {/* 格式化选项 */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" gutterBottom>
             Formatting Options
@@ -581,29 +422,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             </Grid>
           </Paper>
         </Grid>
-
-        {/* Error Display */}
-        <Grid item xs={12}>
-          <Collapse in={!!error}>
-            <Alert
-              severity="error"
-              action={
-                <IconButton
-                  aria-label="close"
-                  color="inherit"
-                  size="small"
-                  onClick={() => setError(null)}
-                >
-                  <CloseIcon fontSize="inherit" />
-                </IconButton>
-              }
-            >
-              {error}
-            </Alert>
-          </Collapse>
-        </Grid>
-
-        {/* Preview Section */}
+        {/* 预览 */}
         {showPreview && (
           <Grid item xs={12}>
             <Paper sx={{ p: 3, mt: 2 }}>
@@ -613,17 +432,13 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   <CloseIcon />
                 </IconButton>
               </Box>
-              
               <Typography variant="h5" gutterBottom>
                 {reportTitle || `${REPORT_CONFIG.types.find(t => t.value === reportType).label}`}
               </Typography>
-              
               <Typography variant="subtitle1" gutterBottom>
-                {companyInfo?.name || 'Company'} | {new Date(dateRange.start).toLocaleDateString()} - {new Date(dateRange.end).toLocaleDateString()}
+                {companyInfo?.name || 'Company'} | {dateRange.start && dateRange.end ? `${new Date(dateRange.start).toLocaleDateString()} - ${new Date(dateRange.end).toLocaleDateString()}` : ''}
               </Typography>
-              
               <Divider sx={{ my: 2 }} />
-              
               {reportSections.executiveSummary && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" gutterBottom>Executive Summary</Typography>
@@ -645,7 +460,6 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   </Grid>
                 </Box>
               )}
-              
               {reportSections.financialHighlights && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" gutterBottom>Financial Highlights</Typography>
@@ -657,7 +471,6 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   </Box>
                 </Box>
               )}
-              
               {dataOptions.includeTrends && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" gutterBottom>Trend Analysis</Typography>
@@ -669,7 +482,6 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   </Box>
                 </Box>
               )}
-              
               {reportSections.recommendations && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" gutterBottom>Recommendations</Typography>
@@ -683,8 +495,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             </Paper>
           </Grid>
         )}
-
-        {/* Action Buttons */}
+        {/* 操作按钮 */}
         <Grid item xs={6}>
           <Button
             fullWidth
@@ -706,49 +517,29 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             startIcon={isGenerating ? <CircularProgress size={24} /> : <FileDownloadIcon />}
             sx={{
               py: 2,
-              fontWeight: 'bold',
-              fontSize: '1rem'
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              letterSpacing: '0.5px',
+              borderRadius: 1.5,
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+              background: 'linear-gradient(90deg, #667eea, #764ba2)',
+              '&:hover': {
+                boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                background: 'linear-gradient(90deg, #5c6bc0, #6a45a2)'
+              }
             }}
           >
             {isGenerating ? 'Generating...' : 'Generate Report'}
           </Button>
         </Grid>
       </Grid>
+      {error && (
+        <Typography color="error" sx={{ mt: 2 }}>
+          {error}
+        </Typography>
+      )}
     </Paper>
   );
-};
-
-// Styles
-const styles = {
-  paper: {
-    p: 4,
-    borderRadius: 2,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-    background: 'white'
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    mb: 2
-  },
-  icon: {
-    color: '#1976d2',
-    fontSize: 32,
-    mr: 2
-  },
-  title: {
-    fontWeight: 700,
-    color: '#2d3748'
-  }
-};
-
-ReportGenerator.propTypes = {
-  onGenerateReport: PropTypes.func.isRequired,
-  companyInfo: PropTypes.shape({
-    name: PropTypes.string.isRequired,
-    logo: PropTypes.string,
-    address: PropTypes.string
-  }).isRequired
 };
 
 export default ReportGenerator;

@@ -192,6 +192,22 @@ public class MemberController {
         }
     }
 
+    @GetMapping("/courts/available")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> getAvailableCourts(
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam("startTime") String startTime,
+            @RequestParam("endTime") String endTime) {
+        if (date == null || startTime == null || endTime == null || startTime.isBlank() || endTime.isBlank()) {
+            return ResponseEntity.badRequest().body("Missing required parameters");
+        }
+        try {
+            return ResponseEntity.ok(courtService.findAvailableCourts(date, startTime, endTime));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error finding available courts: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/wallet/init")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> initializeWallet() {

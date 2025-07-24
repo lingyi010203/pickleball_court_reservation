@@ -13,4 +13,5 @@ public interface CourtService {
     void updateCourtPricing(Integer id, CourtPricingDto pricingDto);
     List<Court> getAllCourts();
     Court getCourtByIdForMember(Integer id);
+    List<Court> findAvailableCourts(java.time.LocalDate date, String startTime, String endTime);
 }

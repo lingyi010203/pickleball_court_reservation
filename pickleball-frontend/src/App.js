@@ -35,6 +35,7 @@ import AdminManageUsers from './components/admin/AdminManageUsers';
 import AdminManageTiers from './components/admin/AdminManageTiers';
 import AdminManageCourts from './components/admin/AdminManageCourts';
 import AdminManageBookings from './components/admin/AdminManageBookings';
+import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -189,6 +190,13 @@ function App() {
               <HelpdeskPage />
             </ProtectedRoute>
           } />
+
+          {/* Court availability by time */}
+          <Route path="court-availability" element={
+            <ProtectedRoute>
+              <CourtAvailabilityPage />
+            </ProtectedRoute>
+          } />
         </Route>
 
       {/* Admin routes with nested structure */}
@@ -202,6 +210,7 @@ function App() {
         <Route path="tiers" element={<AdminManageTiers />} />
         <Route path="courts" element={<AdminManageCourts />} />
         <Route path="bookings" element={<AdminManageBookings />} />
+        <Route path="settings" element={<div />} />
       </Route>
 
         {/* 404 fallback */}

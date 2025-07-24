@@ -1,11 +1,12 @@
 package com.pickleball_backend.pickleball.service;
 
+import com.pickleball_backend.pickleball.dto.AdminProfileDto;
 import com.pickleball_backend.pickleball.dto.AdminRegistrationDTO;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.*;
 import com.pickleball_backend.pickleball.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException; // Changed import
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,9 +36,7 @@ public class AdminServiceImpl implements AdminService {
         if (!"ACTIVE".equals(account.getStatus())) {
             return null;
         }
-
-
-        return adminRepository.findByUsername(username).orElse(null);
+        return adminRepository.findByUser_UserAccount_Username(username).orElse(null);
     }
 
     @Override
@@ -46,7 +45,6 @@ public class AdminServiceImpl implements AdminService {
         if (userAccountRepository.findByUsername(registrationDTO.getUsername()).isPresent()) {
             throw new RuntimeException("Username already exists");
         }
-
         // Create and save user first
         User user = new User();
         user.setName(registrationDTO.getName());
@@ -79,10 +77,34 @@ public class AdminServiceImpl implements AdminService {
         if (admin == null) {
             throw new BadCredentialsException("Invalid credentials");
         }
-
         return jwtService.generateToken(
                 username,
                 "ROLE_ADMIN" // Fixed authority
         );
+    }
+
+    // --- Profile methods ---
+    @Override
+    public AdminProfileDto getProfileByUsername(String username) {
+        Admin admin = adminRepository.findByUser_UserAccount_Username(username)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        AdminProfileDto dto = new AdminProfileDto();
+        dto.setName(admin.getUser().getName());
+        dto.setEmail(admin.getUser().getEmail()); // 改为真实邮箱
+        dto.setPhone(admin.getUser().getPhone());
+        // dto.setAvatar(admin.getAvatar()); // 如果有头像字段
+        return dto;
+    }
+
+    @Override
+    public AdminProfileDto updateProfile(String username, AdminProfileDto dto) {
+        Admin admin = adminRepository.findByUser_UserAccount_Username(username)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        admin.getUser().setName(dto.getName());
+        admin.getUser().setPhone(dto.getPhone());
+        admin.getUser().setEmail(dto.getEmail()); // 允许更新邮箱
+        // 邮箱一般不允许改，如需允许可加逻辑
+        adminRepository.save(admin);
+        return getProfileByUsername(username);
     }
 }

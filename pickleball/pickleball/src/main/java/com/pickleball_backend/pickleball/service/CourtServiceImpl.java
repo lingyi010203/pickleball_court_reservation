@@ -337,6 +337,36 @@ public class CourtServiceImpl implements CourtService {
         return courtRepository.findActiveCourts(); // Use the new query
     }
 
+    @Override
+    public List<Court> findAvailableCourts(LocalDate date, String startTime, String endTime) {
+        // 1. 获取所有未归档球场
+        List<Court> allCourts = courtRepository.findActiveCourts();
+
+        // 2. 解析时间
+        java.time.LocalTime start = java.time.LocalTime.parse(startTime);
+        java.time.LocalTime end = java.time.LocalTime.parse(endTime);
+
+        // 3. 查询该日期、时间段有冲突的预订（只查有效状态）
+        List<Booking> bookings = bookingRepository.findAll();
+        Set<Integer> bookedCourtIds = new HashSet<>();
+        for (Booking booking : bookings) {
+            if (booking.getStatus() != null && booking.getStatus().equalsIgnoreCase("CANCELLED")) continue;
+            if (booking.getBookingSlots() == null) continue;
+            for (BookingSlot bs : booking.getBookingSlots()) {
+                Slot slot = bs.getSlot();
+                if (slot == null) continue;
+                if (!date.equals(slot.getDate())) continue;
+                // 判断时间段是否有重叠
+                if (!(end.isBefore(slot.getStartTime()) || start.isAfter(slot.getEndTime()))) {
+                    bookedCourtIds.add(slot.getCourtId());
+                }
+            }
+        }
+        // 4. 过滤出未被预订的球场
+        return allCourts.stream()
+                .filter(court -> !bookedCourtIds.contains(court.getId()))
+                .collect(Collectors.toList());
+    }
 
     @Override
     public Court getCourtByIdForMember(Integer id) {

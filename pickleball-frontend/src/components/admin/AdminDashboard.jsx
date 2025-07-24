@@ -7,7 +7,7 @@ import {
   MenuItem, InputLabel, FormControl,
   Checkbox, FormControlLabel, TextField,
   IconButton, Backdrop, CircularProgress,
-  Dialog, DialogTitle, DialogContent
+  Dialog, DialogTitle, DialogContent, Rating
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -36,6 +36,7 @@ import { Chart } from 'chart.js/auto';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import ReportGenerator from './ReportGenerator';
+import AdminSettings from './AdminSettings';
 
 dayjs.extend(relativeTime);
 
@@ -376,6 +377,7 @@ const AdminDashboard = () => {
     if (location.pathname.startsWith('/admin/courts')) return 'courts';
     if (location.pathname.startsWith('/admin/dashboard')) return 'dashboard';
     if (location.pathname.startsWith('/admin/bookings')) return 'bookings';
+    if (location.pathname.startsWith('/admin/settings')) return 'settings';
     return 'dashboard';
   };
   // 页面主 loading 状态
@@ -511,13 +513,17 @@ const AdminDashboard = () => {
             </ListItemIcon>
             <ListItemText primary="Manage Bookings" />
           </ListItem>
-          <ListItem sx={{
-            borderRadius: 1,
-            cursor: 'pointer',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)'
-            }
-          }}>
+          <ListItem
+            onClick={() => navigate('/admin/settings')}
+            sx={{
+              borderRadius: 1,
+              cursor: 'pointer',
+              bgcolor: getCurrentTab() === 'settings' ? '#f0f2f5' : 'inherit',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
+            }}
+          >
             <ListItemIcon sx={{ minWidth: 40 }}>
               <SettingsIcon />
             </ListItemIcon>
@@ -673,7 +679,7 @@ const AdminDashboard = () => {
                   <Box>
                     <Typography variant="body2" color="text.secondary">Revenue</Typography>
                     <Typography variant="h5" fontWeight="bold">
-                      ${dashboardData.totalRevenue.toLocaleString()}
+                      RM {dashboardData.totalRevenue.toLocaleString()}
                     </Typography>
                     <Typography
                       variant="caption"
@@ -698,16 +704,35 @@ const AdminDashboard = () => {
                   </Avatar>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Average Feedback Rating</Typography>
-                    <Typography variant="h6" gutterBottom>
-                      {dashboardData.averageRating ? dashboardData.averageRating.toFixed(2) : '-'}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ color: dashboardData.averageRatingChange >= 0 ? 'success.main' : 'error.main' }}
-                    >
-                      {dashboardData.averageRatingChange >= 0 ? '+' : ''}
-                      {dashboardData.averageRatingChange.toFixed(1)} from last month
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Rating
+                        value={dashboardData.averageRating || 0}
+                        precision={0.1}
+                        readOnly
+                        size="small"
+                      />
+                      <Typography variant="h6" fontWeight="bold" sx={{ ml: 1 }}>
+                        {dashboardData.averageRating ? dashboardData.averageRating.toFixed(2) : '-'} / 5
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                      {dashboardData.averageRatingChange !== 0 && (
+                        <span style={{
+                          color: dashboardData.averageRatingChange > 0 ? '#43a047' : '#e53935',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}>
+                          {dashboardData.averageRatingChange > 0 ? '▲' : '▼'}
+                          {Math.abs(dashboardData.averageRatingChange).toFixed(1)}
+                        </span>
+                      )}
+                      <Typography variant="caption" color="text.secondary">
+                        {dashboardData.averageRatingChange !== 0
+                          ? 'from last month'
+                          : 'No change from last month'}
+                      </Typography>
+                    </Box>
                   </Box>
                 </Paper>
               </Grid>
@@ -835,6 +860,8 @@ const AdminDashboard = () => {
 
             </Grid>
           </>
+        ) : getCurrentTab() === 'settings' && location.pathname === '/admin/settings' ? (
+          <AdminSettings />
         ) : null}
         <Outlet />
       </Box>

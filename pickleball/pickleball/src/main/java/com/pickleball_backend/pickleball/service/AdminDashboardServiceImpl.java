@@ -474,7 +474,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 contentType = "text/csv";
                 break;
             case "pdf":
-                bytes = generatePdfReport(bookings, filters);
+                bytes = generateComplexPdfReport(request);
                 ext = "pdf";
                 contentType = "application/pdf";
                 break;
@@ -589,6 +589,126 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             }
         }
         document.add(table);
+        document.close();
+        return out.toByteArray();
+    }
+
+    // 复杂PDF报表生成
+    private byte[] generateComplexPdfReport(ReportRequestDto request) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document();
+        PdfWriter.getInstance(document, out);
+        document.open();
+
+        boolean hasContent = false;
+
+        // 1. 标题、公司信息
+        Map<String, Object> metadata = request.getMetadata();
+        if (metadata != null) {
+            document.add(new Paragraph((String) metadata.getOrDefault("title", "Report"), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18)));
+            hasContent = true;
+            Map<String, Object> company = (Map<String, Object>) metadata.getOrDefault("company", java.util.Collections.emptyMap());
+            document.add(new Paragraph((String) company.getOrDefault("name", ""), FontFactory.getFont(FontFactory.HELVETICA, 12)));
+            document.add(new Paragraph("Period: " + metadata.getOrDefault("period", ""), FontFactory.getFont(FontFactory.HELVETICA, 10)));
+            document.add(new Paragraph("Generated at: " + metadata.getOrDefault("generatedAt", ""), FontFactory.getFont(FontFactory.HELVETICA, 10)));
+            document.add(new Paragraph(" "));
+        }
+
+        java.util.List<String> sections = metadata != null ? (java.util.List<String>) metadata.getOrDefault("sections", java.util.List.of()) : java.util.List.of();
+        Map<String, Object> content = request.getContent();
+
+        if (sections == null || sections.isEmpty()) {
+            document.add(new Paragraph("No report sections selected."));
+            hasContent = true;
+        } else {
+            for (String section : sections) {
+                document.add(new Paragraph(section, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16)));
+                hasContent = true;
+                document.add(new Paragraph(" "));
+                if (content != null) {
+                    switch (section) {
+                        case "Executive Summary":
+                            Map<String, Object> summary = (Map<String, Object>) content.get("summary");
+                            if (summary != null) {
+                                java.util.List<Map<String, Object>> keyMetrics = (java.util.List<Map<String, Object>>) summary.get("keyMetrics");
+                                if (keyMetrics != null && !keyMetrics.isEmpty()) {
+                                    PdfPTable table = new PdfPTable(3);
+                                    table.addCell("Metric");
+                                    table.addCell("Value");
+                                    table.addCell("Change");
+                                    for (Map<String, Object> metric : keyMetrics) {
+                                        table.addCell((String) metric.getOrDefault("name", ""));
+                                        table.addCell((String) metric.getOrDefault("value", ""));
+                                        table.addCell((String) metric.getOrDefault("change", ""));
+                                    }
+                                    document.add(table);
+                                }
+                                java.util.List<String> highlights = (java.util.List<String>) summary.get("highlights");
+                                if (highlights != null && !highlights.isEmpty()) {
+                                    document.add(new Paragraph("Highlights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    for (String h : highlights) {
+                                        document.add(new Paragraph("- " + h));
+                                    }
+                                }
+                            }
+                            break;
+                        case "Financial Highlights":
+                            Map<String, Object> financials = (Map<String, Object>) content.get("financials");
+                            if (financials != null) {
+                                java.util.List<Map<String, Object>> incomeStatement = (java.util.List<Map<String, Object>>) financials.get("incomeStatement");
+                                if (incomeStatement != null && !incomeStatement.isEmpty()) {
+                                    document.add(new Paragraph("Income Statement:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    PdfPTable table = new PdfPTable(3);
+                                    table.addCell("Category");
+                                    table.addCell("Current");
+                                    table.addCell("Previous");
+                                    for (Map<String, Object> row : incomeStatement) {
+                                        table.addCell((String) row.getOrDefault("category", ""));
+                                        table.addCell(String.valueOf(row.getOrDefault("current", "")));
+                                        table.addCell(String.valueOf(row.getOrDefault("previous", "")));
+                                    }
+                                    document.add(table);
+                                }
+                                java.util.List<Map<String, Object>> balanceSheet = (java.util.List<Map<String, Object>>) financials.get("balanceSheet");
+                                if (balanceSheet != null && !balanceSheet.isEmpty()) {
+                                    document.add(new Paragraph("Balance Sheet:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    PdfPTable table = new PdfPTable(2);
+                                    table.addCell("Category");
+                                    table.addCell("Value");
+                                    for (Map<String, Object> row : balanceSheet) {
+                                        table.addCell((String) row.getOrDefault("category", ""));
+                                        table.addCell(String.valueOf(row.getOrDefault("value", "")));
+                                    }
+                                    document.add(table);
+                                }
+                            }
+                            break;
+                        case "Trend Analysis":
+                            Map<String, Object> trends = (Map<String, Object>) content.get("trends");
+                            if (trends != null) {
+                                document.add(new Paragraph("Trend data available (visualization not implemented in PDF)", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                            }
+                            break;
+                        case "Recommendations":
+                            java.util.List<String> recs = (java.util.List<String>) content.get("recommendations");
+                            if (recs != null && !recs.isEmpty()) {
+                                document.add(new Paragraph("Recommendations:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                for (String rec : recs) {
+                                    document.add(new Paragraph("- " + rec));
+                                }
+                            }
+                            break;
+                        // 其它 section ...
+                    }
+                }
+                document.add(new Paragraph(" "));
+            }
+        }
+
+        if (!hasContent) {
+            document.add(new Paragraph("No data available for the selected report parameters."));
+        }
+
         document.close();
         return out.toByteArray();
     }

@@ -12,6 +12,8 @@ public interface AdminRepository extends JpaRepository<Admin, Integer> {
             "JOIN u.userAccount ua " +  // Now we can join through User
             "WHERE ua.username = :username")
     Optional<Admin> findByUsername(@Param("username") String username);
+       Optional<Admin> findByUser_UserAccount_Username(String username);
+
 
     @Query("SELECT a FROM Admin a WHERE a.user.id = :userId")
     Optional<Admin> findByUserId(@Param("userId") Integer userId);
