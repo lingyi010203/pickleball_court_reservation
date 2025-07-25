@@ -56,7 +56,7 @@ const Footer = () => {
         }
       }}
     >
-      <Container maxWidth="lg">
+      <Container maxWidth={false} sx={{ maxWidth: '1200px', width: '100%', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
         {/* 主要内容区域 */}
         <Box sx={{ py: 6 }}>
           <Grid container spacing={4}>
@@ -82,7 +82,7 @@ const Footer = () => {
                       WebkitTextFillColor: 'transparent'
                     }}
                   >
-                    Pickleball Pro
+                    Picklefy
                   </Typography>
                 </Box>
                 <Typography 
@@ -310,7 +310,7 @@ const Footer = () => {
               textAlign: { xs: 'center', sm: 'left' }
             }}
           >
-            &copy; {new Date().getFullYear()} Pickleball Pro. All rights reserved.
+            &copy; {new Date().getFullYear()} Picklefy. All rights reserved.
           </Typography>
           
           <Box 

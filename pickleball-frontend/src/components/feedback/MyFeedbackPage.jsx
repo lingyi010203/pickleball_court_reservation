@@ -1,16 +1,56 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Container,
+  Typography,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  useTheme,
+  alpha,
+  Card,
+  CardContent,
+  Grid,
+  Chip,
+  Button,
+  Avatar,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Divider
+} from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../service/api';
 import StarRating from './StarRating';
 import CourtService from '../../service/CourtService';
+import ProfileHeader from '../profile/ProfileHeader';
+import ProfileNavigation from '../profile/ProfileNavigation';
+import axios from 'axios';
+import UserService from '../../service/UserService';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import StarIcon from '@mui/icons-material/Star';
+import CloseIcon from '@mui/icons-material/Close';
 
 const MyFeedbackPage = () => {
+  const theme = useTheme();
   const { currentUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [userData, setUserData] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
     targetType: '',
@@ -29,13 +69,30 @@ const MyFeedbackPage = () => {
   const [deletedFeedback, setDeletedFeedback] = useState(null);
   const [feedbackErrorDialog, setFeedbackErrorDialog] = useState({ open: false, message: '' });
 
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = UserService.getToken();
+        if (!token) return;
+        const profileResponse = await axios.get('http://localhost:8081/api/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUserData(profileResponse.data);
+      } catch (err) {
+        console.error('Failed to load user data:', err);
+      }
+    };
+    fetchUserData();
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated()) return;
 
     const fetchFeedback = async () => {
       try {
         setLoading(true);
-          const response = await api.get('/feedback/user');
+        const response = await api.get('/feedback/user');
         setFeedbackList(response.data);
       } catch (err) {
         setError('Failed to load your feedback');
@@ -152,7 +209,6 @@ const MyFeedbackPage = () => {
         message: editMode ? 'Review updated successfully!' : 'Review submitted successfully!' 
       });
     } catch (err) {
-      // Always show error dialog with backend message if available
       let msg = 'Failed to submit feedback. Please try again.';
       if (err.response && err.response.data) {
         if (typeof err.response.data === 'string') {
@@ -182,11 +238,9 @@ const MyFeedbackPage = () => {
       await api.delete(`/feedback/${deleteId}`);
       setDeleteDialogOpen(false);
       setDeleteId(null);
-      // Refresh feedback list
       const response = await api.get('/feedback/user');
       setFeedbackList(response.data);
       
-      // Show success message with option to review again
       setFeedbackErrorDialog({ 
         open: true, 
         message: 'Review deleted successfully! You can now leave a new review for this booking.' 
@@ -204,114 +258,6 @@ const MyFeedbackPage = () => {
     setDeletedFeedback(null);
   };
 
-  const styles = {
-    container: {
-      maxWidth: '1400px',
-      margin: '0 auto',
-      padding: '20px',
-      fontFamily: 'Arial, sans-serif',
-      minHeight: '100vh',
-      boxSizing: 'border-box'
-    },
-    header: {
-      background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
-      padding: '40px',
-      borderRadius: '20px',
-      textAlign: 'center',
-      color: 'white',
-      marginBottom: '30px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-    },
-    headerTitle: {
-      fontSize: '2.5rem',
-      marginBottom: '10px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '15px'
-    },
-    statsGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-      gap: '20px',
-      marginBottom: '30px'
-    },
-    statCard: {
-      background: 'white',
-      padding: '30px',
-      borderRadius: '15px',
-      textAlign: 'center',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-      transition: 'transform 0.3s ease'
-    },
-    statNumber: {
-      fontSize: '3rem',
-      fontWeight: 'bold',
-      marginBottom: '10px'
-    },
-    card: {
-      background: 'white',
-      borderRadius: '15px',
-      padding: '25px',
-      marginBottom: '20px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-      position: 'relative',
-      wordWrap: 'break-word',
-      overflowWrap: 'break-word'
-    },
-    cardHeader: {
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '15px',
-      marginBottom: '15px'
-    },
-    avatar: {
-      width: '50px',
-      height: '50px',
-      borderRadius: '50%',
-      background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: 'white',
-      fontWeight: 'bold',
-      flexShrink: 0
-    },
-    cardInfo: {
-      flex: 1,
-      minWidth: 0 // 防止flex项目溢出
-    },
-    cardTitle: {
-      fontSize: '1.2rem',
-      fontWeight: 'bold',
-      marginBottom: '5px',
-      color: '#333',
-      wordBreak: 'break-word'
-    },
-    cardMeta: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      marginBottom: '10px',
-      fontSize: '0.9rem',
-      color: '#666',
-      flexWrap: 'wrap'
-    },
-    chip: {
-      background: '#e3f2fd',
-      color: '#1976d2',
-      padding: '4px 12px',
-      borderRadius: '20px',
-      fontSize: '0.8rem',
-      fontWeight: '500'
-    },
-    emptyState: {
-      textAlign: 'center',
-      padding: '60px 20px',
-      color: '#666'
-    }
-  };
-
   const calculateAverageRating = (items) => {
     if (items.length === 0) return 0;
     const sum = items.reduce((acc, item) => acc + (item.rating || 0), 0);
@@ -323,7 +269,7 @@ const MyFeedbackPage = () => {
   };
 
   const isFormChanged = () => {
-    if (!editMode || !editingId) return true; // 新建模式总是可以提交
+    if (!editMode || !editingId) return true;
     
     const originalFeedback = feedbackList.find(f => f.id === editingId);
     if (!originalFeedback) return true;
@@ -335,511 +281,490 @@ const MyFeedbackPage = () => {
     );
   };
 
+  const handleCloseSnackbar = () => { setError(''); setSuccess(''); };
+
   if (!isAuthenticated()) {
     return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.headerTitle}>📝 My Feedback</h1>
-          <p>You need to log in to view your feedback.</p>
-        </div>
-        <div style={styles.emptyState}>
-          <a href="/login">Go to Login</a>
-        </div>
-      </div>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Typography variant="h6" color="text.secondary">
+          You need to log in to view your feedback.
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
+      </Box>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.headerTitle}>📝 My Feedback</h1>
-        <p>See your submitted feedback and ratings</p>
-      </div>
+    <Box sx={{ minHeight: '100vh', py: 1, backgroundColor: theme.palette.background.default }}>
+      <Container maxWidth={false} sx={{ maxWidth: '1200px', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
+        <Box sx={{ display: 'flex', gap: { xs: 2, lg: 3 }, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' }, width: '100%' }}>
+          {/* 左侧栏 */}
+          <Box sx={{ width: { xs: '100%', lg: '260px' }, flexShrink: 0, position: { lg: 'sticky' }, top: { lg: 20 }, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 2.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, position: 'relative' }}>
+              <ProfileHeader profile={userData} />
+            </Box>
+            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 1.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+              <ProfileNavigation />
+            </Box>
+          </Box>
+          
+          {/* 右侧内容区 */}
+          <Box sx={{ flex: 1, minWidth: 0, width: { xs: '100%', lg: 'calc(100% - 260px - 24px)' }, overflow: 'hidden' }}>
+            <Snackbar open={!!error || !!success} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+              <Alert severity={error ? 'error' : 'success'} onClose={handleCloseSnackbar} sx={{ width: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(10px)', background: alpha(theme.palette.background.paper, 0.9) }}>{error || success}</Alert>
+            </Snackbar>
+            
+            {/* 主内容卡片 */}
+            <Card sx={{ 
+              borderRadius: 3, 
+              boxShadow: '0 8px 32px rgba(0,0,0,0.08)', 
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              overflow: 'hidden',
+              background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
+            }}>
+              <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+                {/* 页面标题 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                  <RateReviewIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+                  <Typography variant="h4" fontWeight="bold">
+                    My Feedback
+                  </Typography>
+                </Box>
 
-      {/* Statistics */}
-      <div style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <div style={{...styles.statNumber, color: '#1976d2'}}>
-            {feedbackList.length}
-          </div>
-          <div>Total Feedback</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={{...styles.statNumber, color: '#ff9800'}}>
-            {calculateAverageRating(feedbackList)} ⭐
-          </div>
-          <div>Average Rating</div>
-        </div>
-      </div>
+                {/* 统计卡片 */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      borderRadius: 3,
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`
+                    }}>
+                      <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                        <RateReviewIcon sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 1 }} />
+                        <Typography variant="h3" fontWeight="bold" color={theme.palette.primary.main}>
+                          {feedbackList.length}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary">
+                          Total Feedback
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      borderRadius: 3,
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`
+                    }}>
+                      <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                        <StarIcon sx={{ fontSize: 48, color: theme.palette.warning.main, mb: 1 }} />
+                        <Typography variant="h3" fontWeight="bold" color={theme.palette.warning.main}>
+                          {calculateAverageRating(feedbackList)}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary">
+                          Average Rating
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
 
-      {/* Quick Review Again Button */}
-      {deletedFeedback && (
-        <div style={{
-          background: 'linear-gradient(135deg, #e8f5e8, #f0f8f0)',
-          border: '2px solid #4caf50',
-          borderRadius: '12px',
-          padding: '20px',
-          marginBottom: '20px',
-          textAlign: 'center'
-        }}>
-          <h3 style={{ color: '#2e7d32', marginBottom: '10px' }}>
-            ✨ Ready to review again?
-          </h3>
-          <p style={{ color: '#388e3c', marginBottom: '15px' }}>
-            You just deleted a review for {deletedFeedback.targetName}. You can now leave a new review!
-          </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button
-              onClick={() => {
-                setDeletedFeedback(null);
-                navigate('/profile/my-bookings');
-              }}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#4caf50',
-                color: 'white',
-                fontWeight: 'bold',
-                fontSize: 14,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-              onMouseLeave={(e) => e.target.style.opacity = '1'}
-            >
-              Leave New Review
-            </button>
-            <button
-              onClick={() => setDeletedFeedback(null)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: '2px solid #4caf50',
-                background: 'white',
-                color: '#4caf50',
-                fontWeight: 'bold',
-                fontSize: 14,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = '#4caf50';
-                e.target.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'white';
-                e.target.style.color = '#4caf50';
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Feedback List */}
-      {error && (
-        <div style={{ color: '#d32f2f', marginBottom: '20px', textAlign: 'center' }}>{error}</div>
-      )}
-      {loading ? (
-        <div style={styles.emptyState}>Loading...</div>
-      ) : feedbackList.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={{ fontSize: '80px', marginBottom: '20px', opacity: 0.3 }}>💬</div>
-          <p>You haven't submitted any feedback yet.</p>
-          <p>Be the first to share your thoughts!</p>
-        </div>
-      ) : (
-        feedbackList.map(item => (
-          <div key={item.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div style={styles.avatar}>{item.userName ? item.userName.charAt(0) : '?'}</div>
-              <div style={styles.cardInfo}>
-                <div style={styles.cardTitle}>{item.targetName || 'Untitled'}</div>
-                <div style={styles.cardMeta}>
-                  <span>{item.targetType}</span>
-                  <span>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
-                  <span style={styles.chip}>{item.rating}★</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                  <StarRating rating={item.rating} />
-                  <span>({item.rating}/5)</span>
-                </div>
-                <div style={{ color: '#666', lineHeight: '1.6' }}>{item.review}</div>
-                {item.tags && item.tags.length > 0 && (
-                  <div style={{ margin: '8px 0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {item.tags.map(tag => (
-                      <span key={tag} style={{
-                        background: '#e3f2fd',
-                        color: '#1976d2',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.9rem'
-                      }}>{tag}</span>
-                    ))}
-                  </div>
-                )}
-                {/* Edit status indicator */}
-                {editMode && editingId === item.id && (
-                  <div style={{
-                    background: 'linear-gradient(135deg, #e8f5e8, #f0f8f0)',
-                    border: '2px solid #4caf50',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    margin: '8px 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    color: '#2e7d32',
-                    fontWeight: '500'
+                {/* 删除后提示 */}
+                {deletedFeedback && (
+                  <Card sx={{ 
+                    mb: 3,
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
+                    border: `2px solid ${theme.palette.success.main}`
                   }}>
-                    ✏️ Currently editing this review
-                  </div>
+                    <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                      <Typography variant="h6" fontWeight="bold" color={theme.palette.success.main} sx={{ mb: 1 }}>
+                        ✨ Ready to review again?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        You just deleted a review for {deletedFeedback.targetName}. You can now leave a new review!
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          onClick={() => {
+                            setDeletedFeedback(null);
+                            navigate('/profile/my-bookings');
+                          }}
+                        >
+                          Leave New Review
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="success"
+                          onClick={() => setDeletedFeedback(null)}
+                        >
+                          Dismiss
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
                 )}
-                {/* Edit button only for own feedback */}
-                {currentUser && item.userUsername === currentUser.username && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: 10 }}>
-                    <button
-                      style={{ 
-                        padding: '8px 16px', 
-                        borderRadius: 8, 
-                        border: '2px solid #1976d2', 
-                        background: 'white', 
-                        color: '#1976d2', 
-                        cursor: 'pointer', 
-                        fontSize: 14,
-                        fontWeight: '500',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = '#1976d2';
-                        e.target.style.color = 'white';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'white';
-                        e.target.style.color = '#1976d2';
-                      }}
-                      onClick={() => handleOpenDialog(item)}
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      style={{ 
-                        padding: '8px 16px', 
-                        borderRadius: 8, 
-                        border: '2px solid #d32f2f', 
-                        background: 'white', 
-                        color: '#d32f2f', 
-                        cursor: 'pointer', 
-                        fontSize: 14,
-                        fontWeight: '500',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = '#d32f2f';
-                        e.target.style.color = 'white';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'white';
-                        e.target.style.color = '#d32f2f';
-                      }}
-                      onClick={() => handleDeleteClick(item)}
-                    >
-                      🗑️ Delete
-                    </button>
-                  </div>
+
+                {/* Feedback List */}
+                {feedbackList.length === 0 ? (
+                  <Card sx={{ 
+                    borderRadius: 3,
+                    background: alpha(theme.palette.grey[50], 0.5),
+                    border: `2px dashed ${alpha(theme.palette.divider, 0.3)}`
+                  }}>
+                    <CardContent sx={{ p: 6, textAlign: 'center' }}>
+                      <Typography variant="h1" sx={{ fontSize: 80, mb: 2, opacity: 0.3 }}>💬</Typography>
+                      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                        No feedback yet
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Be the first to share your thoughts!
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {feedbackList.map(item => (
+                      <Card key={item.id} sx={{ 
+                        borderRadius: 3,
+                        boxShadow: theme.shadows[1],
+                        transition: 'box-shadow 0.2s',
+                        '&:hover': { boxShadow: theme.shadows[3] }
+                      }}>
+                        <CardContent sx={{ p: 3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+                            <Avatar sx={{ 
+                              bgcolor: theme.palette.primary.main,
+                              width: 50,
+                              height: 50
+                            }}>
+                              {item.userName ? item.userName.charAt(0).toUpperCase() : '?'}
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                {item.targetName || 'Untitled'}
+                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                                <Chip 
+                                  label={item.targetType} 
+                                  size="small" 
+                                  color="primary" 
+                                  variant="outlined"
+                                />
+                                <Typography variant="body2" color="text.secondary">
+                                  {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <StarRating rating={item.rating} />
+                                  <Typography variant="body2" color="text.secondary">
+                                    ({item.rating}/5)
+                                  </Typography>
+                                </Box>
+                              </Box>
+                              <Typography variant="body1" sx={{ lineHeight: 1.6, mb: 2 }}>
+                                {item.review}
+                              </Typography>
+                              {item.tags && item.tags.length > 0 && (
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                                  {item.tags.map(tag => (
+                                    <Chip 
+                                      key={tag} 
+                                      label={tag} 
+                                      size="small" 
+                                      color="primary" 
+                                      variant="outlined"
+                                    />
+                                  ))}
+                                </Box>
+                              )}
+                              {/* Edit status indicator */}
+                              {editMode && editingId === item.id && (
+                                <Chip
+                                  label="Currently editing this review"
+                                  color="success"
+                                  icon={<EditIcon />}
+                                  sx={{ mb: 2 }}
+                                />
+                              )}
+                              {/* Action buttons */}
+                              {currentUser && item.userUsername === currentUser.username && (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<EditIcon />}
+                                    onClick={() => handleOpenDialog(item)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    color="error"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => handleDeleteClick(item)}
+                                  >
+                                    Delete
+                                  </Button>
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
                 )}
-              </div>
-            </div>
-          </div>
-        ))
-      )}
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      </Container>
 
       {/* Floating Action Button */}
-      <button 
-        style={{
+      <Box
+        sx={{
           position: 'fixed',
-          bottom: '30px',
-          right: '30px',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
-          border: 'none',
-          color: 'white',
-          fontSize: '32px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          bottom: 30,
+          right: 30,
           zIndex: 1000
         }}
-        onClick={handleOpenDialog}
-        title="Add Feedback"
       >
-        ➕
-      </button>
+        <Button
+          variant="contained"
+          sx={{
+            borderRadius: '50%',
+            width: 60,
+            height: 60,
+            minWidth: 60,
+            boxShadow: theme.shadows[8]
+          }}
+          onClick={() => handleOpenDialog()}
+        >
+          <AddIcon />
+        </Button>
+      </Box>
 
-      {/* Modal Form */}
-      {openDialog && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
-        }}>
-          <form onSubmit={handleSubmit} style={{
-            background: 'white', borderRadius: '20px', padding: '30px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflowY: 'auto'
-          }}>
-            <h2 style={{ marginBottom: '20px' }}>{editMode ? 'Edit Feedback' : 'Add New Feedback'}</h2>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Target Type</label>
-              <select name="targetType" value={formData.targetType} onChange={handleFormChange} required style={{ width: '100%', padding: 12, borderRadius: 10, border: '2px solid #e0e0e0' }}>
-                <option value="">Select Type</option>
-                <option value="COURT">Court</option>
-                <option value="EVENT">Event</option>
-                <option value="COACH">Coach</option>
-              </select>
-            </div>
+      {/* Feedback Form Dialog */}
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6" fontWeight="bold">
+              {editMode ? 'Edit Feedback' : 'Add New Feedback'}
+            </Typography>
+            <IconButton onClick={handleCloseDialog}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 3 }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <FormControl fullWidth>
+              <InputLabel>Target Type</InputLabel>
+              <Select
+                name="targetType"
+                value={formData.targetType}
+                onChange={handleFormChange}
+                label="Target Type"
+                required
+              >
+                <MenuItem value="">Select Type</MenuItem>
+                <MenuItem value="COURT">Court</MenuItem>
+                <MenuItem value="EVENT">Event</MenuItem>
+                <MenuItem value="COACH">Coach</MenuItem>
+              </Select>
+            </FormControl>
+
             {formData.targetType === 'COURT' && (
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Court</label>
-                <select name="targetId" value={formData.targetId} onChange={handleFormChange} required style={{ width: '100%', padding: 12, borderRadius: 10, border: '2px solid #e0e0e0' }}>
-                  <option value="">Select Court</option>
-                  {courtOptions.map(court => (
-                    <option key={court.id} value={court.id}>{court.name} ({court.location})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {formData.targetType === 'EVENT' && (
-              <div style={{ marginBottom: '20px', color: '#d32f2f' }}>
-                <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Event</label>
-                <div>Event selection not available yet.</div>
-              </div>
-            )}
-            {formData.targetType === 'COACH' && (
-              <div style={{ marginBottom: '20px', color: '#d32f2f' }}>
-                <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Coach</label>
-                <div>Coach selection not available yet.</div>
-              </div>
-            )}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Rating</label>
-              <StarRating rating={formData.rating} interactive onRatingChange={r => setFormData(f => ({ ...f, rating: r }))} />
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Review</label>
-              <textarea name="review" value={formData.review} onChange={handleFormChange} required style={{ width: '100%', padding: 12, borderRadius: 10, border: '2px solid #e0e0e0', minHeight: 80 }} />
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontWeight: 500, display: 'block', marginBottom: 8 }}>Tags (optional)</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                {formData.tags.map(tag => (
-                  <span key={tag} style={{ background: '#e3f2fd', color: '#1976d2', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {tag}
-                    <button type="button" onClick={() => handleRemoveTag(tag)} style={{ background: 'none', border: 'none', color: '#1976d2', marginLeft: 4, cursor: 'pointer', fontWeight: 'bold' }}>×</button>
-                  </span>
-                ))}
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={handleTagInputChange}
-                  onKeyDown={handleTagInputKeyDown}
-                  placeholder="Type and press Enter"
-                  style={{ border: 'none', outline: 'none', minWidth: 80 }}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', marginTop: '30px' }}>
-              <button 
-                type="button" 
-                onClick={handleCloseDialog} 
-                style={{ 
-                  padding: '12px 24px', 
-                  border: 'none', 
-                  borderRadius: '10px', 
-                  background: '#f5f5f5', 
-                  color: '#666', 
-                  fontSize: 16,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
-                onMouseLeave={(e) => e.target.style.background = '#f5f5f5'}
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                disabled={submitting || !isFormValid() || (editMode && !isFormChanged())}
-                style={{ 
-                  padding: '12px 24px', 
-                  border: 'none', 
-                  borderRadius: '10px', 
-                  background: submitting || !isFormValid() || (editMode && !isFormChanged()) ? '#e0e0e0' : 'linear-gradient(135deg, #1976d2, #42a5f5)', 
-                  color: submitting || !isFormValid() || (editMode && !isFormChanged()) ? '#757575' : 'white', 
-                  fontSize: 16,
-                  cursor: submitting || !isFormValid() || (editMode && !isFormChanged()) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  fontWeight: '500'
-                }}
-              >
-                {submitting ? (editMode ? '🔄 Updating...' : '🔄 Submitting...') : (editMode ? '✅ Update' : '📝 Submit')}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteDialogOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000
-        }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 32, minWidth: 320, textAlign: 'center' }}>
-            <h3 style={{ marginBottom: 16 }}>Are you sure you want to delete this feedback?</h3>
-            <p style={{ marginBottom: 24, color: '#666', fontSize: 14 }}>
-              You can leave a new review after deletion.
-            </p>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-              <button
-                onClick={handleDeleteConfirm}
-                style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#d32f2f', color: 'white', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}
-              >
-                Delete
-              </button>
-              <button
-                onClick={handleDeleteCancel}
-                style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#f5f5f5', color: '#333', fontWeight: 'bold', fontSize: 16, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Dialog for feedback validation */}
-      {feedbackErrorDialog.open && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000
-        }}>
-          <div style={{ 
-            background: 'white', 
-            borderRadius: 16, 
-            padding: 32, 
-            minWidth: 320, 
-            textAlign: 'center', 
-            maxWidth: 400,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
-          }}>
-            <h3 style={{ 
-              marginBottom: 24, 
-              color: feedbackErrorDialog.message.includes('successfully') ? '#2e7d32' : '#d32f2f',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}>
-              {feedbackErrorDialog.message.includes('successfully') ? '✅ Success' : '❌ Error'}
-            </h3>
-            <div style={{ 
-              marginBottom: 24,
-              color: feedbackErrorDialog.message.includes('successfully') ? '#2e7d32' : '#d32f2f',
-              lineHeight: '1.5'
-            }}>
-              {feedbackErrorDialog.message || 'You must have booked this court before you can leave feedback.'}
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {feedbackErrorDialog.message.includes('deleted successfully') && (
-                <>
-                  <button
-                    onClick={() => {
-                      setFeedbackErrorDialog({ open: false, message: '' });
-                      navigate('/profile/my-bookings');
-                    }}
-                    style={{ 
-                      padding: '12px 24px', 
-                      borderRadius: 8, 
-                      border: 'none', 
-                      background: '#1976d2', 
-                      color: 'white', 
-                      fontWeight: 'bold', 
-                      fontSize: 16, 
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-                    onMouseLeave={(e) => e.target.style.opacity = '1'}
-                  >
-                    Review Again
-                  </button>
-                  <button
-                    onClick={() => {
-                      setFeedbackErrorDialog({ open: false, message: '' });
-                      setDeletedFeedback(null);
-                    }}
-                    style={{ 
-                      padding: '12px 24px', 
-                      borderRadius: 8, 
-                      border: 'none', 
-                      background: '#4caf50', 
-                      color: 'white', 
-                      fontWeight: 'bold', 
-                      fontSize: 16, 
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-                    onMouseLeave={(e) => e.target.style.opacity = '1'}
-                  >
-                    Great!
-                  </button>
-                </>
-              )}
-              {!feedbackErrorDialog.message.includes('deleted successfully') && (
-                <button
-                  onClick={() => {
-                    setFeedbackErrorDialog({ open: false, message: '' });
-                    if (feedbackErrorDialog.message.includes('successfully')) {
-                      // 如果是成功消息，关闭对话框
-                      setOpenDialog(false);
-                    } else {
-                      // 如果是错误消息，保持表单打开
-                      setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
-                      setEditMode(false);
-                      setEditingId(null);
-                    }
-                  }}
-                  style={{ 
-                    padding: '12px 24px', 
-                    borderRadius: 8, 
-                    border: 'none', 
-                    background: feedbackErrorDialog.message.includes('successfully') ? '#4caf50' : '#1976d2', 
-                    color: 'white', 
-                    fontWeight: 'bold', 
-                    fontSize: 16, 
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+              <FormControl fullWidth>
+                <InputLabel>Court</InputLabel>
+                <Select
+                  name="targetId"
+                  value={formData.targetId}
+                  onChange={handleFormChange}
+                  label="Court"
+                  required
                 >
-                  {feedbackErrorDialog.message.includes('successfully') ? 'Great!' : 'OK'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                  <MenuItem value="">Select Court</MenuItem>
+                  {courtOptions.map(court => (
+                    <MenuItem key={court.id} value={court.id}>
+                      {court.name} ({court.location})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {formData.targetType === 'EVENT' && (
+              <Alert severity="warning">
+                Event selection not available yet.
+              </Alert>
+            )}
+
+            {formData.targetType === 'COACH' && (
+              <Alert severity="warning">
+                Coach selection not available yet.
+              </Alert>
+            )}
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Rating</Typography>
+              <StarRating 
+                rating={formData.rating} 
+                interactive 
+                onRatingChange={r => setFormData(f => ({ ...f, rating: r }))} 
+              />
+            </Box>
+
+            <TextField
+              name="review"
+              label="Review"
+              value={formData.review}
+              onChange={handleFormChange}
+              multiline
+              rows={4}
+              fullWidth
+              required
+            />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Tags (optional)</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                {formData.tags.map(tag => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    onDelete={() => handleRemoveTag(tag)}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+              <TextField
+                value={tagInput}
+                onChange={handleTagInputChange}
+                onKeyDown={handleTagInputKeyDown}
+                placeholder="Type and press Enter to add tags"
+                fullWidth
+                size="small"
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={handleCloseDialog} variant="outlined">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={submitting || !isFormValid() || (editMode && !isFormChanged())}
+            startIcon={submitting ? <CircularProgress size={16} /> : null}
+          >
+            {submitting ? (editMode ? 'Updating...' : 'Submitting...') : (editMode ? 'Update' : 'Submit')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this feedback? You can leave a new review after deletion.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} variant="contained" color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error/Success Dialog */}
+      <Dialog
+        open={feedbackErrorDialog.open}
+        onClose={() => setFeedbackErrorDialog({ open: false, message: '' })}
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle>
+          {feedbackErrorDialog.message.includes('successfully') ? 'Success' : 'Error'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {feedbackErrorDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          {feedbackErrorDialog.message.includes('deleted successfully') && (
+            <>
+              <Button
+                onClick={() => {
+                  setFeedbackErrorDialog({ open: false, message: '' });
+                  navigate('/profile/my-bookings');
+                }}
+                variant="contained"
+              >
+                Review Again
+              </Button>
+              <Button
+                onClick={() => {
+                  setFeedbackErrorDialog({ open: false, message: '' });
+                  setDeletedFeedback(null);
+                }}
+                variant="outlined"
+              >
+                Great!
+              </Button>
+            </>
+          )}
+          {!feedbackErrorDialog.message.includes('deleted successfully') && (
+            <Button
+              onClick={() => {
+                setFeedbackErrorDialog({ open: false, message: '' });
+                if (feedbackErrorDialog.message.includes('successfully')) {
+                  setOpenDialog(false);
+                } else {
+                  setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
+                  setEditMode(false);
+                  setEditingId(null);
+                }
+              }}
+              variant="contained"
+            >
+              {feedbackErrorDialog.message.includes('successfully') ? 'Great!' : 'OK'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 
