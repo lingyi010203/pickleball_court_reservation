@@ -208,7 +208,9 @@ const RedeemHistory = () => {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   pt: 1,
-                  borderTop: `1px solid ${theme.palette.divider}`
+                  borderTop: '2px solid',
+                  borderColor: theme.palette.divider,
+                  opacity: 0.8
                 }}>
                   <Typography variant="body2" color="text.secondary">
                     Discount: {redemption.discountType === 'percentage' ? 

@@ -10,7 +10,8 @@ import {
   Divider,
   useMediaQuery,
   IconButton,
-  Skeleton
+  Skeleton,
+  useTheme
 } from '@mui/material';
 import {
   SportsTennis as CourtsIcon,
@@ -45,6 +46,7 @@ function Navbar() {
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width:900px)');
+  const theme = useTheme();
 
   const username = currentUser?.username || '';
   const role = currentUser?.role || '';
@@ -205,15 +207,18 @@ function Navbar() {
 
   return (
     <AppBar
-      position="static"
+      position="fixed"
+      elevation={2}
       sx={{
-        backgroundColor: 'white',
-        color: 'black',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        py: 0
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary,
+        boxShadow: theme.shadows[2],
+        borderBottom: theme.palette.mode === 'dark' ? '1px solid #23262F' : '1px solid #e0e0e0',
+        transition: 'background-color 0.3s, color 0.3s',
+        zIndex: (theme) => theme.zIndex.drawer + 1
       }}
     >
-      <Container maxWidth="xl">
+      <Container maxWidth={false} sx={{ maxWidth: '1200px', width: '100%', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
         <Toolbar sx={{
           justifyContent: 'space-between',
           py: { xs: 1, sm: 1.5 }, // 响应式垂直间距
@@ -250,7 +255,7 @@ function Navbar() {
                   fontFamily: '"Roboto Condensed", sans-serif'
                 }}
               >
-                {isAdminRoute ? 'ADMIN PORTAL' : 'PICKLEBALL'}
+                {isAdminRoute ? 'ADMIN PORTAL' : 'Picklefy'}
               </Typography>
             </Box>
           </Box>

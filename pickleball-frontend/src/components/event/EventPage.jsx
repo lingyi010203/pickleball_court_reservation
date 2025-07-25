@@ -23,7 +23,9 @@ import {
   Divider,
   Paper,
   CircularProgress,
-  Alert
+  Alert,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   CalendarToday,
@@ -36,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import FriendlyMatchPage from './FriendlyMatchPage';
+import ThemedCard from '../common/ThemedCard';
 
 const EventPage = () => {
   const [events, setEvents] = useState([]);
@@ -59,6 +62,7 @@ const EventPage = () => {
   const isEventOrganizer = currentUser?.role === 'EVENTORGANIZER' || currentUser?.role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer';
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
 
 
   const fetchEvents = async () => {
@@ -303,7 +307,7 @@ const EventPage = () => {
 
           return (
             <Grid item xs={12} md={6} lg={4} key={event.id}>
-              <Card
+              <ThemedCard
                 sx={{
                   height: '100%',
                   display: 'flex',
@@ -396,7 +400,7 @@ const EventPage = () => {
                     View Details
                   </Button>
                 </CardActions>
-              </Card>
+              </ThemedCard>
             </Grid>
           );
         })}
@@ -447,11 +451,11 @@ const EventPage = () => {
                 {selectedEvent.description || selectedEvent.title}
               </Typography>
 
-              <Divider sx={{ my: 2 }} />
+              <Divider sx={{ my: 2, color: theme.palette.divider }} />
 
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
                     <Typography variant="h6" gutterBottom>Event Details</Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -505,7 +509,7 @@ const EventPage = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
                     <Typography variant="h6" gutterBottom>Organizer</Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -551,8 +555,8 @@ const EventPage = () => {
 
               {selectedEvent.schedule && (
                 <>
-                  <Divider sx={{ my: 2 }} />
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Divider sx={{ my: 2, color: theme.palette.divider }} />
+                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
                     <Typography variant="h6" gutterBottom>Schedule</Typography>
                     {scheduleItems.length > 0 ? (
                       <ul>
@@ -588,7 +592,7 @@ const EventPage = () => {
                   size="large"
                   disabled={selectedEvent.currentParticipants >= selectedEvent.capacity || isRegistered || checkingRegistration}
                   onClick={() => handleRegisterClick(selectedEvent)}
-                  sx={isRegistered ? { backgroundColor: '#bdbdbd', color: '#fff' } : {}}
+                  sx={isRegistered ? { backgroundColor: theme.palette.grey[400], color: theme.palette.common.white } : {}}
                 >
                   {selectedEvent.currentParticipants >= selectedEvent.capacity
                     ? 'Event Full'
@@ -632,7 +636,7 @@ const EventPage = () => {
                     width: 80,
                     height: 80,
                     borderRadius: '50%',
-                    bgcolor: 'success.main',
+                    bgcolor: theme.palette.success.main,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -640,9 +644,9 @@ const EventPage = () => {
                     animation: 'pulse 2s infinite'
                   }}
                 >
-                  <Typography variant="h2" color="white">✓</Typography>
+                  <Typography variant="h2" color={theme.palette.common.white}>✓</Typography>
                 </Box>
-                <Typography variant="h5" color="success.main" fontWeight="bold">
+                <Typography variant="h5" color={theme.palette.success.main} fontWeight="bold">
                   Registration Successful!
                 </Typography>
               </Box>
@@ -658,7 +662,7 @@ const EventPage = () => {
                 </Typography>
               </Alert>
               
-              <Paper sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, mb: 2 }}>
+              <Paper sx={{ p: 2, bgcolor: theme.palette.grey[50], borderRadius: 2, mb: 2 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   📧 <strong>What's Next?</strong>
                 </Typography>
@@ -699,14 +703,14 @@ const EventPage = () => {
                     width: 60,
                     height: 60,
                     borderRadius: '50%',
-                    bgcolor: 'primary.main',
+                    bgcolor: theme.palette.primary.main,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     mb: 2
                   }}
                 >
-                  <Typography variant="h4" color="white">📝</Typography>
+                  <Typography variant="h4" color={theme.palette.common.white}>📝</Typography>
                 </Box>
                 <Typography variant="h5" fontWeight="bold">
                   Confirm Registration
@@ -718,8 +722,8 @@ const EventPage = () => {
             </DialogTitle>
             
             <DialogContent sx={{ px: 4 }}>
-              <Paper sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 2, mb: 3 }}>
-                <Typography variant="h6" gutterBottom color="primary.main">
+              <Paper sx={{ p: 3, bgcolor: theme.palette.grey[50], borderRadius: 2, mb: 3 }}>
+                <Typography variant="h6" gutterBottom color={theme.palette.primary.main}>
                   {registerEvent?.title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>

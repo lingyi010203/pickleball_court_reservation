@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
+import ThemedCard from '../common/ThemedCard';
 
 const ActiveVouchers = () => {
   const theme = useTheme();
@@ -137,7 +138,7 @@ const ActiveVouchers = () => {
           
           return (
             <Grid item xs={12} md={6} lg={4} key={voucher.id}>
-              <Card sx={{ 
+              <ThemedCard sx={{ 
                 height: '100%',
                 borderRadius: 3,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -213,7 +214,9 @@ const ActiveVouchers = () => {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     pt: 1,
-                    borderTop: `1px solid ${theme.palette.divider}`
+                    borderTop: '2px solid',
+                    borderColor: theme.palette.divider,
+                    opacity: 0.8
                   }}>
                     <Typography variant="body2" color="text.secondary">
                       Discount: {voucher.discountType === 'percentage' ? 
@@ -247,7 +250,7 @@ const ActiveVouchers = () => {
                     </Button>
                   </Box>
                 </CardContent>
-              </Card>
+              </ThemedCard>
             </Grid>
           );
         })}

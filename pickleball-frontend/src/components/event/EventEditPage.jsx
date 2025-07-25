@@ -24,7 +24,9 @@ import {
   InputAdornment,
   Fade,
   Zoom,
-  CircularProgress
+  CircularProgress,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Event,
@@ -46,6 +48,7 @@ export default function EventEditPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const theme = useTheme();
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);

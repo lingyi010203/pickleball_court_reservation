@@ -36,6 +36,8 @@ import AdminManageTiers from './components/admin/AdminManageTiers';
 import AdminManageCourts from './components/admin/AdminManageCourts';
 import AdminManageBookings from './components/admin/AdminManageBookings';
 import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
+import ProfileOverview from './components/profile/ProfileOverview';
+import EditProfileForm from './components/profile/EditProfileForm';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -63,155 +65,48 @@ function App() {
         <Route path="/reset-password-success" element={<ResetPasswordSuccess />} />
         <Route path="/admin/login" element={<AdminLogin />} />
 
-      {/* Protected user routes with layout */}
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Navigate to="/home" replace />} />
-        <Route path="home" element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        } />
-
-          {/* Profile section */}
-          <Route path="profile" element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          } />
-
-          {/* Rewards section */}
-          <Route path="profile/rewards" element={
-            <ProtectedRoute>
-              <RewardsPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Booking history */}
-          <Route path="profile/my-bookings" element={
-            <ProtectedRoute>
-              <BookingHistory />
-            </ProtectedRoute>
-          } />
-
-          {/* Feedback routes */}
-          <Route path="profile/my-feedback" element={
-            <ProtectedRoute>
-              <MyFeedbackPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Feedback form page */}
-          <Route path="feedback" element={
-            <ProtectedRoute>
-              <FeedbackPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Court listing */}
-          <Route path="courts" element={
-            <ProtectedRoute>
-              <CourtListPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Court details */}
-          <Route path="courts/:id" element={
-            <ProtectedRoute>
-              <CourtDetailPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Booking flow */}
-          <Route path="booking/:courtId" element={
-            <ProtectedRoute>
-              <BookingPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Payment page */}
-          <Route path="payment" element={
-            <ProtectedRoute>
-              <PaymentPage />
-            </ProtectedRoute>
-          } />
-        
-        {/* Wallet top-up page */}
-        <Route path="wallet/topup" element={
-          <ProtectedRoute>
-            <WalletTopUpPage />
-          </ProtectedRoute>
-        } />
-
-          {/* Booking confirmation page */}
-          <Route path="booking/confirmation" element={
-            <ProtectedRoute>
-              <BookingConfirmationPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Event listing */}
-          <Route path="events" element={
-            <ProtectedRoute>
-              <EventPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Event creation */}
-          <Route path="events/create" element={
-            <ProtectedRoute>
-              <EventCreatePage />
-            </ProtectedRoute>
-          } />
-
-          {/* Event editing */}
-          <Route path="events/edit/:eventId" element={
-            <ProtectedRoute>
-              <EventEditPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Friendly Match page */}
-          <Route path="friendly-match" element={
-            <ProtectedRoute>
-              <FriendlyMatchPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Messaging page */}
-          <Route path="messages" element={
-            <ProtectedRoute>
-              <MessagingPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Helpdesk page */}
-          <Route path="helpdesk" element={
-            <ProtectedRoute>
-              <HelpdeskPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Court availability by time */}
-          <Route path="court-availability" element={
-            <ProtectedRoute>
-              <CourtAvailabilityPage />
-            </ProtectedRoute>
-          } />
+        {/* Protected user routes with layout */}
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="home" element={<HomePage />} />
+          <Route path="profile" element={<ProfilePage />}>
+            <Route index element={<ProfileOverview />} />
+            <Route path="my-bookings" element={<BookingHistory />} />
+            <Route path="edit-profile" element={null} />
+            <Route path="notifications" element={null} />
+            {/* 其它 profile 子页面可继续添加 */}
+          </Route>
+          <Route path="profile/rewards" element={<RewardsPage />} />
+          <Route path="profile/my-feedback" element={<MyFeedbackPage />} />
+          <Route path="feedback" element={<FeedbackPage />} />
+          <Route path="courts" element={<CourtListPage />} />
+          <Route path="courts/:id" element={<CourtDetailPage />} />
+          <Route path="booking/:courtId" element={<BookingPage />} />
+          <Route path="payment" element={<PaymentPage />} />
+          <Route path="wallet/topup" element={<WalletTopUpPage />} />
+          <Route path="booking/confirmation" element={<BookingConfirmationPage />} />
+          <Route path="events" element={<EventPage />} />
+          <Route path="events/create" element={<EventCreatePage />} />
+          <Route path="events/edit/:eventId" element={<EventEditPage />} />
+          <Route path="friendly-match" element={<FriendlyMatchPage />} />
+          <Route path="messages" element={<MessagingPage />} />
+          <Route path="helpdesk" element={<HelpdeskPage />} />
+          <Route path="court-availability" element={<CourtAvailabilityPage />} />
         </Route>
 
-      {/* Admin routes with nested structure */}
-      <Route path="/admin" element={
-        <AdminProtectedRoute>
-          <AdminDashboardLayout />
-        </AdminProtectedRoute>
-      }>
-        <Route path="dashboard" element={<div />} /> {/* Dashboard home, content handled in AdminDashboard */}
-        <Route path="users" element={<AdminManageUsers />} />
-        <Route path="tiers" element={<AdminManageTiers />} />
-        <Route path="courts" element={<AdminManageCourts />} />
-        <Route path="bookings" element={<AdminManageBookings />} />
-        <Route path="settings" element={<div />} />
-      </Route>
+        {/* Admin routes with nested structure */}
+        <Route path="/admin" element={
+          <AdminProtectedRoute>
+            <AdminDashboardLayout />
+          </AdminProtectedRoute>
+        }>
+          <Route path="dashboard" element={<div />} /> {/* Dashboard home, content handled in AdminDashboard */}
+          <Route path="users" element={<AdminManageUsers />} />
+          <Route path="tiers" element={<AdminManageTiers />} />
+          <Route path="courts" element={<AdminManageCourts />} />
+          <Route path="bookings" element={<AdminManageBookings />} />
+          <Route path="settings" element={<div />} />
+        </Route>
 
         {/* 404 fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

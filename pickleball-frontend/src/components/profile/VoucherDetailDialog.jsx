@@ -9,7 +9,9 @@ import {
     Chip,
     Box,
     useTheme,
-    Grid // Add this import
+    Grid,
+    useTheme,
+    alpha
 } from '@mui/material';
 import { ConfirmationNumber as VoucherIcon } from '@mui/icons-material';
 

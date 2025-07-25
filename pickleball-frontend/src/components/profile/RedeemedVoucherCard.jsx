@@ -1,21 +1,22 @@
 import React from 'react';
 import { 
   Card, CardContent, Typography, Chip, Button, 
-  Box, useTheme, Grid
+  Box, useTheme, Grid, alpha
 } from '@mui/material';
 import { ConfirmationNumber as VoucherIcon } from '@mui/icons-material';
+import ThemedCard from '../common/ThemedCard';
 
 const RedeemedVoucherCard = ({ voucher }) => {
   const theme = useTheme();
   
   return (
-    <Card sx={{ 
+    <ThemedCard sx={{ 
       height: '100%',
       borderRadius: 3,
       overflow: 'hidden',
-      boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+      boxShadow: theme.shadows[6],
       border: `1px solid ${theme.palette.success.light}`,
-      background: theme.palette.success.light + '20'
+      background: alpha(theme.palette.success.light, 0.2)
     }}>
       <CardContent sx={{ p: 3 }}>
         <Box sx={{ 
@@ -76,7 +77,7 @@ const RedeemedVoucherCard = ({ voucher }) => {
           </Grid>
         </Grid>
       </CardContent>
-    </Card>
+    </ThemedCard>
   );
 };
 

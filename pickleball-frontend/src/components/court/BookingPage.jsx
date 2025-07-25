@@ -29,6 +29,7 @@ import CourtService from '../../service/CourtService';
 import { getAllSlotsForCourt } from '../../service/SlotService';
 import BookingService from '../../service/BookingService';
 import dayjs from 'dayjs';
+import ThemedCard from '../common/ThemedCard';
 
 const PADDLE_PRICE = 5; // 每个 paddle 租金
 const BALL_SET_PRICE = 12; // 一组 ball set 售价
@@ -207,7 +208,7 @@ const BookingPage = () => {
   const renderBookingSummary = () => {
     if (!court) return null;
     return (
-      <Card sx={{
+      <ThemedCard sx={{
         position: 'sticky',
         top: 20,
         borderRadius: 3,
@@ -385,7 +386,7 @@ const BookingPage = () => {
           </Typography>
         )}
       </CardContent>
-      </Card >
+      </ThemedCard >
     );
   };
 
@@ -453,7 +454,7 @@ return (
 
     <Grid container spacing={4}>
       <Grid item xs={12} md={8}>
-        <Card sx={{
+        <ThemedCard sx={{
           borderRadius: 3,
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
           mb: 4,
@@ -637,7 +638,7 @@ return (
             </Box>
 
             {/* 时间槽位 */}
-            <Card sx={{
+            <ThemedCard sx={{
               borderRadius: 3,
               background: 'white',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
@@ -708,7 +709,7 @@ return (
                   )}
                 </Grid>
               </CardContent>
-            </Card>
+            </ThemedCard>
 
             {/* 价格信息 */}
             {court && (
@@ -727,7 +728,7 @@ return (
               </Box>
             )}
           </CardContent>
-        </Card>
+        </ThemedCard>
       </Grid>
 
       <Grid item xs={12} md={4}>

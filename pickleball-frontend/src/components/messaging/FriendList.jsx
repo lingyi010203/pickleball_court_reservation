@@ -5,8 +5,10 @@ import {
   ListItemText, Typography, Box 
 } from '@mui/material';
 import friendService from '../../service/FriendService';
+import { useTheme, alpha } from '@mui/material/styles';
 
 export default function FriendList({ onSelectFriend }) {
+  const theme = useTheme();
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,23 +31,33 @@ export default function FriendList({ onSelectFriend }) {
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 2 }}>Your Friends</Typography>
+      <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary, fontWeight: 700 }}>Your Friends</Typography>
       {friends.length === 0 ? (
-        <Typography>No friends yet</Typography>
+        <Box sx={{ textAlign: 'center', py: 6, color: theme.palette.text.secondary }}>
+          <Typography variant="body1">No friends yet</Typography>
+        </Box>
       ) : (
         <List>
           {(Array.isArray(friends) ? friends : []).map(friend => (
-            <ListItem 
-              key={friend.id} 
+            <ListItem
+              key={friend.id}
               button
               onClick={() => onSelectFriend(friend)}
+              sx={{
+                borderRadius: 2,
+                mb: 1,
+                transition: 'background 0.2s',
+                '&:hover': {
+                  background: alpha(theme.palette.primary.main, 0.08)
+                }
+              }}
             >
               <ListItemAvatar>
-                <Avatar src={friend.profileImage} />
+                <Avatar src={friend.profileImage} sx={{ boxShadow: theme.shadows[2] }} />
               </ListItemAvatar>
-              <ListItemText 
-                primary={friend.name} 
-                secondary={`@${friend.username}`} 
+              <ListItemText
+                primary={<Typography sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{friend.name}</Typography>}
+                secondary={<Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{`@${friend.username}`}</Typography>}
               />
             </ListItem>
           ))}

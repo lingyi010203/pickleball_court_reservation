@@ -107,4 +107,15 @@ public class AdminServiceImpl implements AdminService {
         adminRepository.save(admin);
         return getProfileByUsername(username);
     }
+    @Override
+public void changePassword(String username, String currentPassword, String newPassword) {
+    Admin admin = adminRepository.findByUser_UserAccount_Username(username)
+            .orElseThrow(() -> new RuntimeException("Admin not found"));
+    UserAccount account = admin.getUser().getUserAccount();
+    if (!passwordEncoder.matches(currentPassword, account.getPassword())) {
+        throw new RuntimeException("Current password is incorrect");
+    }
+    account.setPassword(passwordEncoder.encode(newPassword));
+    userAccountRepository.save(account);
+}
 }

@@ -1,48 +1,144 @@
-import React from 'react';
-import { Box, Grid } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Button, CircularProgress, Snackbar, Alert, alpha, useTheme } from '@mui/material';
 import ProfileStats from './ProfileStats';
 import RecentBookings from './RecentBookings';
 import RecentInvoices from './RecentInvoices';
+import axios from 'axios';
+import UserService from '../../service/UserService';
+import { getWalletBalance, initializeWallet, topUpWallet } from '../../service/WalletService';
 
-const ProfileOverview = ({ profile }) => {
+const ProfileOverview = () => {
+  const theme = useTheme();
+  const [profile, setProfile] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState('');
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = UserService.getToken();
+        if (!token) return;
+        const response = await axios.get('http://localhost:8081/api/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setProfile(response.data);
+      } catch {}
+    };
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        setWalletLoading(true);
+        let balance;
+        try {
+          balance = await getWalletBalance();
+        } catch (err) {
+          await initializeWallet();
+          balance = await getWalletBalance();
+        }
+        setWalletBalance(balance);
+        setWalletError('');
+      } catch (err) {
+        setWalletError('Failed to load wallet balance: ' + err.message);
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+    fetchWallet();
+  }, []);
+
   return (
-    <>
-      {/* Activity Overview Section */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
+      {/* Wallet Balance */}
       <Box sx={{
-        backgroundColor: 'white',
-        borderRadius: '16px',
-        p: 5,
-        mb: 1
+        backgroundColor: theme.palette.background.paper,
+        borderRadius: 2,
+        boxShadow: theme.shadows[2],
+        p: { xs: 2.5, lg: 3 },
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 3,
+        width: '100%',
+        boxSizing: 'border-box',
+        minHeight: 100
       }}>
-        <ProfileStats profile={profile} />
+        <Box sx={{ flex: 1, minWidth: 250 }}>
+          <Typography variant="h5" fontWeight="bold" sx={{ mb: 0.5, fontSize: { xs: '1.25rem', lg: '1.5rem' } }}>
+            Wallet Balance
+          </Typography>
+          {walletLoading ? (
+            <CircularProgress size={24} />
+          ) : walletError ? (
+            <Typography color="error" variant="body2" sx={{ fontSize: '0.9rem', wordBreak: 'break-word' }}>
+              {walletError}
+            </Typography>
+          ) : (
+            <Typography 
+              variant="h4" 
+              fontWeight="bold" 
+              color="success.main" 
+              sx={{ mb: 0.5, fontSize: { xs: '1.5rem', lg: '2rem' }, letterSpacing: '-0.5px', wordBreak: 'break-word' }}
+            >
+              RM{walletBalance?.toFixed(2) || '0.00'}
+            </Typography>
+          )}
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.9rem', lineHeight: 1.3 }}>
+            Available balance for bookings
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Recent Activity Section */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <Box sx={{
-            height: 'auto',
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            p: 3
-          }}>
-            <RecentBookings />
-          </Box>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Box sx={{
-            height: 'auto',
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            p: 3
-          }}>
-            <RecentInvoices />
-          </Box>
-        </Grid>
-      </Grid>
-    </>
+      {/* Activity Overview */}
+      <Box sx={{
+        backgroundColor: theme.palette.background.paper,
+        borderRadius: 2,
+        boxShadow: theme.shadows[1],
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        p: { xs: 2.5, lg: 3 },
+        width: '100%',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }}>
+        <ProfileStats profile={profile || {}} />
+      </Box>
+
+      {/* Recent Bookings & Invoices */}
+      <Box sx={{ display: 'flex', gap: 2.5, flexDirection: { xs: 'column', lg: 'row' }, width: '100%' }}>
+        <Box sx={{
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: 2,
+          boxShadow: theme.shadows[1],
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          p: { xs: 2.5, lg: 3 },
+          flex: 1,
+          minWidth: { xs: '100%', lg: 300 },
+          height: 400,
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}>
+          <RecentBookings />
+        </Box>
+        <Box sx={{
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: 2,
+          boxShadow: theme.shadows[1],
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          p: { xs: 2.5, lg: 3 },
+          flex: 1,
+          minWidth: { xs: '100%', lg: 300 },
+          height: 400,
+          overflow: 'hidden',
+          boxSizing: 'border-box'
+        }}>
+          <RecentInvoices />
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

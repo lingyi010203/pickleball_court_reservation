@@ -26,7 +26,6 @@ import {
   Divider,
   Stack,
   TextField,
-  useTheme,
   useMediaQuery,
   CircularProgress
 } from '@mui/material';
@@ -50,6 +49,8 @@ import {
 } from '@mui/icons-material';
 import * as FriendlyMatchService from '../../service/FriendlyMatchService';
 import { useAuth } from '../../context/AuthContext';
+import ThemedCard from '../common/ThemedCard';
+import { useTheme, alpha } from '@mui/material/styles';
 
 const FriendlyMatchPage = () => {
   const theme = useTheme();
@@ -250,7 +251,7 @@ const FriendlyMatchPage = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <Paper 
+      <ThemedCard 
         elevation={3} 
         sx={{ 
           p: 3, 
@@ -302,10 +303,10 @@ const FriendlyMatchPage = () => {
             <TeamCard team={awayTeam} isAway />
           </Grid>
         </Grid>
-      </Paper>
+      </ThemedCard>
 
       {/* Match Details */}
-      <Card elevation={2} sx={{ mb: 3 }}>
+      <ThemedCard elevation={2} sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Match Details
@@ -362,7 +363,7 @@ const FriendlyMatchPage = () => {
             {match.matchRules || 'Friendly competitive match between two skilled teams'}
           </Typography>
         </CardContent>
-      </Card>
+      </ThemedCard>
 
       {/* Join Status Alert */}
       {joinStatus !== 'not_joined' && (
@@ -404,7 +405,7 @@ const FriendlyMatchPage = () => {
       </Stack>
 
       {/* Tabs */}
-      <Paper elevation={2}>
+      <ThemedCard elevation={2}>
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
@@ -483,7 +484,7 @@ const FriendlyMatchPage = () => {
             • Proper sports attire required
           </Typography>
         </TabPanel>
-      </Paper>
+      </ThemedCard>
 
       {/* Join Request Modal */}
       <Dialog open={showJoinModal} onClose={() => setShowJoinModal(false)} maxWidth="sm" fullWidth>

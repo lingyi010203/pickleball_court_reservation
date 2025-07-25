@@ -5,7 +5,7 @@ import {
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
   CircularProgress, Grid, Chip, MenuItem, FormControl, InputLabel, Select,
   TablePagination, TableSortLabel, TextField, Divider, Checkbox,
-  Card, CardContent, Avatar, List, ListItem, ListItemText, TableFooter
+  Card, CardContent, Avatar, List, ListItem, ListItemText, TableFooter, useTheme
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,6 +29,7 @@ import ModernBookingDetailsDialog from './ModernBookingDetailsDialog';
 import { getStatusChip } from './statusConfig';
 
 const AdminManageBookings = () => {
+  const theme = useTheme();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -551,7 +552,7 @@ const AdminManageBookings = () => {
           </Box>
         ) : (
           <Table>
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+            <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? '#2a2a2a' : '#f5f5f5' }}>
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
@@ -599,9 +600,16 @@ const AdminManageBookings = () => {
                   const isItemSelected = isSelected(booking.id);
                   return (
                     <TableRow
-                      key={booking.id}
                       hover
+                      key={booking.id}
                       selected={isItemSelected}
+                      sx={{
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark'
+                            ? 'rgba(187, 134, 252, 0.08)'
+                            : 'rgba(142, 68, 173, 0.05)'
+                        }
+                      }}
                     >
                       <TableCell padding="checkbox">
                         <Checkbox

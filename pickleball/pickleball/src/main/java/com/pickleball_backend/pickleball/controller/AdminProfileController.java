@@ -2,6 +2,8 @@ package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.dto.AdminProfileDto;
 import com.pickleball_backend.pickleball.service.AdminService;
+import com.pickleball_backend.pickleball.dto.ChangePasswordRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -36,4 +38,13 @@ public class AdminProfileController {
         AdminProfileDto updated = adminService.updateProfile(username, dto);
         return ResponseEntity.ok(updated);
     }
+
+    @PostMapping("/change-password")
+public ResponseEntity<?> changePassword(
+        Authentication authentication,
+        @RequestBody ChangePasswordRequest request) {
+    String username = authentication.getName();
+    adminService.changePassword(username, request.getCurrentPassword(), request.getNewPassword());
+    return ResponseEntity.ok().build();
+}
 }

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Box, Typography, Button, Divider, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Typography, Button, Divider, List, ListItem, ListItemText, useTheme, alpha } from '@mui/material';
 import { Edit } from '@mui/icons-material';
 
 const ProfileDetails = ({ profile, onEdit }) => {
+  const theme = useTheme();
   return (
     <>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -14,9 +15,9 @@ const ProfileDetails = ({ profile, onEdit }) => {
           variant="outlined"
           onClick={onEdit}
           sx={{ 
-            color: '#8e44ad', 
-            borderColor: '#8e44ad',
-            '&:hover': { borderColor: '#732d91' }
+            color: theme.palette.primary.main, 
+            borderColor: theme.palette.primary.main,
+            '&:hover': { borderColor: alpha(theme.palette.primary.main, 0.7) }
           }}
         >
           Edit
@@ -50,6 +51,7 @@ const ProfileDetails = ({ profile, onEdit }) => {
 };
 
 const DetailItem = ({ label, value }) => {
+  const theme = useTheme();
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
       <Typography variant="body2" color="text.secondary">

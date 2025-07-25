@@ -5,6 +5,7 @@ import { Card, CardContent, Typography, Box, Button, LinearProgress, Grid, Circu
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EventService from '../../service/EventService';
+import ThemedCard from '../common/ThemedCard';
 
 const formatDate = (isoString) => new Date(isoString).toLocaleDateString();
 const formatTime = (isoString) => new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -30,7 +31,14 @@ const UpcomingEvents = () => {
   }, []);
 
   return (
-    <Box sx={{ mb: 6 }}>
+    <Box 
+      sx={{ 
+        mb: 6,
+        maxWidth: 1200,
+        mx: 'auto',
+        width: '100%'
+      }}
+    >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" fontWeight="bold">Upcoming Events</Typography>
         <Button variant="outlined" size="small" onClick={() => navigate('/events')}>View All</Button>
@@ -43,7 +51,7 @@ const UpcomingEvents = () => {
         <Grid container spacing={3}>
           {events.map(event => (
             <Grid item xs={12} md={6} key={event.id}>
-              <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+              <ThemedCard>
                 <CardContent>
                   <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>{event.title}</Typography>
                   <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
@@ -72,7 +80,7 @@ const UpcomingEvents = () => {
                     View Details
                   </Button>
                 </CardContent>
-              </Card>
+              </ThemedCard>
             </Grid>
           ))}
         </Grid>

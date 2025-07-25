@@ -18,6 +18,19 @@ html, body {
   color: #333;
 }
 
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+body[data-theme='dark'] {
+  background: #181818;
+  color: #eee;
+}
+body[data-theme='light'] {
+  background: #f8fafc;
+  color: #222;
+}
+
 /* Dark mode (auto) */
 @media (prefers-color-scheme: dark) {
   html, body {
@@ -87,6 +100,17 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #aaa;
+}
+
+body[data-theme='dark']::-webkit-scrollbar {
+  width: 10px;
+}
+body[data-theme='dark']::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+body[data-theme='dark']::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
 }
 
 /* Utility Classes (Optional Helpers) */

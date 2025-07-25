@@ -17,6 +17,7 @@ import {
   AccountBalanceWallet as WalletIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
+import ThemedCard from '../common/ThemedCard';
 
 const QUICK_ACTIONS = [
   { 
@@ -63,78 +64,80 @@ const QUICK_ACTIONS = [
 
 const ActionCard = ({ action, navigate }) => {
   const theme = useTheme();
-  
   return (
-    <Grid item xs={12} sm={6} md={3}>
-      <Card 
-        sx={{ 
+    <Grid item xs={12} sm={6} md={2.4}>
+      <ThemedCard
+        sx={{
           borderRadius: 3,
-          height: '100%',
+          height: 220,
+          width: '100%',
           transition: theme.transitions.create(['transform', 'box-shadow'], {
             duration: theme.transitions.duration.short,
           }),
-          '&:hover': { 
-            boxShadow: 6, 
-            transform: 'translateY(-4px)' 
+          '&:hover': {
+            boxShadow: 6,
+            transform: 'translateY(-4px)'
           }
         }}
       >
-        <CardActionArea 
+        <CardActionArea
           onClick={() => navigate(action.path)}
-          sx={{ height: '100%', p: 2 }}
+          sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}
           aria-label={`Go to ${action.title}`}
         >
-          <CardContent sx={{ textAlign: 'center' }}>
-            <Box sx={{ 
-              mb: 2,
+          <CardContent sx={{ 
+            textAlign: 'center', 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            p: 1,
+            '&:last-child': { pb: 1 }
+          }}>
+            <Box sx={{
+              mb: 1.5,
               display: 'inline-flex',
               p: 1.5,
               borderRadius: '50%',
-              bgcolor: theme.palette[action.color].light,
-              color: theme.palette[action.color].main
+              bgcolor: theme.palette[action.color]?.light || theme.palette.background.paper,
+              color: theme.palette[action.color]?.main || theme.palette.text.primary,
+              alignSelf: 'center'
             }}>
               <action.Icon fontSize="large" />
             </Box>
-            
-            <Typography 
-              variant="h6" 
+            <Typography
+              variant="h6"
               fontWeight="bold"
               gutterBottom
-              sx={{ minHeight: '3rem' }}
+              sx={{ 
+                minHeight: '2.5rem',
+                fontSize: '1rem',
+                lineHeight: 1.2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
               {action.title}
             </Typography>
-            
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               color="text.secondary"
-              sx={{ mb: 2, minHeight: '3rem' }}
+              sx={{ 
+                minHeight: '2.5rem',
+                fontSize: '0.875rem',
+                lineHeight: 1.3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }}
             >
               {action.description}
             </Typography>
-            
-            <Typography 
-              variant="button" 
-              color={action.color}
-              sx={{ 
-                display: 'inline-flex',
-                alignItems: 'center',
-                fontWeight: 'bold',
-                '&:after': {
-                  content: '"→"',
-                  ml: 0.5,
-                  transition: 'transform 0.2s'
-                },
-                '&:hover:after': {
-                  transform: 'translateX(3px)'
-                }
-              }}
-            >
-              Get Started
-            </Typography>
           </CardContent>
         </CardActionArea>
-      </Card>
+      </ThemedCard>
     </Grid>
   );
 };
@@ -143,7 +146,15 @@ const QuickActions = () => {
   const navigate = useNavigate();
   
   return (
-    <Box component="section" sx={{ mb: 6 }}>
+    <Box 
+      component="section" 
+      sx={{ 
+        mb: 6,
+        maxWidth: 1200,
+        mx: 'auto',
+        width: '100%'
+      }}
+    >
       <Typography 
         variant="h5" 
         component="h2"

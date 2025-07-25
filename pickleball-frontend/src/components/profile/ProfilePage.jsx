@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Grid,
   CircularProgress,
   Container,
   Button,
   Typography,
   Snackbar,
   Alert,
-  Divider,
   useMediaQuery,
-  useTheme
+  useTheme,
+  alpha
 } from '@mui/material';
 import ProfileHeader from './ProfileHeader';
 import ProfileStats from './ProfileStats';
@@ -19,7 +18,7 @@ import RecentInvoices from './RecentInvoices';
 import ProfileNavigation from './ProfileNavigation';
 import axios from 'axios';
 import UserService from '../../service/UserService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import EditProfileForm from './EditProfileForm';
 import { getWalletBalance, initializeWallet, topUpWallet } from '../../service/WalletService';
 import Dialog from '@mui/material/Dialog';
@@ -27,11 +26,17 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
+import NotificationPreferencesPage from './NotificationPreferencesPage';
 
 const ProfilePage = ({ editMode = false }) => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const location = useLocation();
+  const isEditProfile = location.pathname.endsWith('/edit-profile');
+  const isNotifications = location.pathname.endsWith('/notifications');
+
+  // State management
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,6 +48,8 @@ const ProfilePage = ({ editMode = false }) => {
   const [activeView, setActiveView] = useState('overview');
   const [usernameChanged, setUsernameChanged] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+
+  // Wallet state
   const [walletBalance, setWalletBalance] = useState(null);
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState('');
@@ -50,6 +57,7 @@ const ProfilePage = ({ editMode = false }) => {
   const [topupAmount, setTopupAmount] = useState('');
   const [topupLoading, setTopupLoading] = useState(false);
 
+  // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -63,12 +71,9 @@ const ProfilePage = ({ editMode = false }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        // Enhance profile with status information
         const enhancedProfile = {
           ...response.data,
-          accountStatus: response.data.requestedUserType ?
-            'PENDING' :
-            'ACTIVE'
+          accountStatus: response.data.requestedUserType ? 'PENDING' : 'ACTIVE'
         };
 
         UserService.setProfileImage(response.data.profileImage);
@@ -111,18 +116,17 @@ const ProfilePage = ({ editMode = false }) => {
     fetchWallet();
   }, []);
 
+  // Profile update handler
   const handleUpdateProfile = async (updatedProfile) => {
     try {
       const token = UserService.getToken();
       const oldUsername = profile.username;
 
-      // Format date properly for backend
       const payload = {
         ...updatedProfile,
         dob: updatedProfile.dob ? new Date(updatedProfile.dob).toISOString() : null
       };
 
-      // Send update request
       const response = await axios.put(
         'http://localhost:8081/api/profile',
         payload,
@@ -132,15 +136,6 @@ const ProfilePage = ({ editMode = false }) => {
       const filename = response.data.filename;
       UserService.setProfileImage(filename);
 
-      // Enhance profile with status information
-      const updatedProfileData = {
-        ...response.data,
-        accountStatus: response.data.requestedUserType ?
-          'Pending' :
-          'Active'
-      };
-
-      // Check if username changed
       if (updatedProfile.username && updatedProfile.username !== oldUsername) {
         setUsernameChanged(true);
         setNewUsername(updatedProfile.username);
@@ -150,13 +145,11 @@ const ProfilePage = ({ editMode = false }) => {
           severity: 'info'
         });
       } else {
-        // Update profile state with enhanced response data
         setProfile({
           ...response.data,
           status: response.data.status
         });
 
-        // Show status message
         if (response.data.status === 'PENDING') {
           setSnackbar({
             open: true,
@@ -175,7 +168,6 @@ const ProfilePage = ({ editMode = false }) => {
       }
     } catch (err) {
       let errorMessage = 'Failed to update profile. Please try again.';
-
       if (err.response?.data) {
         errorMessage = err.response.data;
       } else if (err.message) {
@@ -190,40 +182,7 @@ const ProfilePage = ({ editMode = false }) => {
     }
   };
 
-  const handleLogoutAfterUsernameChange = () => {
-    UserService.logout();
-    navigate('/login');
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  const handleOpenTopup = () => setTopupOpen(true);
-  const handleCloseTopup = () => {
-    setTopupOpen(false);
-    setTopupAmount('');
-  };
-  const handleTopup = async () => {
-    if (!topupAmount || isNaN(topupAmount) || Number(topupAmount) <= 0) {
-      setWalletError('Please enter a valid amount');
-      return;
-    }
-    setTopupLoading(true);
-    try {
-      await topUpWallet(Number(topupAmount));
-      const newBalance = await getWalletBalance();
-      setWalletBalance(newBalance);
-      setSnackbar({ open: true, message: 'Top-up successful!', severity: 'success' });
-      handleCloseTopup();
-    } catch (err) {
-      setWalletError('Top-up failed: ' + err.message);
-    } finally {
-      setTopupLoading(false);
-    }
-  };
-
-  // Update handlePhotoUpdate function
+  // Photo handlers
   const handlePhotoUpdate = async (file) => {
     try {
       const token = UserService.getToken();
@@ -241,13 +200,9 @@ const ProfilePage = ({ editMode = false }) => {
         }
       );
 
-      // Extract filename from response (assuming backend returns string)
       const filename = response.data;
-
-      // Update UserService (triggers event)
       UserService.setProfileImage(filename);
 
-      // Update local state
       setProfile(prev => ({
         ...prev,
         profileImage: filename
@@ -267,7 +222,6 @@ const ProfilePage = ({ editMode = false }) => {
     }
   };
 
-  // Update handleRemovePhoto function
   const handleRemovePhoto = async () => {
     try {
       const token = UserService.getToken();
@@ -276,10 +230,8 @@ const ProfilePage = ({ editMode = false }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Update UserService (triggers event)
       UserService.setProfileImage(null);
 
-      // Update local state
       setProfile(prev => ({
         ...prev,
         profileImage: null
@@ -299,15 +251,38 @@ const ProfilePage = ({ editMode = false }) => {
     }
   };
 
-  // Then in the EditProfileForm component, add the new handlers:
-  <EditProfileForm
-    profile={profile}
-    onSave={handleUpdateProfile}
-    onCancel={() => setActiveView('overview')}
-    onPhotoUpdate={handlePhotoUpdate}
-    onRemovePhoto={handleRemovePhoto}
-  />
+  // Wallet handlers
+  const handleTopup = async () => {
+    if (!topupAmount || isNaN(topupAmount) || Number(topupAmount) <= 0) {
+      setWalletError('Please enter a valid amount');
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      await topUpWallet(Number(topupAmount));
+      const newBalance = await getWalletBalance();
+      setWalletBalance(newBalance);
+      setSnackbar({ open: true, message: 'Top-up successful!', severity: 'success' });
+      setTopupOpen(false);
+      setTopupAmount('');
+    } catch (err) {
+      setWalletError('Top-up failed: ' + err.message);
+    } finally {
+      setTopupLoading(false);
+    }
+  };
 
+  // Other handlers
+  const handleLogoutAfterUsernameChange = () => {
+    UserService.logout();
+    navigate('/login');
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Loading state
   if (loading) {
     return (
       <Box sx={{
@@ -316,11 +291,12 @@ const ProfilePage = ({ editMode = false }) => {
         alignItems: 'center',
         height: '80vh'
       }}>
-        <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+        <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Box sx={{ textAlign: 'center', p: 4 }}>
@@ -329,7 +305,6 @@ const ProfilePage = ({ editMode = false }) => {
         </Typography>
         <Button
           variant="contained"
-          sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
           onClick={() => window.location.reload()}
         >
           Reload Page
@@ -340,141 +315,130 @@ const ProfilePage = ({ editMode = false }) => {
 
   return (
     <Box sx={{
-      backgroundColor: 'white',
+      backgroundColor: theme.palette.background.default,
       minHeight: '100vh',
-      pt: { xs: '100px', md: '40px' }, // Increased top padding
-      px: 3,
+      pt: { xs: 2, lg: 3 },
       pb: 3
     }}>
-      <Grid container spacing={2}>
-        {/* Left Column - Profile Sidebar */}
-        <Grid item xs={12} md={3} sx={{ maxWidth: 300 }}>
+      <Container maxWidth={false} sx={{ 
+        maxWidth: '1200px', 
+        px: { xs: 1, sm: 2, lg: 3 },
+        overflow: 'hidden'
+      }}>
+        {/* Main Layout Container using Flexbox */}
+        <Box sx={{
+          display: 'flex',
+          gap: { xs: 2, lg: 3 },
+          alignItems: 'flex-start',
+          flexDirection: { xs: 'column', lg: 'row' },
+          width: '100%',
+          overflow: 'hidden'
+        }}>
+          {/* Left Sidebar - Fixed Width */}
           <Box sx={{
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            height: 'auto',
-            p: 3,
-            position: 'sticky',
-            top: { xs: '100px', md: '150px' },
+            width: { xs: '100%', lg: '260px' },
+            flexShrink: 0,
+            position: { lg: 'sticky' },
+            top: { lg: 20 },
+            height: 'fit-content',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
           }}>
-            <ProfileHeader profile={profile} />
-            <ProfileNavigation setActiveView={setActiveView} />
+            {/* Profile Header Card */}
+            <Box sx={{
+              backgroundColor: theme.palette.background.paper,
+              borderRadius: 2,
+              boxShadow: theme.shadows[1],
+              p: 2.5,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              position: 'relative'
+            }}>
+              <ProfileHeader profile={profile} />
+            </Box>
+            {/* Profile Navigation Card */}
+            <Box sx={{
+              backgroundColor: theme.palette.background.paper,
+              borderRadius: 2,
+              boxShadow: theme.shadows[1],
+              p: 1.5,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+            }}>
+              <ProfileNavigation setActiveView={setActiveView} />
+            </Box>
           </Box>
-        </Grid>
-
-        {/* Right Column - Profile Content */}
-        <Grid item xs={12} md={9} sx={{ maxWidth: 950 }}>
-          {activeView === 'overview' ? (
-            <>
-              {/* Wallet Section */}
-              <Box sx={{
-                backgroundColor: '#f5f5fa',
-                borderRadius: '16px',
-                p: 3,
-                mb: 2,
-                boxShadow: '0 2px 8px rgba(149,157,165,0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <Box>
-                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>Wallet Balance</Typography>
-                  {walletLoading ? (
-                    <CircularProgress size={20} />
-                  ) : walletError ? (
-                    <Typography color="error">{walletError}</Typography>
-                  ) : (
-                    <Typography variant="h5" fontWeight="bold" color="#4caf50">
-                      RM{walletBalance?.toFixed(2)}
-                    </Typography>
-                  )}
-                </Box>
-                <Button
-                  variant="contained"
-                  sx={{ backgroundColor: '#4caf50', '&:hover': { backgroundColor: '#388e3c' } }}
-                  onClick={() => navigate('/wallet/topup')}
-                  disabled={walletLoading}
-                >
-                  Top Up
-                </Button>
-              </Box>
-
-              {/* Top Up Dialog */}
-              <Dialog open={topupOpen} onClose={handleCloseTopup}>
-                <DialogTitle>Top Up Wallet</DialogTitle>
-                <DialogContent>
-                  <TextField
-                    autoFocus
-                    margin="dense"
-                    label="Amount (RM)"
-                    type="number"
-                    fullWidth
-                    value={topupAmount}
-                    onChange={e => setTopupAmount(e.target.value)}
-                    inputProps={{ min: 1, step: 1 }}
-                  />
-                  {walletError && (
-                    <Alert severity="error" sx={{ mt: 2 }}>{walletError}</Alert>
-                  )}
-                </DialogContent>
-                <DialogActions>
-                  <Button onClick={handleCloseTopup} disabled={topupLoading}>Cancel</Button>
-                  <Button onClick={handleTopup} variant="contained" disabled={topupLoading}>
-                    {topupLoading ? <CircularProgress size={20} /> : 'Top Up'}
-                  </Button>
-                </DialogActions>
-              </Dialog>
-
-              {/* Activity Overview Section */}
-              <Box sx={{
-                backgroundColor: 'white',
-                borderRadius: '16px',
-                p: 0.5,
-                mb: 1
-              }}>
-                <ProfileStats profile={profile} />
-              </Box>
-
-              {/* Recent Activity Section */}
-              <Grid container spacing={3} >
-                <Grid item xs={12} md={6} sx={{ maxWidth: 450 }}>
-                  <Box sx={{
-                    height: 'auto',
-                    backgroundColor: 'white',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    p: 3
-                  }}>
-                    <RecentBookings />
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={6} sx={{ maxWidth: 450 }}>
-                  <Box sx={{
-                    height: 'auto',
-                    backgroundColor: 'white',
-                    borderRadius: '16px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    p: 3
-                  }}>
-                    <RecentInvoices />
-                  </Box>
-                </Grid>
-              </Grid>
-            </>
-          ) : (
-            <EditProfileForm
-              profile={profile}
-              onSave={handleUpdateProfile}
-              onCancel={() => setActiveView('overview')}
-              onPhotoUpdate={handlePhotoUpdate}
-              onRemovePhoto={handleRemovePhoto}
-            />
-
+          {/* Right Content Area - Flexible Width */}
+          <Box sx={{ 
+            flex: 1, 
+            minWidth: 0,
+            width: { xs: '100%', lg: 'calc(100% - 260px - 24px)' },
+            overflow: 'hidden'
+          }}>
+            {isEditProfile ? (
+              <EditProfileForm
+                profile={profile}
+                onSave={handleUpdateProfile}
+                onCancel={() => navigate('/profile')}
+                onPhotoUpdate={handlePhotoUpdate}
+                onRemovePhoto={handleRemovePhoto}
+              />
+            ) : isNotifications ? (
+              <NotificationPreferencesPage
+                profile={profile}
+                onSave={prefs => setProfile(prev => ({ ...prev, ...prefs }))}
+                onCancel={() => navigate('/profile')}
+              />
+            ) : (
+              <Outlet />
+            )}
+          </Box>
+        </Box>
+      </Container>
+      {/* Top Up Dialog */}
+      <Dialog open={topupOpen} onClose={() => setTopupOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ pb: 2 }}>
+          <Typography variant="h5" fontWeight="bold">
+            Top Up Wallet
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2 }}>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Amount (RM)"
+            type="number"
+            fullWidth
+            value={topupAmount}
+            onChange={(e) => setTopupAmount(e.target.value)}
+            inputProps={{ min: 1, step: 1 }}
+            sx={{ mt: 2 }}
+            size="large"
+          />
+          {walletError && (
+            <Alert severity="error" sx={{ mt: 2 }}>{walletError}</Alert>
           )}
-        </Grid>
-      </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button 
+            onClick={() => setTopupOpen(false)} 
+            disabled={topupLoading}
+            size="large"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleTopup} 
+            variant="contained" 
+            disabled={topupLoading}
+            size="large"
+            sx={{ minWidth: 120 }}
+          >
+            {topupLoading ? <CircularProgress size={20} /> : 'Top Up'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
+      {/* Snackbar Notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={usernameChanged ? 10000 : 4000}
@@ -496,11 +460,7 @@ const ProfilePage = ({ editMode = false }) => {
               </Button>
             ) : null
           }
-          sx={{
-            backgroundColor: snackbar.severity === 'success' ? '#4caf50' :
-              snackbar.severity === 'info' ? '#2196f3' : '#f44336',
-            color: 'white'
-          }}
+          sx={{ width: '100%' }}
         >
           {snackbar.message}
           {usernameChanged && (

@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import HelpdeskService from '../../service/HelpdeskService';
 import ReactMarkdown from 'react-markdown';
-import { FaUser, FaRobot, FaPaperclip } from 'react-icons/fa';
+import { FaUser, FaRobot, FaPaperclip, FaArrowLeft } from 'react-icons/fa';
+import { useTheme, alpha } from '@mui/material/styles';
+import { IconButton, Button, CircularProgress, Box, Typography, TextField } from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
 
 const HelpdeskPage = () => {
+  const theme = useTheme();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +123,7 @@ const HelpdeskPage = () => {
     });
   };
 
-  // Inline styles (same as before, can be customized)
+  // Updated UI styles
   const styles = {
     container: {
       maxWidth: '800px',
@@ -127,25 +131,30 @@ const HelpdeskPage = () => {
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      background: '#f8f9fa'
+      background: theme.palette.background.default
     },
     header: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      padding: '2rem',
+      background: theme.palette.background.paper,
+      color: theme.palette.text.primary,
+      padding: '1.5rem',
       textAlign: 'center',
-      borderRadius: '0 0 20px 20px',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+      boxShadow: theme.shadows[1],
+      borderBottom: '2px solid',
+      borderColor: theme.palette.divider,
+      opacity: 0.8,
+      position: 'relative'
     },
     headerTitle: {
       margin: '0 0 0.5rem 0',
-      fontSize: '2rem',
-      fontWeight: '600'
+      fontSize: '1.5rem',
+      fontWeight: '700',
+      color: theme.palette.primary.main
     },
     headerSubtitle: {
       margin: 0,
-      opacity: 0.9,
-      fontSize: '1rem'
+      opacity: 0.8,
+      fontSize: '0.9rem',
+      color: theme.palette.text.secondary
     },
     messages: {
       flex: 1,
@@ -153,7 +162,8 @@ const HelpdeskPage = () => {
       padding: '1.5rem',
       display: 'flex',
       flexDirection: 'column',
-      gap: '1rem'
+      gap: '1.5rem',
+      background: theme.palette.background.default
     },
     welcomeMessage: {
       marginBottom: '1rem'
@@ -161,8 +171,9 @@ const HelpdeskPage = () => {
     message: {
       display: 'flex',
       flexDirection: 'column',
-      maxWidth: '80%',
-      animation: 'fadeIn 0.3s ease-in'
+      maxWidth: '85%',
+      animation: 'fadeIn 0.3s ease-in',
+      transition: 'all 0.2s'
     },
     userMessage: {
       alignSelf: 'flex-end'
@@ -171,19 +182,26 @@ const HelpdeskPage = () => {
       alignSelf: 'flex-start'
     },
     messageContent: {
-      background: 'white',
-      padding: '1rem 1.5rem',
+      background: theme.palette.mode === 'light'
+        ? alpha(theme.palette.grey[50], 0.98)
+        : theme.palette.background.paper,
+      color: theme.palette.text.primary,
+      padding: '1rem 1.25rem',
       borderRadius: '18px',
-      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-      position: 'relative'
+      boxShadow: theme.shadows[1],
+      position: 'relative',
+      borderBottomLeftRadius: '4px'
     },
     userMessageContent: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      padding: '1rem 1.5rem',
+      background: theme.palette.mode === 'light'
+        ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.light, 0.85)} 100%)`
+        : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.dark, 0.9)} 100%)`,
+      color: theme.palette.primary.contrastText,
+      padding: '1rem 1.25rem',
       borderRadius: '18px',
-      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-      position: 'relative'
+      boxShadow: theme.shadows[1],
+      position: 'relative',
+      borderBottomRightRadius: '4px'
     },
     messageList: {
       margin: '0.5rem 0',
@@ -193,44 +211,46 @@ const HelpdeskPage = () => {
       margin: '0.25rem 0'
     },
     messageTime: {
-      fontSize: '0.75rem',
-      color: '#666',
+      fontSize: '0.7rem',
+      color: theme.palette.text.secondary,
       marginTop: '0.25rem',
       textAlign: 'right'
     },
     userMessageTime: {
-      fontSize: '0.75rem',
-      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '0.7rem',
+      color: alpha(theme.palette.primary.contrastText, 0.7),
       marginTop: '0.25rem',
       textAlign: 'right'
     },
     errorMessage: {
-      color: '#dc3545',
+      color: theme.palette.error.main,
       fontWeight: '500'
     },
     escalateButton: {
-      background: '#28a745',
-      color: 'white',
+      background: theme.palette.success.main,
+      color: theme.palette.getContrastText(theme.palette.success.main),
       border: 'none',
       padding: '0.5rem 1rem',
       borderRadius: '20px',
       fontSize: '0.875rem',
       cursor: 'pointer',
       marginTop: '0.75rem',
-      transition: 'all 0.2s ease'
+      transition: 'all 0.2s ease',
+      fontWeight: 500,
+      display: 'block'
     },
     escalateButtonHover: {
-      background: '#218838',
+      background: theme.palette.success.dark,
       transform: 'translateY(-1px)'
     },
     escalatedNotice: {
-      background: '#d4edda',
-      color: '#155724',
+      background: alpha(theme.palette.success.light, 0.2),
+      color: theme.palette.success.dark,
       padding: '0.5rem 1rem',
       borderRadius: '8px',
       fontSize: '0.875rem',
       marginTop: '0.75rem',
-      border: '1px solid #c3e6cb'
+      border: `1px solid ${alpha(theme.palette.success.light, 0.5)}`
     },
     typingIndicator: {
       display: 'flex',
@@ -241,81 +261,89 @@ const HelpdeskPage = () => {
       width: '8px',
       height: '8px',
       borderRadius: '50%',
-      background: '#ccc',
+      background: theme.palette.divider,
       animation: 'typing 1.4s infinite ease-in-out'
     },
     typingDot1: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      background: '#ccc',
-      animation: 'typing 1.4s infinite ease-in-out',
       animationDelay: '-0.32s'
     },
     typingDot2: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      background: '#ccc',
-      animation: 'typing 1.4s infinite ease-in-out',
       animationDelay: '-0.16s'
     },
     errorBanner: {
-      background: '#f8d7da',
-      color: '#721c24',
+      background: alpha(theme.palette.error.light, 0.2),
+      color: theme.palette.error.dark,
       padding: '1rem',
       borderRadius: '8px',
       margin: '1rem 0',
-      border: '1px solid #f5c6cb',
+      border: `1px solid ${theme.palette.error.light}`,
       textAlign: 'center'
     },
     input: {
-      background: 'white',
-      padding: '1.5rem',
-      borderTop: '1px solid #e9ecef',
-      boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)'
+      background: theme.palette.mode === 'light'
+        ? alpha(theme.palette.grey[50], 0.98)
+        : theme.palette.background.paper,
+      padding: '1rem',
+      borderTop: '2px solid',
+      borderColor: theme.palette.divider,
+      opacity: 0.8,
+      boxShadow: theme.shadows[2]
     },
     inputContainer: {
       display: 'flex',
-      gap: '1rem',
+      gap: '0.5rem',
       alignItems: 'flex-end'
     },
     textarea: {
       flex: 1,
-      border: '2px solid #e9ecef',
+      border: '2px solid',
+      borderColor: theme.palette.divider,
+      opacity: 0.8,
       borderRadius: '25px',
-      padding: '0.75rem 1.5rem',
+      padding: '0.75rem 1.25rem',
       fontSize: '1rem',
       resize: 'none',
       outline: 'none',
-      transition: 'border-color 0.2s ease',
+      transition: 'all 0.2s ease',
       fontFamily: 'inherit',
-      lineHeight: 1.5
+      lineHeight: 1.5,
+      background: theme.palette.mode === 'light'
+        ? alpha(theme.palette.grey[100], 0.95)
+        : theme.palette.background.default,
+      color: theme.palette.text.primary,
+      minHeight: '50px'
     },
     textareaFocus: {
-      borderColor: '#667eea'
+      borderColor: theme.palette.primary.main,
+      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`
     },
     textareaDisabled: {
-      background: '#f8f9fa',
+      background: theme.palette.action.disabledBackground,
       cursor: 'not-allowed'
     },
     sendButton: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
+      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+      color: theme.palette.primary.contrastText,
       border: 'none',
-      padding: '0.75rem 1.5rem',
-      borderRadius: '25px',
+      padding: '0.75rem',
+      borderRadius: '50%',
       fontSize: '1rem',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
-      minWidth: '80px'
+      minWidth: '48px',
+      height: '48px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: theme.shadows[2]
     },
     sendButtonHover: {
       transform: 'translateY(-2px)',
-      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+      boxShadow: theme.shadows[4]
     },
     sendButtonDisabled: {
-      background: '#ccc',
+      background: theme.palette.action.disabled,
+      color: theme.palette.text.disabled,
       cursor: 'not-allowed',
       transform: 'none',
       boxShadow: 'none'
@@ -327,9 +355,56 @@ const HelpdeskPage = () => {
       background: 'transparent',
       border: 'none',
       cursor: 'pointer',
-      color: '#667eea',
-      fontSize: '1.5rem',
+      color: theme.palette.primary.main,
+      fontSize: '1.25rem',
       marginRight: '0.5rem'
+    },
+    quickReplyContainer: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.5rem',
+      marginTop: '1rem'
+    },
+    quickReplyButton: {
+      background: theme.palette.mode === 'light'
+        ? alpha(theme.palette.primary.light, 0.08)
+        : theme.palette.background.paper,
+      color: theme.palette.primary.main,
+      border: `1.5px solid ${theme.palette.primary.main}`,
+      borderRadius: '20px',
+      padding: '0.4rem 1rem',
+      fontSize: '0.85rem',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      fontWeight: 500
+    },
+    backButton: {
+      background: theme.palette.background.paper,
+      color: theme.palette.text.secondary,
+      border: `1px solid ${theme.palette.divider}`,
+      borderRadius: '20px',
+      padding: '0.4rem 1rem',
+      fontSize: '0.85rem',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      fontWeight: 500,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.3rem'
+    },
+    topicQuestionButton: {
+      background: theme.palette.mode === 'light'
+        ? alpha(theme.palette.primary.light, 0.08)
+        : theme.palette.background.paper,
+      color: theme.palette.primary.main,
+      border: `1.5px solid ${theme.palette.primary.main}`,
+      borderRadius: '20px',
+      padding: '0.4rem 1rem',
+      fontSize: '0.85rem',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      fontWeight: 500,
+      textAlign: 'left'
     }
   };
 
@@ -552,17 +627,27 @@ const HelpdeskPage = () => {
           <div style={styles.welcomeMessage}>
             <div style={{ ...styles.message, ...styles.aiMessage }}>
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <FaRobot size={28} style={{ marginRight: 8 }} />
+                <div style={{ 
+                  background: alpha(theme.palette.primary.main, 0.1), 
+                  borderRadius: '50%', 
+                  padding: '0.5rem',
+                  marginRight: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <FaRobot size={24} style={{ color: theme.palette.primary.main }} />
+                </div>
               </div>
               <div style={styles.messageContent}>
-                <p>👋 Hello! I'm your AI assistant. I can help you with:</p>
+                <p style={{ fontWeight: 500, marginBottom: '0.5rem' }}>👋 Hello! I'm your AI assistant. I can help you with:</p>
                 <ul style={styles.messageList}>
                   <li style={styles.messageListItem}>📅 Court bookings and reservations</li>
                   <li style={styles.messageListItem}>💳 Membership information and benefits</li>
-                  <li style={styles.messageListItem}>💳 Payment methods and wallet management</li>
+                  <li style={styles.messageListItem}>💰 Payment methods and wallet management</li>
                   <li style={styles.messageListItem}>📝 General questions about our services</li>
                 </ul>
-                <p>Just type your question below and I'll do my best to help!</p>
+                <p style={{ marginTop: '0.5rem' }}>Just type your question below and I'll do my best to help!</p>
               </div>
               <div style={styles.messageTime}>
                 {formatTime(new Date())}
@@ -577,29 +662,54 @@ const HelpdeskPage = () => {
             ...(message.sender === 'user' ? styles.userMessage : styles.aiMessage)
           }}>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              {message.sender === 'ai'
-                ? <FaRobot size={28} style={{ marginRight: 8 }} />
-                : <FaUser size={28} style={{ marginRight: 8 }} />}
+              {message.sender === 'ai' ? (
+                <div style={{ 
+                  background: alpha(theme.palette.primary.main, 0.1), 
+                  borderRadius: '50%', 
+                  padding: '0.5rem',
+                  marginRight: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <FaRobot size={24} style={{ color: theme.palette.primary.main }} />
+                </div>
+              ) : (
+                <div style={{ 
+                  background: alpha(theme.palette.primary.main, 0.2), 
+                  borderRadius: '50%', 
+                  padding: '0.5rem',
+                  marginRight: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <FaUser size={20} style={{ color: theme.palette.primary.main }} />
+                </div>
+              )}
+              
               <div style={message.sender === 'user' ? styles.userMessageContent : styles.messageContent}>
                 {message.isError ? (
                   <div style={styles.errorMessage}>
                     <span>⚠️ {message.content}</span>
                   </div>
                 ) : (
-                  message.sender === 'ai'
-                    ? <ReactMarkdown>{message.content}</ReactMarkdown>
-                    : <span>{message.content}</span>
+                  message.sender === 'ai' ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    <span>{message.content}</span>
+                  )
                 )}
 
                 {message.sender === 'ai' && message.queryId && !message.escalated && !message.isEscalated && (
                   <button
                     style={styles.escalateButton}
                     onMouseEnter={(e) => {
-                      e.target.style.background = '#218838';
+                      e.target.style.background = theme.palette.success.dark;
                       e.target.style.transform = 'translateY(-1px)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.background = '#28a745';
+                      e.target.style.background = theme.palette.success.main;
                       e.target.style.transform = 'translateY(0)';
                     }}
                     onClick={() => handleEscalate(message.queryId)}
@@ -615,173 +725,104 @@ const HelpdeskPage = () => {
                 )}
 
                 {message.type === 'quick_replies' && (
-                  <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-                    {message.options.map(btn => (
-                      <button
-                        key={btn.value}
-                        onClick={() => handleQuickReply(btn.value)}
-                        style={{
-                          background: '#e9ecef',
-                          color: '#343a40',
-                          border: '1px solid #ced4da',
-                          borderRadius: '15px',
-                          padding: '0.3rem 0.8rem',
-                          margin: '0.25rem 0.5rem',
-                          fontSize: '0.875rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = '#dee2e6';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = '#e9ecef';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
+                  <div style={{ marginTop: '1rem' }}>
+                    <p style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: theme.palette.text.secondary }}>
+                      What do you need help with?
+                    </p>
+                    <div style={styles.quickReplyContainer}>
+                      {message.options.map(btn => (
+                        <button
+                          key={btn.value}
+                          onClick={() => handleQuickReply(btn.value)}
+                          style={styles.quickReplyButton}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = alpha(theme.palette.primary.main, 0.1);
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = theme.palette.background.paper;
+                          }}
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {message.type === 'topic_questions' && (
-                  <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-                    {message.options.map(q => (
-                      <button
-                        key={q}
-                        onClick={() => handleTopicQuestion(q)}
-                        style={{
-                          background: '#e9ecef',
-                          color: '#343a40',
-                          border: '1px solid #ced4da',
-                          borderRadius: '15px',
-                          padding: '0.3rem 0.8rem',
-                          margin: '0.25rem 0.5rem',
-                          fontSize: '0.875rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = '#dee2e6';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = '#e9ecef';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                      >
-                        {q}
-                      </button>
-                    ))}
-                    {/* Back button */}
-                    <button
-                      onClick={() => {
-                        setPendingQuestions(null);
-                        setCurrentTopic(null);
-                        setShowQuickReplies(true);
-                        setShowEscalateForm(false);
-                        setEscalateSubmitted(false);
-                        setMessages(prev => [
-                          ...prev.filter(m => m.type !== 'topic_questions'),
-                          {
-                            id: Date.now() + Math.random(),
-                            sender: 'ai',
-                            type: 'quick_replies',
-                            options: QUICK_REPLIES,
-                            timestamp: new Date().toISOString()
-                          }
-                        ]);
-                      }}
-                      style={{
-                        background: '#fff',
-                        color: '#667eea',
-                        border: '1px solid #667eea',
-                        borderRadius: '15px',
-                        padding: '0.3rem 0.8rem',
-                        margin: '0.25rem 0.5rem',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        fontWeight: 'bold'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = '#f0f4ff';
-                        e.target.style.borderColor = '#667eea';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = '#fff';
-                        e.target.style.borderColor = '#667eea';
-                      }}
-                    >
-                      ← Back
-                    </button>
-                    {/* Escalate to Human Support button and form removed */}
-                    {showEscalateForm && !escalateSubmitted && (
-                      <div style={{ marginTop: '1rem', background: '#f8f9fa', borderRadius: 8, padding: 12 }}>
-                        <textarea
-                          value={escalateMessage}
-                          onChange={e => setEscalateMessage(e.target.value)}
-                          placeholder="Describe your issue..."
-                          rows={3}
-                          style={{ width: '100%', borderRadius: 8, padding: 8, border: '1px solid #ced4da' }}
-                        />
+                  <div style={{ marginTop: '1rem' }}>
+                    <p style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: theme.palette.text.secondary }}>
+                      Here are some common questions about {message.topic.replace('_', ' ')}:
+                    </p>
+                    <div style={styles.quickReplyContainer}>
+                      {message.options.map(q => (
                         <button
-                          onClick={handleEscalateSubmit}
-                          style={{
-                            background: '#28a745',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '15px',
-                            padding: '0.3rem 1.2rem',
-                            margin: '0.5rem 0 0 0',
-                            fontSize: '0.95rem',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
+                          key={q}
+                          onClick={() => handleTopicQuestion(q)}
+                          style={styles.topicQuestionButton}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = theme.palette.action.hover;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = theme.palette.background.paper;
                           }}
                         >
-                          Submit
+                          {q}
                         </button>
-                      </div>
-                    )}
-                    {escalateSubmitted && (
-                      <div style={{ color: 'green', marginTop: 8, fontWeight: 'bold' }}>
-                        Your request has been submitted. Please wait for a response via email.
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <button
+                        onClick={() => {
+                          setPendingQuestions(null);
+                          setCurrentTopic(null);
+                          setShowQuickReplies(true);
+                          setShowEscalateForm(false);
+                          setEscalateSubmitted(false);
+                          setMessages(prev => [
+                            ...prev.filter(m => m.type !== 'topic_questions'),
+                            {
+                              id: Date.now() + Math.random(),
+                              sender: 'ai',
+                              type: 'quick_replies',
+                              options: QUICK_REPLIES,
+                              timestamp: new Date().toISOString()
+                            }
+                          ]);
+                        }}
+                        style={styles.backButton}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = theme.palette.action.hover;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = theme.palette.background.paper;
+                        }}
+                      >
+                        <FaArrowLeft size={12} /> Back to topics
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {message.type === 'feedback_options' && (
-                  <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-                    {message.options.map(q => (
-                      <button
-                        key={q}
-                        onClick={() => handleFeedbackQuestion(q)}
-                        style={{
-                          background: '#e9ecef',
-                          color: '#343a40',
-                          border: '1px solid #ced4da',
-                          borderRadius: '15px',
-                          padding: '0.3rem 0.8rem',
-                          margin: '0.25rem 0.5rem',
-                          fontSize: '0.875rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = '#dee2e6';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = '#e9ecef';
-                          e.target.style.borderColor = '#ced4da';
-                        }}
-                      >
-                        {q}
-                      </button>
-                    ))}
+                  <div style={{ marginTop: '1rem' }}>
+                    <div style={styles.quickReplyContainer}>
+                      {message.options.map(q => (
+                        <button
+                          key={q}
+                          onClick={() => handleFeedbackQuestion(q)}
+                          style={styles.topicQuestionButton}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = theme.palette.action.hover;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = theme.palette.background.paper;
+                          }}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -794,11 +835,24 @@ const HelpdeskPage = () => {
 
         {isLoading && (
           <div style={{ ...styles.message, ...styles.aiMessage }}>
-            <div style={styles.messageContent}>
-              <div style={styles.typingIndicator}>
-                <span style={styles.typingDot1}></span>
-                <span style={styles.typingDot2}></span>
-                <span style={styles.typingDot}></span>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <div style={{ 
+                background: alpha(theme.palette.primary.main, 0.1), 
+                borderRadius: '50%', 
+                padding: '0.5rem',
+                marginRight: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <FaRobot size={24} style={{ color: theme.palette.primary.main }} />
+              </div>
+              <div style={styles.messageContent}>
+                <div style={styles.typingIndicator}>
+                  <span style={{ ...styles.typingDot, ...styles.typingDot1 }}></span>
+                  <span style={{ ...styles.typingDot, ...styles.typingDot2 }}></span>
+                  <span style={styles.typingDot}></span>
+                </div>
               </div>
             </div>
           </div>
@@ -830,11 +884,13 @@ const HelpdeskPage = () => {
                 ...(inputMessage.trim() ? styles.textareaFocus : {})
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#667eea';
+                e.target.style.borderColor = theme.palette.primary.main;
+                e.target.style.boxShadow = `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`;
               }}
               onBlur={(e) => {
                 if (!inputMessage.trim()) {
-                  e.target.style.borderColor = '#e9ecef';
+                  e.target.style.borderColor = theme.palette.divider;
+                  e.target.style.boxShadow = 'none';
                 }
               }}
             />
@@ -848,17 +904,17 @@ const HelpdeskPage = () => {
               onMouseEnter={(e) => {
                 if (!isLoading && inputMessage.trim()) {
                   e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                  e.target.style.boxShadow = theme.shadows[4];
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isLoading && inputMessage.trim()) {
                   e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = theme.shadows[2];
                 }
               }}
             >
-              {isLoading ? 'Sending...' : 'Send'}
+              <SendIcon fontSize="small" />
             </button>
           </div>
         </div>
@@ -881,11 +937,13 @@ const HelpdeskPage = () => {
                 ...(inputMessage.trim() ? styles.textareaFocus : {})
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#667eea';
+                e.target.style.borderColor = theme.palette.primary.main;
+                e.target.style.boxShadow = `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`;
               }}
               onBlur={(e) => {
                 if (!inputMessage.trim()) {
-                  e.target.style.borderColor = '#e9ecef';
+                  e.target.style.borderColor = theme.palette.divider;
+                  e.target.style.boxShadow = 'none';
                 }
               }}
             />
@@ -899,17 +957,17 @@ const HelpdeskPage = () => {
               onMouseEnter={(e) => {
                 if (!isLoading && inputMessage.trim()) {
                   e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                  e.target.style.boxShadow = theme.shadows[4];
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isLoading && inputMessage.trim()) {
                   e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = theme.shadows[2];
                 }
               }}
             >
-              {isLoading ? 'Sending...' : 'Send'}
+              <SendIcon fontSize="small" />
             </button>
           </div>
         </div>
@@ -981,4 +1039,4 @@ const HelpdeskPage = () => {
   );
 };
 
-export default HelpdeskPage; 
+export default HelpdeskPage;

@@ -2,70 +2,92 @@ import React from 'react';
 import { 
   Box, 
   Typography, 
-  Card, 
-  CardContent, 
   Button, 
-  Divider 
+  Divider,
+  useTheme
 } from '@mui/material';
-import { Receipt } from '@mui/icons-material';
 
 const RecentInvoices = () => {
+  const theme = useTheme();
   // Placeholder data - replace with actual data from backend
   const invoices = [];
   
   return (
-    <Card sx={{ 
-      borderRadius: '16px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-      height: 'auto%',
-      border: '1px solid #e0e0e0',
-      backgroundColor: 'white',
-      p: 2
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
     }}>
-      <CardContent sx={{ p: 0 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          mb: 1 
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 2,
+        flexShrink: 0
+      }}>
+        <Typography variant="h6" sx={{ 
+          fontWeight: 'bold',
+          fontSize: { xs: '1.1rem', lg: '1.25rem' }
         }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-            My Invoices
-          </Typography>
-          <Button 
-            size="small" 
-            sx={{ 
-              color: '#8e44ad', 
-              fontWeight: 'bold',
-              textTransform: 'none',
-              fontSize: '0.875rem'
-            }}
-          >
-            See all
-          </Button>
-        </Box>
-        
+          My Invoices
+        </Typography>
+        <Button 
+          size="small" 
+          sx={{ 
+            color: theme.palette.primary.main, 
+            fontWeight: 'bold',
+            textTransform: 'none',
+            fontSize: '0.85rem',
+            minWidth: 'auto',
+            px: 1
+          }}
+        >
+          See all
+        </Button>
+      </Box>
+      
+      {/* Content */}
+      <Box sx={{ 
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}>
         {invoices.length > 0 ? (
-          <Box>
+          <Box sx={{ 
+            flex: 1,
+            overflowY: 'auto'
+          }}>
             {/* Render invoice items */}
+            {invoices.map((invoice, index) => (
+              <Box key={index} sx={{ mb: 1, p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                {/* Invoice item content */}
+              </Box>
+            ))}
           </Box>
         ) : (
           <Box sx={{ 
+            flex: 1,
             display: 'flex', 
-            flexDirection: 'column', 
-            minHeight: 200,
-            p: 3
+            flexDirection: 'column',
+            justifyContent: 'center',
+            px: 2
           }}>
-            <Typography variant="h4" sx={{ 
+            <Typography variant="h3" sx={{ 
               fontWeight: 'bold', 
               textAlign: 'center',
-              mb: 1
+              mb: 1,
+              fontSize: { xs: '2rem', lg: '2.5rem' },
+              color: theme.palette.text.primary
             }}>
               RM0
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ 
               textAlign: 'center',
-              mb: 3
+              mb: 3,
+              fontSize: '0.9rem'
             }}>
               spent on sports this year
             </Typography>
@@ -75,27 +97,35 @@ const RecentInvoices = () => {
             <Typography variant="body2" sx={{ 
               fontWeight: 500,
               textAlign: 'center',
-              mb: 2
+              mb: 2,
+              fontSize: '0.9rem',
+              lineHeight: 1.4,
+              color: theme.palette.text.primary
             }}>
               Claim up to RM1,000 in tax relief while staying active and healthy!
             </Typography>
             
             <Button 
               variant="text"
+              size="small"
               sx={{
-                color: '#8e44ad',
+                color: theme.palette.primary.main,
                 fontWeight: 'bold',
                 textTransform: 'none',
                 alignSelf: 'center',
-                '&:hover': { backgroundColor: 'transparent' }
+                fontSize: '0.85rem',
+                '&:hover': { 
+                  backgroundColor: 'transparent',
+                  textDecoration: 'underline'
+                }
               }}
             >
               See last year's amount →
             </Button>
           </Box>
         )}
-      </CardContent>
-    </Card>
+      </Box>
+    </Box>
   );
 };
 

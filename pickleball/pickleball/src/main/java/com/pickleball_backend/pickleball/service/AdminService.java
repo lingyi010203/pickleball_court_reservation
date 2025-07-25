@@ -10,4 +10,5 @@ public interface AdminService {
     String loginAndGetToken(String username, String password);
     AdminProfileDto getProfileByUsername(String username);
     AdminProfileDto updateProfile(String username, AdminProfileDto dto);
+    void changePassword(String username, String currentPassword, String newPassword);
 }

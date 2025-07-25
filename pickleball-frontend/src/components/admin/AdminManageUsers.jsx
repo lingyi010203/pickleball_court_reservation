@@ -52,9 +52,11 @@ import UserService from '../../service/UserService';
 import AdminUserForm from './AdminUserForm';
 import ConfirmationDialog from './ConfirmationDialog';
 import AdminInviteForm from './AdminInviteForm';
+import { useTheme, alpha } from '@mui/material/styles';
 
 const AdminManageUsers = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -75,17 +77,17 @@ const AdminManageUsers = () => {
         gap: 2
       }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#5d3587' }}>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
             User Management
           </Typography>
-          <Typography variant="body1" sx={{ color: 'text.secondary', mt: 1 }}>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1 }}>
             Manage users and review type change requests
           </Typography>
         </Box>
       </Box>
 
       {/* Tab Navigation */}
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, '& .MuiTab-root.Mui-selected': { color: theme.palette.primary.main } }}>
         <Tab label="Pending Requests" />
         <Tab label="User Management" />
       </Tabs>
@@ -111,6 +113,7 @@ const PendingRequestsTab = () => {
     severity: 'success'
   });
   const [filter, setFilter] = useState('all');
+  const theme = useTheme();
 
   useEffect(() => {
     fetchPendingRequests();
@@ -254,9 +257,9 @@ const PendingRequestsTab = () => {
         justifyContent: 'space-between',
         alignItems: 'center',
         mb: 3,
-        backgroundColor: 'white',
+        backgroundColor: theme.palette.background.paper,
         borderRadius: '16px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+        boxShadow: theme.shadows[1],
         p: 2
       }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
@@ -282,9 +285,9 @@ const PendingRequestsTab = () => {
             startIcon={<RefreshIcon />}
             onClick={fetchPendingRequests}
             sx={{
-              borderColor: '#8e44ad',
-              color: '#8e44ad',
-              '&:hover': { borderColor: '#732d91' }
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': { borderColor: theme.palette.primary.dark }
             }}
           >
             Refresh
@@ -295,9 +298,9 @@ const PendingRequestsTab = () => {
       {/* Content Section */}
       {filteredRequests.length === 0 ? (
         <Box sx={{
-          backgroundColor: 'white',
+          backgroundColor: theme.palette.background.paper,
           borderRadius: '16px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          boxShadow: theme.shadows[2],
           p: 6,
           textAlign: 'center'
         }}>
@@ -320,13 +323,13 @@ const PendingRequestsTab = () => {
           }}
         >
           <Table sx={{ minWidth: 650 }} aria-label="pending requests table">
-            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+            <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>User ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Current Type</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Requested Type</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>User ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Current Type</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Requested Type</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -338,7 +341,8 @@ const PendingRequestsTab = () => {
                     <Chip
                       label={request.currentType}
                       sx={{
-                        backgroundColor: '#e0e0e0',
+                        backgroundColor: theme.palette.grey[200],
+                        color: theme.palette.text.primary,
                         fontWeight: 'bold'
                       }}
                     />
@@ -348,11 +352,11 @@ const PendingRequestsTab = () => {
                       label={request.requestedType}
                       sx={{
                         backgroundColor: request.requestedType === 'Coach'
-                          ? '#e3f2fd'
-                          : '#f3e5f5',
+                          ? theme.palette.info.light
+                          : theme.palette.secondary.light,
                         color: request.requestedType === 'Coach'
-                          ? '#1565c0'
-                          : '#8e44ad',
+                          ? theme.palette.info.dark
+                          : theme.palette.secondary.dark,
                         fontWeight: 'bold'
                       }}
                     />
@@ -365,10 +369,18 @@ const PendingRequestsTab = () => {
                           size="small"
                           startIcon={<CheckCircleIcon />}
                           sx={{
-                            backgroundColor: '#2ecc71',
-                            '&:hover': { backgroundColor: '#27ae60' },
+                            background: `linear-gradient(90deg, ${theme.palette.success.main} 60%, ${alpha(theme.palette.success.light, 0.85)})`,
+                            color: theme.palette.getContrastText(theme.palette.success.main),
+                            fontWeight: 'bold',
                             textTransform: 'none',
-                            fontWeight: 'bold'
+                            borderRadius: 2,
+                            px: 2,
+                            py: 0.5,
+                            boxShadow: theme.shadows[1],
+                            '&:hover': {
+                              background: `linear-gradient(90deg, ${theme.palette.success.dark} 60%, ${theme.palette.success.main})`,
+                              boxShadow: theme.shadows[3]
+                            }
                           }}
                           onClick={() => handleApprove(request.userId, request.requestedType)}
                         >
@@ -451,6 +463,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const theme = useTheme();
 
   const fetchUsers = async () => {
     try {
@@ -821,9 +834,9 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         )}
 
         <Table>
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
             <TableRow>
-              <TableCell padding="checkbox">
+              <TableCell padding="checkbox" sx={{ color: theme.palette.text.primary }}>
                 <Checkbox
                   indeterminate={selectedUsers.length > 0 && selectedUsers.length < users.length}
                   checked={users.length > 0 && selectedUsers.length === users.length}
@@ -831,21 +844,21 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                   disabled={loading}
                 />
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={orderBy === 'name'}
                   direction={orderBy === 'name' ? order : 'asc'}
                   onClick={() => handleSort('name')}
                   disabled={loading}
                 >
-                  <Typography sx={{ fontWeight: 'bold' }}>Name</Typography>
+                  <Typography sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Name</Typography>
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Join Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Role</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Join Date</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Actions</TableCell>
             </TableRow>
           </TableHead>
 

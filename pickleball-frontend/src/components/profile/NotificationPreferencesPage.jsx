@@ -8,12 +8,15 @@ import {
   Snackbar,
   Alert,
   FormGroup,
-  CircularProgress
+  CircularProgress,
+  useTheme,
+  alpha
 } from '@mui/material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
 
 const NotificationPreferences = ({ profile, onSave, onCancel }) => {
+  const theme = useTheme();
   const [preferences, setPreferences] = useState({
     emailNotifications: profile.emailNotifications,
     pushNotifications: profile.pushNotifications
@@ -74,9 +77,9 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
 
   return (
     <Box sx={{ 
-      backgroundColor: 'white', 
+      backgroundColor: theme.palette.background.paper, 
       borderRadius: '16px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+      boxShadow: theme.shadows[4],
       p: 3,
       maxWidth: '900px',
       mx: 'auto'
@@ -84,8 +87,10 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
       <Typography variant="h5" sx={{ 
         fontWeight: 'bold', 
         mb: 3,
-        color: '#8e44ad',
-        borderBottom: '1px solid #eee',
+        color: theme.palette.primary.main,
+        borderBottom: '2px solid',
+        borderColor: theme.palette.divider,
+        opacity: 0.8,
         pb: 1
       }}>
         Notification Preferences
@@ -96,7 +101,7 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
       </Typography>
       
       <FormGroup>
-        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+        <Box sx={{ mb: 2, p: 2, backgroundColor: theme.palette.action.hover, borderRadius: '8px' }}>
           <FormControlLabel
             control={
               <Checkbox
@@ -120,7 +125,7 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
           />
         </Box>
         
-        <Box sx={{ p: 2, backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+        <Box sx={{ p: 2, backgroundColor: theme.palette.action.hover, borderRadius: '8px' }}>
           <FormControlLabel
             control={
               <Checkbox
@@ -151,8 +156,8 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
           onClick={onCancel}
           disabled={loading}
           sx={{ 
-            color: 'text.secondary',
-            borderColor: 'text.secondary',
+            color: theme.palette.text.secondary,
+            borderColor: theme.palette.text.secondary,
             minWidth: '120px',
             textTransform: 'uppercase',
             fontWeight: 'bold',
@@ -167,8 +172,8 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
           onClick={handleSubmit}
           disabled={loading}
           sx={{ 
-            backgroundColor: '#8e44ad', 
-            '&:hover': { backgroundColor: '#732d91' },
+            backgroundColor: theme.palette.primary.main, 
+            '&:hover': { backgroundColor: theme.palette.primary.dark },
             minWidth: '180px',
             textTransform: 'uppercase',
             fontWeight: 'bold',
@@ -190,7 +195,7 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
           onClose={handleCloseSnackbar} 
           severity={snackbar.severity}
           sx={{ 
-            backgroundColor: snackbar.severity === 'success' ? '#4caf50' : '#f44336',
+            backgroundColor: snackbar.severity === 'success' ? theme.palette.success.main : theme.palette.error.main,
             color: 'white'
           }}
         >

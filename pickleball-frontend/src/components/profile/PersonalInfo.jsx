@@ -1,18 +1,19 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme, alpha } from '@mui/material';
 
-const PersonalInfo = ({ profile }) => {
+const PersonalInfo = (props) => {
+  const theme = useTheme();
   return (
     <Box sx={{ 
-      backgroundColor: 'white', 
+      backgroundColor: theme.palette.background.paper, 
       borderRadius: '16px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+      boxShadow: theme.shadows[4],
       p: 3
     }}>
       <Typography variant="subtitle1" sx={{ 
         fontWeight: 'bold', 
         mb: 1,
-        color: '#8e44ad'
+        color: theme.palette.primary.main
       }}>
         PERSONAL
       </Typography>
@@ -21,7 +22,7 @@ const PersonalInfo = ({ profile }) => {
           Name
         </Typography>
         <Typography variant="body1" sx={{ fontWeight: 500 }}>
-          {profile.name}
+          {props.profile.name}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           Changes of name will be reflected across your account
@@ -32,7 +33,7 @@ const PersonalInfo = ({ profile }) => {
           Gender
         </Typography>
         <Typography variant="body1" sx={{ fontWeight: 500 }}>
-          {profile.gender || 'Not provided'}
+          {props.profile.gender || 'Not provided'}
         </Typography>
       </Box>
     </Box>

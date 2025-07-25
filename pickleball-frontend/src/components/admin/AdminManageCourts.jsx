@@ -5,7 +5,7 @@ import {
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
   CircularProgress, Grid, Chip, MenuItem, FormControl, InputLabel, Select, 
   InputAdornment, Checkbox, Divider, TablePagination, TableSortLabel,
-  FormGroup, FormControlLabel, TableFooter
+  FormGroup, FormControlLabel, TableFooter, useTheme, alpha
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -21,6 +21,7 @@ import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
 
 
 const AdminManageCourts = () => {
+  const theme = useTheme();
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -461,7 +462,7 @@ const AdminManageCourts = () => {
   if (loading && !courts.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+        <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
@@ -470,10 +471,10 @@ const AdminManageCourts = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#5d3587' }}>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
             Manage Courts
           </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1 }}>
             Manage and organize all sports courts
           </Typography>
         </Box>
@@ -481,7 +482,7 @@ const AdminManageCourts = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+          sx={{ background: `linear-gradient(90deg, ${theme.palette.primary.main} 60%, ${alpha(theme.palette.primary.light, 0.85)})`, color: theme.palette.getContrastText(theme.palette.primary.main), fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { background: `linear-gradient(90deg, ${theme.palette.primary.dark} 60%, ${theme.palette.primary.main})`, boxShadow: theme.shadows[4] } }}
         >
           Add New Court
         </Button>
@@ -519,10 +520,10 @@ const AdminManageCourts = () => {
             startIcon={<RefreshIcon />}
             onClick={fetchCourts}
             sx={{ 
-              borderColor: '#8e44ad', 
-              color: '#8e44ad', 
+              borderColor: theme.palette.primary.main, 
+              color: theme.palette.primary.main, 
               minWidth: 120,
-              '&:hover': { borderColor: '#732d91' }
+              '&:hover': { borderColor: theme.palette.primary.dark }
             }}
           >
             Refresh
@@ -551,16 +552,16 @@ const AdminManageCourts = () => {
 
       <TableContainer component={Paper} sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
         <Table>
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
             <TableRow>
-              <TableCell padding="checkbox">
+              <TableCell padding="checkbox" sx={{ color: theme.palette.text.primary }}>
                 <Checkbox
                   indeterminate={selectedCourts.length > 0 && selectedCourts.length < courts.length}
                   checked={courts.length > 0 && selectedCourts.length === courts.length}
                   onChange={handleSelectAllClick}
                 />
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={orderBy === 'name'}
                   direction={orderBy === 'name' ? order : 'asc'}
@@ -569,8 +570,8 @@ const AdminManageCourts = () => {
                   Court Name
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Venue</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Venue</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={orderBy === 'status'}
                   direction={orderBy === 'status' ? order : 'asc'}
@@ -579,10 +580,10 @@ const AdminManageCourts = () => {
                   Status
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Operating Day(s)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Peak Hourly Price (RM)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Off-Peak Hourly Price (RM)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Operating Day(s)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Peak Hourly Price (RM)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Off-Peak Hourly Price (RM)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -602,10 +603,10 @@ const AdminManageCourts = () => {
                     <Chip
                       label={court.status}
                       sx={{
-                        backgroundColor: court.status === 'ACTIVE' ? '#d5f5e3' :
-                          court.status === 'MAINTENANCE' ? '#fff3cd' : '#f5d5d5',
-                        color: court.status === 'ACTIVE' ? '#27ae60' :
-                          court.status === 'MAINTENANCE' ? '#856404' : '#c0392b',
+                        backgroundColor: court.status === 'ACTIVE' ? theme.palette.success.light :
+                          court.status === 'MAINTENANCE' ? theme.palette.warning.light : theme.palette.error.light,
+                        color: court.status === 'ACTIVE' ? theme.palette.success.dark :
+                          court.status === 'MAINTENANCE' ? theme.palette.warning.dark : theme.palette.error.dark,
                         fontWeight: 'bold'
                       }}
                     />
@@ -724,7 +725,7 @@ const AdminManageCourts = () => {
                   {venues.map(v => (
                     <MenuItem key={v.id} value={v.id}>{v.name} ({v.address || v.location})</MenuItem>
                   ))}
-                  <MenuItem value="add_new_venue" style={{ color: '#8e44ad', fontWeight: 'bold' }}>+ 新建场馆</MenuItem>
+                  <MenuItem value="add_new_venue" style={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>+ 新建场馆</MenuItem>
                 </Select>
                 {formErrors.venueId && <Typography color="error" variant="caption">{formErrors.venueId}</Typography>}
               </FormControl>
@@ -912,7 +913,7 @@ const AdminManageCourts = () => {
             onClick={handleSubmit}
             variant="contained"
             disabled={loading}
-            sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+            sx={{ background: `linear-gradient(90deg, ${theme.palette.primary.main} 60%, ${alpha(theme.palette.primary.light, 0.85)})`, color: theme.palette.getContrastText(theme.palette.primary.main), fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { background: `linear-gradient(90deg, ${theme.palette.primary.dark} 60%, ${theme.palette.primary.main})`, boxShadow: theme.shadows[4] } }}
           >
             {loading ? <CircularProgress size={24} /> : currentCourt ? 'Update' : 'Create'}
           </Button>

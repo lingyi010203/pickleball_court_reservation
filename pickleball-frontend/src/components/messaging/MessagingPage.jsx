@@ -3,17 +3,32 @@ import React from 'react';
 import { Container, Box } from '@mui/material';
 import MessagingHub from './MessagingHub';
 import { SocketProvider } from '../../context/SocketContext';
+import { useTheme, alpha } from '@mui/material/styles';
 
 export default function MessagingPage() {
+  const theme = useTheme();
   return (
-    <Container maxWidth="md" sx={{ mt: 4, height: '80vh' }}>
-      <Box 
-        sx={{ 
-          height: '100%', 
-          border: '1px solid #e0e0e0', 
-          borderRadius: 2, 
+    <Container maxWidth="md" sx={{ 
+      mt: { xs: 2, sm: 4 }, 
+      height: { xs: 'calc(100vh - 32px)', md: '85vh' }, 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      p: 0
+    }}>
+      <Box
+        sx={{
+          height: '100%',
+          width: '100%',
+          borderRadius: 4,
           overflow: 'hidden',
-          boxShadow: 3
+          boxShadow: theme.shadows[6],
+          bgcolor: theme.palette.background.paper,
+          display: 'flex',
+          flexDirection: 'column',
+          border: theme.palette.mode === 'dark'
+            ? `1px solid ${alpha(theme.palette.divider, 0.3)}`
+            : `1px solid ${alpha(theme.palette.divider, 0.2)}`
         }}
       >
         <SocketProvider>

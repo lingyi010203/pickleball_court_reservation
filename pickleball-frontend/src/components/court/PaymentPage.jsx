@@ -29,6 +29,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import api from '../../api/axiosConfig.js';
 import { getWalletBalance, initializeWallet } from '../../service/WalletService';
 import { useAuth } from '../../context/AuthContext';
+import ThemedCard from '../common/ThemedCard';
 
 const PaymentPage = () => {
   const location = useLocation();
@@ -168,7 +169,7 @@ const PaymentPage = () => {
       }}>
         {/* Left Column - Booking Summary */}
         <Box sx={{ flex: { xs: 'none', md: 1 } }}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+          <ThemedCard sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
             <CardContent sx={{ p: 4 }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2', mb: 3 }}>
                 📋 Booking Summary
@@ -244,12 +245,12 @@ const PaymentPage = () => {
                 </Grid>
               </Grid>
             </CardContent>
-          </Card>
+          </ThemedCard>
         </Box>
 
         {/* Right Column - Payment */}
         <Box sx={{ flex: { xs: 'none', md: 1 } }}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
+          <ThemedCard sx={{ borderRadius: 3, boxShadow: 2, height: '100%' }}>
             <CardContent sx={{ p: 4 }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#2e7d32', mb: 3 }}>
                 💳 Payment Details
@@ -286,7 +287,7 @@ const PaymentPage = () => {
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
                   {/* Wallet Option */}
-                  <Card 
+                  <ThemedCard 
                     variant="outlined" 
                     sx={{ 
                       mb: 2, 
@@ -317,10 +318,10 @@ const PaymentPage = () => {
                       }
                       sx={{ p: 2, width: '100%' }}
                     />
-                  </Card>
+                  </ThemedCard>
 
                   {/* Credit Card Option */}
-                  <Card 
+                  <ThemedCard 
                     variant="outlined" 
                     sx={{ 
                       borderRadius: 2,
@@ -339,7 +340,7 @@ const PaymentPage = () => {
                       }
                       sx={{ p: 2, width: '100%' }}
                     />
-                  </Card>
+                  </ThemedCard>
                 </RadioGroup>
               </FormControl>
 
@@ -425,7 +426,7 @@ const PaymentPage = () => {
                 </Button>
               </Box>
             </CardContent>
-          </Card>
+          </ThemedCard>
         </Box>
       </Box>
     </Container>

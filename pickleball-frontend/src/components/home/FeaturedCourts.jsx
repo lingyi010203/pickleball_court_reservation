@@ -42,7 +42,14 @@ const FeaturedCourts = () => {
   }, []);
 
   return (
-    <Box sx={{ mb: 6 }}>
+    <Box 
+      sx={{ 
+        mb: 6,
+        maxWidth: 1200,
+        mx: 'auto',
+        width: '100%'
+      }}
+    >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" fontWeight="bold">Featured Courts</Typography>
         <Button variant="outlined" size="small" onClick={() => navigate('/courts')}>View All Courts</Button>

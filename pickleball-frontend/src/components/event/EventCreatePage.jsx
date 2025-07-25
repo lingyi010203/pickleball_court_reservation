@@ -23,7 +23,9 @@ import {
   InputAdornment,
   Fade,
   Zoom,
-  CircularProgress
+  CircularProgress,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Event,
@@ -45,6 +47,7 @@ import { useAuth } from '../../context/AuthContext';
 import EventService from '../../service/EventService';
 
 const EventCreatePage = () => {
+  const theme = useTheme();
   // Removed profile and loading state
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);

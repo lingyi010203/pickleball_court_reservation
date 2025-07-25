@@ -1,24 +1,27 @@
 // src/components/messaging/Conversation.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Box, Paper, Avatar, Typography, TextField, 
+import {
+  Box, Paper, Avatar, Typography, TextField,
   Button, IconButton, List, CircularProgress
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MessageBubble from './MessageBubble';
 import messageService from '../../service/MessageService';
 import { useSocket } from '../../context/SocketContext';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import { useTheme, alpha } from '@mui/material/styles';
 
 export default function Conversation({ otherUser, onBack }) {
+  const theme = useTheme();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const { stompClient } = useSocket();
-  
+
   // Get current user
   const currentUser = JSON.parse(localStorage.getItem('currentUser')) || {};
   const fileInputRef = useRef(null);
@@ -31,22 +34,22 @@ export default function Conversation({ otherUser, onBack }) {
           setLoading(false);
           return;
         }
-        
+
         const data = await messageService.getConversation(otherUser.username);
-        
+
         // Enhance message data
         const enhancedMessages = data.map(msg => ({
           ...msg,
-          senderUsername: msg.senderUsername || 
-                         (msg.sender?.userAccount?.username || '') ||
-                         (msg.sender?.username || ''),
-          senderProfileImage: msg.senderProfileImage || 
-                            (msg.sender?.profileImage || '') ||
-                            (msg.sender?.userAccount?.profileImage || ''),
+          senderUsername: msg.senderUsername ||
+            (msg.sender?.userAccount?.username || '') ||
+            (msg.sender?.username || ''),
+          senderProfileImage: msg.senderProfileImage ||
+            (msg.sender?.profileImage || '') ||
+            (msg.sender?.userAccount?.profileImage || ''),
           // Ensure image URLs are absolute
           imageUrl: msg.imageUrl ? msg.imageUrl : null
         }));
-        
+
         setMessages(enhancedMessages);
       } catch (error) {
         console.error('Failed to fetch messages', error);
@@ -54,7 +57,7 @@ export default function Conversation({ otherUser, onBack }) {
         setLoading(false);
       }
     };
-    
+
     if (otherUser) fetchMessages();
   }, [otherUser]);
 
@@ -71,29 +74,29 @@ export default function Conversation({ otherUser, onBack }) {
         if (data.type === 'delivered' || data.type === 'read') {
           setMessages(prev =>
             prev.map(msg =>
-              msg.id === data.messageId ? { 
-                ...msg, 
-                [data.type === 'delivered' ? 'delivered' : 'read']: true 
+              msg.id === data.messageId ? {
+                ...msg,
+                [data.type === 'delivered' ? 'delivered' : 'read']: true
               } : msg
             )
           );
           return;
         }
-        
+
         // Enhance received message
         const enhancedMessage = {
           ...data,
-          senderUsername: data.senderUsername || 
-                         (data.sender?.username || ''),
-          senderProfileImage: data.senderProfileImage || 
-                            (data.sender?.profileImage || ''),
+          senderUsername: data.senderUsername ||
+            (data.sender?.username || ''),
+          senderProfileImage: data.senderProfileImage ||
+            (data.sender?.profileImage || ''),
           // Ensure image URLs are absolute
           imageUrl: data.imageUrl ? `${process.env.REACT_APP_API_BASE_URL}${data.imageUrl}` : null
         };
-        
+
         // Only add relevant messages
-        if (enhancedMessage.senderUsername === otherUser.username || 
-            enhancedMessage.recipientUsername === otherUser.username) {
+        if (enhancedMessage.senderUsername === otherUser.username ||
+          enhancedMessage.recipientUsername === otherUser.username) {
           setMessages(prev => [...prev, enhancedMessage]);
         }
       }
@@ -105,17 +108,17 @@ export default function Conversation({ otherUser, onBack }) {
   // Scroll to bottom and mark delivered
   useEffect(() => {
     scrollToBottom();
-    
+
     // Mark undelivered messages
     const undeliveredIds = messages
-      .filter(msg => 
-        !msg.delivered && 
+      .filter(msg =>
+        !msg.delivered &&
         msg.senderUsername &&
         msg.senderUsername.toLowerCase() === otherUser.username.toLowerCase()
       )
       .map(msg => msg.id)
       .filter(id => id);
-      
+
     if (undeliveredIds.length > 0) {
       messageService.markAsDelivered(undeliveredIds);
       if (stompClient && stompClient.connected) {
@@ -156,7 +159,7 @@ export default function Conversation({ otherUser, onBack }) {
         senderProfileImage: currentUser.profileImage
       }
     ]);
-    
+
     setNewMessage('');
     scrollToBottom();
 
@@ -181,32 +184,32 @@ export default function Conversation({ otherUser, onBack }) {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     // Validate file
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file (JPG, PNG, GIF)');
-        return;
+      alert('Please select an image file (JPG, PNG, GIF)');
+      return;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) {
-        alert('Image size exceeds 5MB limit');
-        return;
+      alert('Image size exceeds 5MB limit');
+      return;
     }
 
     try {
-        setUploading(true);
-        
-        // Upload image
-        const imageUrl = await messageService.uploadImage(file);
-        
-        // Send message with image
-        handleSendImage(imageUrl);
+      setUploading(true);
+
+      // Upload image
+      const imageUrl = await messageService.uploadImage(file);
+
+      // Send message with image
+      handleSendImage(imageUrl);
     } catch (err) {
-        console.error('Image upload failed', err);
-        alert(`Image upload failed: ${err.message}`);
+      console.error('Image upload failed', err);
+      alert(`Image upload failed: ${err.message}`);
     } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploading(false);
     }
   };
 
@@ -233,7 +236,7 @@ export default function Conversation({ otherUser, onBack }) {
         type: 'image'
       }
     ]);
-    
+
     scrollToBottom();
 
     // Send via WebSocket
@@ -287,47 +290,94 @@ export default function Conversation({ otherUser, onBack }) {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <Paper sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
-        <IconButton onClick={onBack} sx={{ mr: 1 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: theme.palette.background.default }}>      {/* Header */}
+      <Paper sx={{
+        p: 1.5,
+        display: 'flex',
+        alignItems: 'center',
+        background: theme.palette.mode === 'dark'
+          ? alpha(theme.palette.background.paper, 0.9)
+          : alpha(theme.palette.background.paper, 0.95),
+        color: theme.palette.text.primary,
+        borderRadius: 0,
+        boxShadow: theme.shadows[1],
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+      }}>
+        <IconButton
+          onClick={onBack}
+          sx={{
+            mr: 1,
+            color: theme.palette.text.secondary,
+            '&:hover': {
+              background: alpha(theme.palette.primary.main, 0.1)
+            }
+          }}
+        >
           <ArrowBackIcon />
         </IconButton>
-        <Avatar src={otherUser.profileImage} sx={{ mr: 2 }} />
-        <Typography variant="h6">{otherUser.name}</Typography>
+        <Avatar
+          src={otherUser.profileImage}
+          sx={{
+            width: 42,
+            height: 42,
+            boxShadow: theme.shadows[1],
+            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+            mr: 2
+          }}
+        />
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{otherUser.name}</Typography>
+        </Box>
       </Paper>
-      
       {/* Message list */}
-      <Box sx={{ 
-        flex: 1, 
-        overflow: 'auto', 
-        p: 2, 
-        bgcolor: 'background.paper',
+      <Box sx={{
+        flex: 1,
+        overflow: 'auto',
+        p: { xs: 1, sm: 2 },
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        minHeight: 0,
+        background: theme.palette.mode === 'dark'
+          ? `linear-gradient(${alpha(theme.palette.background.default, 0.9)}, ${alpha(theme.palette.background.default, 0.9)}), 
+             url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E")`
+          : theme.palette.background.default,
+        backgroundSize: '300px 300px'
       }}>
         <List sx={{ padding: 0 }}>
           {messages.map((msg) => (
-            <MessageBubble 
-              key={msg.id || msg.timestamp} 
-              message={msg} 
+            <MessageBubble
+              key={msg.id || msg.timestamp}
+              message={msg}
             />
           ))}
           <div ref={messagesEndRef} />
         </List>
       </Box>
-      
       {/* Input area */}
-      <Paper sx={{ p: 1, display: 'flex', alignItems: 'center', position: 'relative' }}>
+      <Paper sx={{
+        p: 1.5,
+        display: 'flex',
+        alignItems: 'center',
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 10,
+        borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        background: theme.palette.background.paper,
+        boxShadow: theme.shadows[3]
+      }}>
         {uploading && (
           <Box sx={{
             position: 'absolute',
-            top: -30,
+            top: -40,
             left: 0,
             right: 0,
             display: 'flex',
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            zIndex: 2
           }}>
             <CircularProgress size={20} />
             <Typography variant="caption" sx={{ ml: 1 }}>
@@ -335,23 +385,19 @@ export default function Conversation({ otherUser, onBack }) {
             </Typography>
           </Box>
         )}
-        
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Type a message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          sx={{ mr: 1 }}
-          multiline
-          maxRows={4}
-        />
-        <IconButton 
+        <IconButton
           onClick={() => fileInputRef.current.click()}
           disabled={uploading}
+          sx={{
+            color: theme.palette.text.secondary,
+            mx: 0.5,
+            '&:hover': { 
+              color: theme.palette.primary.main,
+              background: alpha(theme.palette.primary.main, 0.1)
+            }
+          }}
         >
-          <AttachFileIcon />
+          <InsertPhotoIcon />
         </IconButton>
         <input
           type="file"
@@ -361,15 +407,45 @@ export default function Conversation({ otherUser, onBack }) {
           onChange={handleFileChange}
           disabled={uploading}
         />
-        <Button 
-          variant="contained" 
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Type a message..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          sx={{ 
+            mr: 1, 
+            bgcolor: theme.palette.background.paper,
+            borderRadius: 4,
+            '& .MuiOutlinedInput-root': { 
+              borderRadius: 4,
+              bgcolor: theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.grey[800], 0.4) 
+                : alpha(theme.palette.grey[100], 0.8)
+            }
+          }}
+          multiline
+          maxRows={4}
+        />
+        <Button
+          variant="contained"
           color="primary"
           onClick={handleSend}
           disabled={!newMessage.trim() || uploading}
-          sx={{ 
-            minWidth: '56px', 
-            height: '56px',
-            borderRadius: '50%'
+          sx={{
+            minWidth: 48,
+            height: 48,
+            borderRadius: '50%',
+            boxShadow: theme.shadows[2],
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+            '&:hover': {
+              background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.dark})`,
+              boxShadow: theme.shadows[4]
+            },
+            '&:disabled': {
+              background: theme.palette.action.disabledBackground
+            }
           }}
         >
           <SendIcon />

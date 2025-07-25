@@ -17,7 +17,9 @@ import {
   CircularProgress,
   Alert,
   Grid,
-  Divider
+  Divider,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   AccountBalance as WalletIcon,
@@ -29,6 +31,7 @@ import {
 import { getWalletTransactions, getWalletDetails } from '../../service/WalletService';
 
 const WalletTransactionHistory = () => {
+  const theme = useTheme();
   const [transactions, setTransactions] = useState([]);
   const [walletDetails, setWalletDetails] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -5,7 +5,7 @@ import {
   TableHead, TableRow, Paper, Button, IconButton, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
   CircularProgress, Grid, Chip, Switch, FormControlLabel, MenuItem, 
-  FormControl, InputLabel, Select, TableSortLabel, DialogContentText
+  FormControl, InputLabel, Select, TableSortLabel, DialogContentText, useTheme, alpha
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -21,6 +21,7 @@ import axios from 'axios';
 import UserService from '../../service/UserService';
 
 const AdminManageTiers = () => {
+  const theme = useTheme();
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -417,9 +418,9 @@ const AdminManageTiers = () => {
         }}
       >
         <Table stickyHeader>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>
+          <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={sortConfig.key === 'tierName'}
                   direction={sortConfig.direction}
@@ -428,7 +429,7 @@ const AdminManageTiers = () => {
                   Tier Name
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={sortConfig.key === 'minPoints'}
                   direction={sortConfig.direction}
@@ -437,7 +438,7 @@ const AdminManageTiers = () => {
                   Min Points
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={sortConfig.key === 'maxPoints'}
                   direction={sortConfig.direction}
@@ -446,9 +447,9 @@ const AdminManageTiers = () => {
                   Max Points
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Benefits</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Benefits</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, textAlign: 'center' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

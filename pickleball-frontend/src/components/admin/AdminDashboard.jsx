@@ -37,6 +37,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import ReportGenerator from './ReportGenerator';
 import AdminSettings from './AdminSettings';
+import { useTheme, alpha } from '@mui/material/styles';
 
 dayjs.extend(relativeTime);
 
@@ -47,6 +48,7 @@ const AdminDashboard = () => {
   const revenueChartRef = useRef(null);
   const bookingChartInstance = useRef(null);
   const revenueChartInstance = useRef(null);
+  const theme = useTheme();
 
   const [adminUsername, setAdminUsername] = useState(UserService.getAdminUsername() || 'Admin');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -134,8 +136,8 @@ const AdminDashboard = () => {
           {
             label: 'Bookings',
             data: bookingTrends.data,
-            borderColor: '#1976d2',
-            backgroundColor: 'rgba(25, 118, 210, 0.1)',
+            borderColor: theme.palette.primary.main,
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
             fill: true,
             tension: 0.4,
           },
@@ -174,8 +176,8 @@ const AdminDashboard = () => {
           {
             label: 'Revenue',
             data: revenueTrends.data,
-            borderColor: '#43a047',
-            backgroundColor: 'rgba(67, 160, 71, 0.1)',
+            borderColor: theme.palette.success.main,
+            backgroundColor: alpha(theme.palette.success.main, 0.1),
             fill: true,
             tension: 0.4,
           },
@@ -384,7 +386,7 @@ const AdminDashboard = () => {
   const loading = summaryLoading || bookingTrendsLoading || revenueTrendsLoading;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.palette.background.default }}>
       {/* Loading Backdrop */}
       <Backdrop
         sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
@@ -397,24 +399,26 @@ const AdminDashboard = () => {
         width: 250,
         minHeight: '100vh',
         borderRadius: 0,
-        boxShadow: '0 0 20px rgba(0,0,0,0.08)',
+        boxShadow: theme.shadows[2],
         display: 'flex',
         flexDirection: 'column',
         position: 'fixed',
         zIndex: 100,
-        p: 2
+        p: 2,
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary
       }}>
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Avatar sx={{
-              bgcolor: 'primary.main',
+              bgcolor: theme.palette.primary.main,
               width: 48,
               height: 48,
               fontSize: '1.25rem'
             }}>
               👨‍💼
             </Avatar>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
               Admin Portal
             </Typography>
           </Box>
@@ -425,16 +429,16 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'dashboard' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'dashboard' ? theme.palette.action.hover : 'inherit',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
             <ListItemIcon sx={{
               minWidth: 40,
-              color: getCurrentTab() === 'dashboard' ? 'primary.main' : 'inherit'
+              color: getCurrentTab() === 'dashboard' ? theme.palette.primary.main : theme.palette.text.secondary
             }}>
               <DashboardIcon />
             </ListItemIcon>
@@ -450,10 +454,10 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'users' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'users' ? theme.palette.action.hover : 'inherit',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
@@ -467,10 +471,10 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'courts' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'courts' ? theme.palette.action.hover : 'inherit',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
@@ -484,10 +488,10 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'tiers' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'tiers' ? theme.palette.action.hover : 'inherit',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
@@ -501,10 +505,10 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               mb: 0.5,
-              bgcolor: getCurrentTab() === 'bookings' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'bookings' ? theme.palette.action.hover : 'inherit',
               cursor: 'pointer',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
@@ -518,9 +522,9 @@ const AdminDashboard = () => {
             sx={{
               borderRadius: 1,
               cursor: 'pointer',
-              bgcolor: getCurrentTab() === 'settings' ? '#f0f2f5' : 'inherit',
+              bgcolor: getCurrentTab() === 'settings' ? theme.palette.action.hover : 'inherit',
               '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                backgroundColor: theme.palette.action.selected
               }
             }}
           >
@@ -537,11 +541,11 @@ const AdminDashboard = () => {
             startIcon={<LogoutIcon />}
             onClick={handleLogout}
             sx={{
-              borderColor: 'error.main',
-              color: 'error.main',
+              borderColor: theme.palette.error.main,
+              color: theme.palette.error.main,
               '&:hover': {
-                backgroundColor: '#fdeded',
-                borderColor: '#c0392b'
+                backgroundColor: alpha(theme.palette.error.light, 0.15),
+                borderColor: theme.palette.error.dark
               }
             }}
           >
@@ -563,7 +567,9 @@ const AdminDashboard = () => {
             alignItems: 'center',
             px: 2,
             py: 1,
-            width: 300
+            width: 300,
+            backgroundColor: theme.palette.background.paper,
+            color: theme.palette.text.primary
           }}>
             <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
             <TextField
@@ -615,9 +621,9 @@ const AdminDashboard = () => {
             {/* Overview Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} md={6} lg={3}>
-                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Avatar sx={{
-                    bgcolor: 'primary.main',
+                    bgcolor: theme.palette.primary.main,
                     width: 48,
                     height: 48,
                     fontSize: '1.25rem'
@@ -641,9 +647,9 @@ const AdminDashboard = () => {
               </Grid>
 
               <Grid item xs={12} md={6} lg={3}>
-                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Avatar sx={{
-                    bgcolor: 'primary.main',
+                    bgcolor: theme.palette.primary.main,
                     width: 48,
                     height: 48,
                     fontSize: '1.25rem'
@@ -667,9 +673,9 @@ const AdminDashboard = () => {
               </Grid>
 
               <Grid item xs={12} md={6} lg={3}>
-                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Avatar sx={{
-                    bgcolor: 'primary.main',
+                    bgcolor: theme.palette.primary.main,
                     width: 48,
                     height: 48,
                     fontSize: '1.25rem'
@@ -693,9 +699,9 @@ const AdminDashboard = () => {
               </Grid>
 
               <Grid item xs={12} md={6} lg={3}>
-                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Avatar sx={{
-                    bgcolor: 'primary.main',
+                    bgcolor: theme.palette.primary.main,
                     width: 48,
                     height: 48,
                     fontSize: '1.25rem'
@@ -741,7 +747,7 @@ const AdminDashboard = () => {
             {/* Charts Section */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} md={6} lg={6}>
-                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450 }}>
+                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">Booking Trends</Typography>
                     <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -762,7 +768,7 @@ const AdminDashboard = () => {
               </Grid>
 
               <Grid item xs={12} md={6} lg={6}>
-                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450 }}>
+                <Paper sx={{ p: 2, height: 400, width: 450, minWidth: 450, maxWidth: 450, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">Revenue Trends</Typography>
                     <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -786,7 +792,7 @@ const AdminDashboard = () => {
             {/* Recent Activity */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} md={8}>
-                <Paper sx={{ p: 2 }}>
+                <Paper sx={{ p: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">Recent Activity</Typography>
                     <Button size="small" onClick={() => setActivityDialogOpen(true)} disabled={recentActivity.length <= 4}>View All</Button>

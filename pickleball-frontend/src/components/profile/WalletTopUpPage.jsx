@@ -13,7 +13,9 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
-  Grid
+  Grid,
+  useTheme,
+  alpha
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ArrowBack as BackIcon } from '@mui/icons-material';
@@ -21,6 +23,7 @@ import { getWalletBalance, topUpWallet } from '../../service/WalletService';
 
 const WalletTopUpPage = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [amount, setAmount] = useState('');
   const [paymentSource, setPaymentSource] = useState('BANK_CARD');
   const [walletBalance, setWalletBalance] = useState(0);
@@ -95,7 +98,7 @@ const WalletTopUpPage = () => {
           alignItems: 'center',
           textTransform: 'none',
           fontWeight: 500,
-          color: '#1976d2',
+          color: theme.palette.primary.main,
           '&:hover': {
             backgroundColor: 'transparent',
             textDecoration: 'underline'
@@ -108,15 +111,15 @@ const WalletTopUpPage = () => {
 
       <Card sx={{
         borderRadius: 3,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-        background: 'linear-gradient(135deg, #f8f9ff, #ffffff)'
+        boxShadow: theme.shadows[4],
+        background: `linear-gradient(135deg, ${theme.palette.background.paper}, ${theme.palette.background.paper})`
       }}>
         <CardContent sx={{ p: 4 }}>
           <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, textAlign: 'center' }}>
             Top Up Wallet
           </Typography>
           
-          <Typography variant="body1" sx={{ mb: 4, textAlign: 'center', color: '#666' }}>
+          <Typography variant="body1" sx={{ mb: 4, textAlign: 'center', color: theme.palette.text.secondary }}>
             Add money to your wallet for easy payments
           </Typography>
 
@@ -124,12 +127,12 @@ const WalletTopUpPage = () => {
           <Box sx={{ 
             mb: 4, 
             p: 3, 
-            bgcolor: 'rgba(46, 125, 50, 0.1)', 
+            bgcolor: alpha(theme.palette.success.light, 0.1), 
             borderRadius: '12px',
-            border: '1px solid rgba(46, 125, 50, 0.2)',
+            border: `1px solid ${alpha(theme.palette.success.light, 0.2)}`,
             textAlign: 'center'
           }}>
-            <Typography variant="h6" fontWeight="bold" color="success.main">
+            <Typography variant="h6" fontWeight="bold" color={theme.palette.success.main}>
               Current Balance: RM{walletBalance.toFixed(2)}
             </Typography>
           </Box>
@@ -165,7 +168,7 @@ const WalletTopUpPage = () => {
                       fontWeight: 600,
                       ...(amount === predefinedAmount.toString() && {
                         background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
-                        color: 'white'
+                        color: theme.palette.common.white
                       })
                     }}
                   >
@@ -222,7 +225,7 @@ const WalletTopUpPage = () => {
               background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
               '&:hover': {
                 background: 'linear-gradient(90deg, #2575fc 0%, #6a11cb 100%)',
-                boxShadow: '0 4px 12px rgba(37, 117, 252, 0.4)'
+                boxShadow: theme.shadows[6]
               }
             }}
           >

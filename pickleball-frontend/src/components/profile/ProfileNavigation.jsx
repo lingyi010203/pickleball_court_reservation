@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   List,
   ListItem,
@@ -7,7 +7,9 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Box
+  Box,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -21,8 +23,10 @@ import {
   Language as LanguageIcon
 } from '@mui/icons-material';
 
-const ProfileNavigation = ({ setActiveView }) => {
+const ProfileNavigation = (props) => {
+  const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -31,7 +35,7 @@ const ProfileNavigation = ({ setActiveView }) => {
   };
 
   const handleViewChange = (view) => {
-    setActiveView(view);
+    props.setActiveView(view);
   };
 
   const handleFeedbackNavigation = () => {
@@ -39,12 +43,25 @@ const ProfileNavigation = ({ setActiveView }) => {
             navigate('/profile/my-bookings');
   };
 
+  // Helper to check if a path is active
+  const isActive = (path) => location.pathname === path;
+
   return (
     <Box>
       {/* ME Section */}
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/my-profile')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile')}
+            selected={isActive('/profile')}
+            sx={isActive('/profile') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <PersonIcon />
             </ListItemIcon>
@@ -52,7 +69,17 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/my-bookings')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/my-bookings')}
+            selected={isActive('/profile/my-bookings')}
+            sx={isActive('/profile/my-bookings') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <BookingsIcon />
             </ListItemIcon>
@@ -60,7 +87,17 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/my-games')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/my-games')}
+            selected={isActive('/profile/my-games')}
+            sx={isActive('/profile/my-games') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <GamesIcon />
             </ListItemIcon>
@@ -68,7 +105,17 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/my-invoices')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/my-invoices')}
+            selected={isActive('/profile/my-invoices')}
+            sx={isActive('/profile/my-invoices') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <InvoicesIcon />
             </ListItemIcon>
@@ -76,16 +123,35 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/rewards')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/rewards')}
+            selected={isActive('/profile/rewards')}
+            sx={isActive('/profile/rewards') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <RewardsIcon />
             </ListItemIcon>
             <ListItemText primary="Rewards" />
           </ListItemButton>
         </ListItem>
-
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/my-feedback')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/my-feedback')}
+            selected={isActive('/profile/my-feedback')}
+            sx={isActive('/profile/my-feedback') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <FeedbackIcon />
             </ListItemIcon>
@@ -99,7 +165,17 @@ const ProfileNavigation = ({ setActiveView }) => {
       {/* ACCOUNT SETTINGS Section */}
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleViewChange('/profile/edit-profile')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/edit-profile')}
+            selected={isActive('/profile/edit-profile')}
+            sx={isActive('/profile/edit-profile') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <SettingsIcon />
             </ListItemIcon>
@@ -107,7 +183,17 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/notifications')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/notifications')}
+            selected={isActive('/profile/notifications')}
+            sx={isActive('/profile/notifications') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <NotificationsIcon />
             </ListItemIcon>
@@ -115,7 +201,17 @@ const ProfileNavigation = ({ setActiveView }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavigation('/profile/language')}>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/language')}
+            selected={isActive('/profile/language')}
+            sx={isActive('/profile/language') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
             <ListItemIcon>
               <LanguageIcon />
             </ListItemIcon>

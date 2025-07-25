@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, TextField, Button, List, ListItem, 
-  ListItemAvatar, Avatar, ListItemText, Typography 
+  ListItemAvatar, Avatar, ListItemText, Typography, useTheme, alpha 
 } from '@mui/material';
+import { Alert } from '@mui/material';
 import friendService from '../../service/FriendService';
 import UserService from '../../service/UserService';
 
 export default function UserSearch() {
+  const theme = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -94,18 +96,33 @@ export default function UserSearch() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           disabled={loading}
+          sx={{
+            bgcolor: theme.palette.background.paper,
+            borderRadius: 2,
+            boxShadow: theme.shadows[1],
+            mr: 1
+          }}
         />
-        <Button 
-          variant="contained" 
-          sx={{ ml: 1 }}
+        <Button
+          variant="contained"
+          sx={{
+            borderRadius: '50%',
+            minWidth: 48,
+            height: 48,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+            boxShadow: theme.shadows[2],
+            '&:hover': {
+              background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`
+            }
+          }}
           onClick={handleSearch}
           disabled={!query.trim() || loading}
         >
-          {loading ? 'Searching...' : 'Search'}
+          {loading ? '...' : 'Go'}
         </Button>
       </Box>
-      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
-      {success && <Typography color="success.main" sx={{ mb: 2 }}>{success}</Typography>}
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>{success}</Alert>}
       
       {loading && <Typography>Searching...</Typography>}
       
@@ -115,24 +132,46 @@ export default function UserSearch() {
             const isOwn = user.username === currentUsername;
             const isFriend = friends.some(f => f.username === user.username);
             return (
-              <ListItem key={user.id}>
+              <ListItem
+                key={user.id}
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  transition: 'background 0.2s',
+                  '&:hover': {
+                    background: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
                 <ListItemAvatar>
-                  <Avatar src={user.profileImage} />
+                  <Avatar src={user.profileImage} sx={{ boxShadow: theme.shadows[2] }} />
                 </ListItemAvatar>
-                <ListItemText 
-                  primary={user.name} 
-                  secondary={`@${user.username}`} 
+                <ListItemText
+                  primary={<Typography sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{user.name}</Typography>}
+                  secondary={<Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{`@${user.username}`}</Typography>}
                 />
                 <Button
-                  variant="outlined"
+                  variant="contained"
+                  sx={{
+                    borderRadius: 3,
+                    fontWeight: 600,
+                    minWidth: 110,
+                    ml: 1,
+                    background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+                    color: isOwn || isFriend ? theme.palette.text.disabled : theme.palette.common.white,
+                    boxShadow: theme.shadows[1],
+                    '&:hover': {
+                      background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`
+                    }
+                  }}
                   disabled={loading || isFriend || isOwn}
                   onClick={() => !isOwn && handleAddFriend(user.username)}
                 >
                   {isOwn
-                    ? "Cannot Add Own"
+                    ? "Own"
                     : isFriend
-                      ? "Already Friend"
-                      : (loading ? 'Sending...' : 'Add Friend')}
+                      ? "Friend"
+                      : (loading ? '...' : 'Add')}
                 </Button>
               </ListItem>
             );

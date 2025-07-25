@@ -5,13 +5,17 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AuthProvider } from './context/AuthContext'; 
 import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider as AdminThemeProvider } from './context/ThemeContext';
+
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
  <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <AdminThemeProvider>
+          <App />
+        </AdminThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

@@ -39,6 +39,7 @@ import isTomorrow from 'dayjs/plugin/isTomorrow';
 import isYesterday from 'dayjs/plugin/isYesterday';
 import weekday from 'dayjs/plugin/weekday';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
+import ThemedCard from '../common/ThemedCard';
 
 dayjs.extend(isToday);
 dayjs.extend(isTomorrow);
@@ -47,7 +48,7 @@ dayjs.extend(weekday);
 dayjs.extend(advancedFormat);
 
 // 主容器样式 - 简洁白色背景
-const CalendarContainer = styled(Card)(({ theme }) => ({
+const CalendarContainer = styled(ThemedCard)(({ theme }) => ({
   background: theme.palette.background.paper,
   borderRadius: '12px',
   overflow: 'hidden',

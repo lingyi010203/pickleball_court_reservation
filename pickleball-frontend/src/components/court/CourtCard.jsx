@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardMedia, CardContent, CardActions, Typography, Button, Chip, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { getCourtImagesPublic } from '../../service/CourtService';
+import ThemedCard from '../common/ThemedCard';
 
 const CourtCard = ({ court }) => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ const CourtCard = ({ court }) => {
   };
 
   return (
-    <Card sx={{ 
+    <ThemedCard sx={{ 
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
@@ -122,7 +123,7 @@ const CourtCard = ({ court }) => {
           Book Now
         </Button>
       </CardActions>
-    </Card>
+    </ThemedCard>
   );
 };
 

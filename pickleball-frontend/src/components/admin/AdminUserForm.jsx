@@ -3,12 +3,13 @@ import {
   Grid, TextField, FormControl, InputLabel, 
   Select, MenuItem, Button, CircularProgress,
   Alert, Box, Typography, FormControlLabel,
-  Checkbox
+  Checkbox, useTheme, alpha
 } from '@mui/material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
 
 const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
+  const theme = useTheme();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -269,7 +270,13 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
         )}
         
         <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button variant="outlined" onClick={onClose} disabled={loading}>
+          <Button variant="outlined" onClick={onClose} disabled={loading}
+            sx={{
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': { borderColor: theme.palette.primary.dark }
+            }}
+          >
             {isReadOnly ? 'Close' : 'Cancel'}
           </Button>
           {!isReadOnly && (
@@ -277,7 +284,19 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
               type="submit" 
               variant="contained" 
               disabled={loading}
-              sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+              sx={{
+                background: `linear-gradient(90deg, ${theme.palette.primary.main} 60%, ${alpha(theme.palette.primary.light, 0.85)})`,
+                color: theme.palette.getContrastText(theme.palette.primary.main),
+                fontWeight: 600,
+                borderRadius: 3,
+                px: 3,
+                py: 1.2,
+                boxShadow: theme.shadows[2],
+                '&:hover': {
+                  background: `linear-gradient(90deg, ${theme.palette.primary.dark} 60%, ${theme.palette.primary.main})`,
+                  boxShadow: theme.shadows[4]
+                }
+              }}
             >
               {loading ? <CircularProgress size={24} /> : user ? 'Update User' : 'Create User'}
             </Button>
