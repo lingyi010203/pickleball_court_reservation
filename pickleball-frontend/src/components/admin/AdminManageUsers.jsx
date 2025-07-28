@@ -53,6 +53,7 @@ import AdminUserForm from './AdminUserForm';
 import ConfirmationDialog from './ConfirmationDialog';
 import AdminInviteForm from './AdminInviteForm';
 import { useTheme, alpha } from '@mui/material/styles';
+import { getStatusChip } from './statusConfig';
 
 const AdminManageUsers = () => {
   const navigate = useNavigate();
@@ -226,7 +227,7 @@ const PendingRequestsTab = () => {
         alignItems: 'center',
         height: '50vh'
       }}>
-        <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+        <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
@@ -240,7 +241,7 @@ const PendingRequestsTab = () => {
         <Button
           variant="contained"
           startIcon={<RefreshIcon />}
-          sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+          sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: alpha(theme.palette.primary.dark, 0.85) } }}
           onClick={fetchPendingRequests}
         >
           Try Again
@@ -287,7 +288,7 @@ const PendingRequestsTab = () => {
             sx={{
               borderColor: theme.palette.primary.main,
               color: theme.palette.primary.main,
-              '&:hover': { borderColor: theme.palette.primary.dark }
+              '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) }
             }}
           >
             Refresh
@@ -338,28 +339,10 @@ const PendingRequestsTab = () => {
                   <TableCell>{request.userId}</TableCell>
                   <TableCell sx={{ fontWeight: 500 }}>{request.userName}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={request.currentType}
-                      sx={{
-                        backgroundColor: theme.palette.grey[200],
-                        color: theme.palette.text.primary,
-                        fontWeight: 'bold'
-                      }}
-                    />
+                    {getStatusChip(request.currentType?.toUpperCase() || 'USER')}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={request.requestedType}
-                      sx={{
-                        backgroundColor: request.requestedType === 'Coach'
-                          ? theme.palette.info.light
-                          : theme.palette.secondary.light,
-                        color: request.requestedType === 'Coach'
-                          ? theme.palette.info.dark
-                          : theme.palette.secondary.dark,
-                        fontWeight: 'bold'
-                      }}
-                    />
+                    {getStatusChip(request.requestedType?.toUpperCase() || 'USER')}
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -369,7 +352,7 @@ const PendingRequestsTab = () => {
                           size="small"
                           startIcon={<CheckCircleIcon />}
                           sx={{
-                            background: `linear-gradient(90deg, ${theme.palette.success.main} 60%, ${alpha(theme.palette.success.light, 0.85)})`,
+                            backgroundColor: theme.palette.success.main,
                             color: theme.palette.getContrastText(theme.palette.success.main),
                             fontWeight: 'bold',
                             textTransform: 'none',
@@ -378,9 +361,10 @@ const PendingRequestsTab = () => {
                             py: 0.5,
                             boxShadow: theme.shadows[1],
                             '&:hover': {
-                              background: `linear-gradient(90deg, ${theme.palette.success.dark} 60%, ${theme.palette.success.main})`,
+                              backgroundColor: theme.palette.success.dark,
                               boxShadow: theme.shadows[3]
-                            }
+                            },
+                            minWidth: 110
                           }}
                           onClick={() => handleApprove(request.userId, request.requestedType)}
                         >
@@ -389,13 +373,23 @@ const PendingRequestsTab = () => {
                       </Tooltip>
                       <Tooltip title="Reject request">
                         <Button
-                          variant="outlined"
+                          variant="contained"
                           size="small"
-                          color="error"
                           startIcon={<CancelIcon />}
                           sx={{
+                            backgroundColor: theme.palette.error.main,
+                            color: theme.palette.getContrastText(theme.palette.error.main),
+                            fontWeight: 'bold',
                             textTransform: 'none',
-                            fontWeight: 'bold'
+                            borderRadius: 2,
+                            px: 2,
+                            py: 0.5,
+                            boxShadow: theme.shadows[1],
+                            '&:hover': {
+                              backgroundColor: theme.palette.error.dark,
+                              boxShadow: theme.shadows[3]
+                            },
+                            minWidth: 110
                           }}
                           onClick={() => handleReject(request.userId)}
                         >
@@ -694,7 +688,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   if (loading && !users.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+        <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
@@ -706,14 +700,14 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+          sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: alpha(theme.palette.primary.dark, 0.85) } }}
         >
           Add New User
         </Button>
         <Button
           variant="outlined"
           onClick={() => setInviteOpen(true)}
-          sx={{ borderColor: '#8e44ad', color: '#8e44ad', '&:hover': { borderColor: '#732d91' } }}
+          sx={{ borderColor: theme.palette.primary.main, color: theme.palette.primary.main, '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) } }}
         >
           Send Invitation
         </Button>
@@ -772,10 +766,10 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
             startIcon={<RefreshIcon />}
             onClick={fetchUsers}
             sx={{
-              borderColor: '#8e44ad',
-              color: '#8e44ad',
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
               minWidth: 120,
-              '&:hover': { borderColor: '#732d91' }
+              '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) }
             }}
           >
             Refresh
@@ -829,7 +823,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
             alignItems: 'center',
             zIndex: 1
           }}>
-            <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+            <CircularProgress size={60} sx={{ color: theme.palette.primary.main }} />
           </Box>
         )}
 
@@ -911,35 +905,10 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                   </TableCell>
                   <TableCell>{user.email || 'No email'}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={user.userType || 'Unknown'}
-                      sx={{
-                        backgroundColor:
-                          user.userType === 'Admin' ? '#d5f5e3' :
-                            user.userType === 'Coach' ? '#e3f2fd' :
-                              user.userType === 'EventOrganizer' ? '#f3e5f5' : '#f5f5f5',
-                        color:
-                          user.userType === 'Admin' ? '#27ae60' :
-                            user.userType === 'Coach' ? '#1565c0' :
-                              user.userType === 'EventOrganizer' ? '#8e44ad' : '#757575'
-                      }}
-                    />
+                    {getStatusChip(user.userType?.toUpperCase() || 'USER')}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={user.status || 'UNKNOWN'}
-                      sx={{
-                        backgroundColor:
-                          user.status === 'ACTIVE' ? '#d5f5e3' :
-                            user.status === 'INACTIVE' ? '#fff3cd' :
-                              user.status === 'SUSPENDED' ? '#ffecb3' : '#f5d5d5',
-                        color:
-                          user.status === 'ACTIVE' ? '#27ae60' :
-                            user.status === 'INACTIVE' ? '#856404' :
-                              user.status === 'SUSPENDED' ? '#ff8f00' : '#c0392b',
-                        fontWeight: 'bold'
-                      }}
-                    />
+                    {getStatusChip(user.status?.toUpperCase() || 'UNKNOWN')}
                   </TableCell>
                   <TableCell>
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
@@ -998,11 +967,32 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
       </TableContainer>
 
       {/* User Form Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
-        <DialogTitle>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+            backgroundColor: theme.palette.background.paper,
+            boxShadow: theme.shadows[10],
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.4rem',
+            pb: 1,
+            mb: 1,
+            color: theme.palette.text.primary,
+          }}
+        >
           {currentUser ? `Edit User: ${currentUser.name}` : 'Create New User'}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
           <AdminUserForm
             user={currentUser}
             onClose={handleCloseDialog}

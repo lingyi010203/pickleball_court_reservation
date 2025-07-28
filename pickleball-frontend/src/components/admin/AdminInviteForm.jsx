@@ -47,8 +47,16 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Send Registration Invitation</DialogTitle>
+    <Dialog open={open} onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: 6,
+          minWidth: 400
+        }
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 700, color: 'primary.main', pb: 1 }}>Send Registration Invitation</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
@@ -61,6 +69,7 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
             onChange={e => setEmail(e.target.value)}
             required
             margin="normal"
+            sx={{ borderRadius: 2 }}
           />
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
@@ -69,6 +78,7 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
               onChange={e => setRole(e.target.value)}
               label="Role"
               required
+              sx={{ borderRadius: 2 }}
             >
               {roleOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
@@ -77,9 +87,36 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
           </FormControl>
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+      <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
+        <Button
+          onClick={onClose}
+          disabled={loading}
+          sx={{
+            borderRadius: 2,
+            fontWeight: 600,
+            px: 3,
+            py: 1.2,
+            minWidth: 120
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading}
+          sx={{
+            backgroundColor: 'primary.main',
+            color: 'primary.contrastText',
+            fontWeight: 600,
+            borderRadius: 2,
+            px: 3,
+            py: 1.2,
+            minWidth: 160,
+            boxShadow: 2,
+            '&:hover': { backgroundColor: 'primary.dark', boxShadow: 4 }
+          }}
+        >
           {loading ? 'Sending...' : 'Send Invitation'}
         </Button>
       </DialogActions>

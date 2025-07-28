@@ -19,34 +19,28 @@ import java.time.LocalDate;
 public class Voucher {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Integer id;
 
     @Column(unique = true)
     private String code;
 
-    @Column(name = "tier_id", nullable = false)
-    private int tierId;
+    @Column(name = "tier_id")
+    private Integer tierId;
 
     @Column(name = "discount_type", nullable = false)
     private String discountType;
 
     @Column(name = "discount_value", nullable = false)
-    private double discountValue;
+    private Double discountValue;
 
     @Column(name = "request_points", nullable = false)
-    private int requestPoints;
+    private Integer requestPoints;
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
-    @Column(name = "discount_amount", nullable = false)
-    private double discountAmount;
-
-    @Column(name = "user_id")
-    private Integer userId;
-
     @ManyToOne
-    @JoinColumn(name = "tier_id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "tier_id", insertable = false, updatable = false)
     @JsonBackReference
     private MembershipTier tier;
 

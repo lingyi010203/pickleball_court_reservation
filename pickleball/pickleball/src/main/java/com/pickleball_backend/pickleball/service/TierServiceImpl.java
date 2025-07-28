@@ -138,6 +138,9 @@ public class TierServiceImpl implements TierService {
             throw new ValidationException("Voucher code already exists");
         }
 
+        // Debug logging
+        logger.info("Creating voucher with expiry date: {}", voucherDto.getExpiryDate());
+
         Voucher voucher = new Voucher();
         voucher.setCode(voucherDto.getCode());
         voucher.setDiscountValue(voucherDto.getDiscountValue());  // Changed from getDiscountAmount()
@@ -145,9 +148,36 @@ public class TierServiceImpl implements TierService {
         voucher.setRequestPoints(voucherDto.getRequestPoints());
         voucher.setExpiryDate(voucherDto.getExpiryDate());
         voucher.setTier(tier);
+        voucher.setTierId(tier.getId()); // Explicitly set tierId
+
+        logger.info("Saving voucher with expiry date: {}", voucher.getExpiryDate());
 
         voucherRepository.save(voucher);
         return tier;
+    }
+
+    @Override
+    @Transactional
+    public Voucher addGeneralVoucher(VoucherDto voucherDto) {
+        if (voucherRepository.existsByCode(voucherDto.getCode())) {
+            throw new ValidationException("Voucher code already exists");
+        }
+
+        // Debug logging
+        logger.info("Creating general voucher with expiry date: {}", voucherDto.getExpiryDate());
+
+        Voucher voucher = new Voucher();
+        voucher.setCode(voucherDto.getCode());
+        voucher.setDiscountValue(voucherDto.getDiscountValue());
+        voucher.setDiscountType(voucherDto.getDiscountType());
+        voucher.setRequestPoints(voucherDto.getRequestPoints());
+        voucher.setExpiryDate(voucherDto.getExpiryDate());
+        voucher.setTier(null); // General voucher has no tier
+        voucher.setTierId(null); // No tier association
+
+        logger.info("Saving general voucher with expiry date: {}", voucher.getExpiryDate());
+
+        return voucherRepository.save(voucher);
     }
 
     @Override
@@ -161,6 +191,10 @@ public class TierServiceImpl implements TierService {
         }
     }
 
+    @Override
+    public List<Voucher> getAllVouchers() {
+        return voucherRepository.findAll();
+    }
 
 
     @Override
@@ -266,11 +300,31 @@ public class TierServiceImpl implements TierService {
             }
         }
 
+        // Debug logging
+        logger.info("Updating voucher {} with expiry date: {}", voucherId, voucherDto.getExpiryDate());
+
         voucher.setCode(voucherDto.getCode());
         voucher.setDiscountValue(voucherDto.getDiscountValue());  // Changed from getDiscountAmount()
         voucher.setDiscountType(voucherDto.getDiscountType());    // Added discount type
         voucher.setRequestPoints(voucherDto.getRequestPoints());
         voucher.setExpiryDate(voucherDto.getExpiryDate());
+
+        // Handle tier update
+        if (voucherDto.getTierName() != null && !voucherDto.getTierName().trim().isEmpty()) {
+            MembershipTier tier = tierRepository.findByTierName(voucherDto.getTierName().toUpperCase());
+            if (tier != null) {
+                voucher.setTier(tier);
+                voucher.setTierId(tier.getId());
+            } else {
+                throw new ValidationException("Tier not found: " + voucherDto.getTierName());
+            }
+        } else {
+            // Remove tier association
+            voucher.setTier(null);
+            voucher.setTierId(null);
+        }
+
+        logger.info("Saving updated voucher with expiry date: {}", voucher.getExpiryDate());
 
         return voucherRepository.save(voucher);
     }

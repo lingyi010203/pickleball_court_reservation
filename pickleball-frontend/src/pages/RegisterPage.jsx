@@ -122,18 +122,17 @@ const RegisterPage = () => {
         display: 'flex',
         alignItems: 'center',
         py: 4,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: theme.palette.background.default,
         overflow: 'auto',
-        mt: 8
       }}>
         <Container maxWidth="lg" sx={{ height: '100%' }}>
           <Box
             sx={{
               display: 'flex',
               flexDirection: { xs: 'column', md: 'row' },
-              backgroundColor: 'white',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[2],
               overflow: 'hidden',
               height: '100%',
               maxHeight: { xs: 'none', md: '700px' },
@@ -166,7 +165,7 @@ const RegisterPage = () => {
               >
                 <Box sx={{
                   textAlign: 'center',
-                  color: 'white',
+                  color: theme.palette.common.white,
                   backgroundColor: 'rgba(0, 0, 0, 0.5)',
                   padding: 4,
                   borderRadius: 2
@@ -199,7 +198,7 @@ const RegisterPage = () => {
                   mb: 3, 
                   textAlign: 'center',
                   fontWeight: 'bold',
-                  color: '#8e44ad'
+                  color: theme.palette.primary.main
                 }}
               >
                 REGISTRATION FORM
@@ -372,9 +371,9 @@ const RegisterPage = () => {
                 sx={{
                   mt: 3,
                   py: 1.5,
-                  backgroundColor: '#8e44ad',
+                  backgroundColor: theme.palette.primary.main,
                   '&:hover': {
-                    backgroundColor: '#732d91',
+                    backgroundColor: theme.palette.primary.dark,
                   },
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
@@ -384,12 +383,12 @@ const RegisterPage = () => {
                 {isLoading ? 'Registering...' : 'Register →'}
               </Button>
 
-              <Typography variant="body2" sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography variant="body2" sx={{ textAlign: 'center', mt: 2, color: theme.palette.text.secondary }}>
                 Already have an account?{' '}
                 <Button 
                   onClick={() => navigate('/login')}
                   sx={{ 
-                    color: '#4a90e2', 
+                    color: theme.palette.primary.main, 
                     fontWeight: 'bold',
                     textTransform: 'none',
                     fontSize: '1rem',

@@ -89,6 +89,7 @@ public class MemberService {
                         v.getDiscountValue(),  // Changed from getDiscountAmount()
                         v.getDiscountType(),  // Added discount type
                         v.getRequestPoints(),
+                        v.getTier() != null ? v.getTier().getTierName() : null,  // Added tierName
                         v.getExpiryDate()
                 ))
                 .collect(Collectors.toList());
@@ -133,7 +134,9 @@ public class MemberService {
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
         // Validate voucher
-        if (voucher.getTier().getId() != member.getTier().getId()) {
+        if (voucher.getTier() == null || voucher.getTier().getId() == null || 
+            member.getTier() == null || member.getTier().getId() == null ||
+            !voucher.getTier().getId().equals(member.getTier().getId())) {
             throw new ValidationException("Voucher not available for your tier");
         }
         if (member.getPointBalance() < voucher.getRequestPoints()) {
@@ -246,7 +249,9 @@ public class MemberService {
                         v.getId(),
                         v.getCode(),
                         v.getDiscountValue(),  // Changed from getDiscountAmount()
+                        v.getDiscountType(),  // Added discount type
                         v.getRequestPoints(),
+                        v.getTier() != null ? v.getTier().getTierName() : null,  // Added tierName
                         v.getExpiryDate()
                 ))
                 .collect(Collectors.toList());

@@ -1,14 +1,15 @@
 // src/pages/ResetPasswordSuccess.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Container, AppBar, Toolbar } from '@mui/material';
+import { Box, Typography, Button, Container, AppBar, Toolbar, useTheme } from '@mui/material';
 
 const ResetPasswordSuccess = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: '#8e44ad' }}>
+      <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             PICKLEBALL
@@ -25,22 +26,22 @@ const ResetPasswordSuccess = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
           <Box
             sx={{
-              backgroundColor: 'white',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[2],
               padding: 4,
               textAlign: 'center',
             }}
           >
-            <Typography variant="h3" sx={{ mb: 2, fontWeight: 'bold', color: '#4CAF50' }}>
+            <Typography variant="h3" sx={{ mb: 2, fontWeight: 'bold', color: theme.palette.success.main }}>
               Password changed!
             </Typography>
-            <Typography variant="h5" sx={{ mb: 4 }}>
+            <Typography variant="h5" sx={{ mb: 4, color: theme.palette.text.primary }}>
               You've Successfully Completed Your Password Reset!
             </Typography>
             
@@ -49,8 +50,8 @@ const ResetPasswordSuccess = () => {
               sx={{
                 py: 1.5,
                 px: 4,
-                backgroundColor: '#8e44ad',
-                '&:hover': { backgroundColor: '#732d91' },
+                backgroundColor: theme.palette.primary.main,
+                '&:hover': { backgroundColor: theme.palette.primary.dark },
                 fontSize: '1.1rem',
                 fontWeight: 'bold',
               }}

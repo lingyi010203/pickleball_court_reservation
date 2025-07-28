@@ -35,6 +35,7 @@ import AdminManageUsers from './components/admin/AdminManageUsers';
 import AdminManageTiers from './components/admin/AdminManageTiers';
 import AdminManageCourts from './components/admin/AdminManageCourts';
 import AdminManageBookings from './components/admin/AdminManageBookings';
+import AdminSettings from './components/admin/AdminSettings';
 import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
 import ProfileOverview from './components/profile/ProfileOverview';
 import EditProfileForm from './components/profile/EditProfileForm';
@@ -105,7 +106,7 @@ function App() {
           <Route path="tiers" element={<AdminManageTiers />} />
           <Route path="courts" element={<AdminManageCourts />} />
           <Route path="bookings" element={<AdminManageBookings />} />
-          <Route path="settings" element={<div />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* 404 fallback */}

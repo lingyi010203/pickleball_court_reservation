@@ -7,13 +7,14 @@ import {
   TextField, 
   Button, 
   Container,
-  AppBar,
-  Toolbar
+  useTheme
 } from '@mui/material';
+import Navbar from '../components/common/Navbar';
 import axios from 'axios';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -40,16 +41,7 @@ const ForgotPasswordPage = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: '#8e44ad' }}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            PICKLEBALL
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/')}>Home</Button>
-          <Button color="inherit" onClick={() => navigate('/login')}>Login</Button>
-          <Button color="inherit" onClick={() => navigate('/register')}>Register</Button>
-        </Toolbar>
-      </AppBar>
+      <Navbar />
 
       <Box sx={{ 
         flexGrow: 1, 
@@ -57,22 +49,22 @@ const ForgotPasswordPage = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
           <Box
             sx={{
-              backgroundColor: 'white',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[2],
               padding: 4,
               textAlign: 'center',
             }}
           >
-            <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold' }}>
+            <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: theme.palette.text.primary }}>
               Forgot your password?
             </Typography>
-            <Typography variant="body1" sx={{ mb: 4, color: '#666' }}>
+            <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
               Enter your email and we'll send you instructions to reset your password
             </Typography>
             
@@ -97,8 +89,8 @@ const ForgotPasswordPage = () => {
               variant="contained"
               sx={{
                 py: 1.5,
-                backgroundColor: '#8e44ad',
-                '&:hover': { backgroundColor: '#732d91' },
+                backgroundColor: theme.palette.primary.main,
+                '&:hover': { backgroundColor: theme.palette.primary.dark },
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 mb: 2
@@ -111,7 +103,7 @@ const ForgotPasswordPage = () => {
             
             <Button 
               color="inherit"
-              sx={{ color: '#4a90e2', fontWeight: 'bold' }}
+              sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}
               onClick={() => navigate('/login')}
             >
               Return to Login

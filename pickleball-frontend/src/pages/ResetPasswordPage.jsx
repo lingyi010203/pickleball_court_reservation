@@ -8,12 +8,14 @@ import {
   Button, 
   Container, 
   AppBar, 
-  Toolbar 
+  Toolbar,
+  useTheme
 } from '@mui/material';
 import axios from 'axios';
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const { token } = useParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -58,7 +60,7 @@ const ResetPasswordPage = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: '#8e44ad' }}>
+      <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             PICKLEBALL
@@ -75,21 +77,21 @@ const ResetPasswordPage = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
           <Box
             sx={{
-              backgroundColor: 'white',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[2],
               padding: 4,
             }}
           >
-            <Typography variant="h4" sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center' }}>
+            <Typography variant="h4" sx={{ mb: 1, fontWeight: 'bold', textAlign: 'center', color: theme.palette.text.primary }}>
               Reset Your Password
             </Typography>
-            <Typography variant="body1" sx={{ mb: 3, color: '#666', textAlign: 'center' }}>
+            <Typography variant="body1" sx={{ mb: 3, color: theme.palette.text.secondary, textAlign: 'center' }}>
               Create a new password for your account
             </Typography>
             
@@ -122,8 +124,8 @@ const ResetPasswordPage = () => {
               variant="contained"
               sx={{
                 py: 1.5,
-                backgroundColor: '#8e44ad',
-                '&:hover': { backgroundColor: '#732d91' },
+                backgroundColor: theme.palette.primary.main,
+                '&:hover': { backgroundColor: theme.palette.primary.dark },
                 fontSize: '1rem',
                 fontWeight: 'bold',
               }}

@@ -43,6 +43,9 @@ import com.lowagie.text.pdf.*;
 import java.nio.charset.StandardCharsets;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import com.pickleball_backend.pickleball.service.ChartService;
+import java.awt.image.BufferedImage;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +63,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final BookingRepository bookingRepository;
     private final CourtRepository courtRepository;
     private final FeedbackRepository feedbackRepository;
+    private final ChartService chartService;
 
     @Override
     public List<AdminUserDto> getAllUsers() {
@@ -601,10 +605,26 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         document.open();
 
         boolean hasContent = false;
+        
+        // 获取格式化选项
+        Map<String, Object> formatting = new HashMap<>();
+        if (request.getMetadata() != null && request.getMetadata().containsKey("formatting")) {
+            formatting = (Map<String, Object>) request.getMetadata().get("formatting");
+        }
+        boolean includeHeaderFooter = (Boolean) formatting.getOrDefault("includeHeaderFooter", true);
+        boolean useBrandColors = (Boolean) formatting.getOrDefault("useBrandColors", true);
+        boolean includeAppendix = (Boolean) formatting.getOrDefault("includeAppendix", false);
 
         // 1. 标题、公司信息
         Map<String, Object> metadata = request.getMetadata();
         if (metadata != null) {
+            // 页眉
+            if (includeHeaderFooter) {
+                document.add(new Paragraph("Picklefy Pickleball Club", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14)));
+                document.add(new Paragraph("Professional Pickleball Court Management System", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                document.add(new Paragraph(" "));
+            }
+            
             document.add(new Paragraph((String) metadata.getOrDefault("title", "Report"), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18)));
             hasContent = true;
             Map<String, Object> company = (Map<String, Object>) metadata.getOrDefault("company", java.util.Collections.emptyMap());
@@ -628,73 +648,381 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 if (content != null) {
                     switch (section) {
                         case "Executive Summary":
-                            Map<String, Object> summary = (Map<String, Object>) content.get("summary");
-                            if (summary != null) {
-                                java.util.List<Map<String, Object>> keyMetrics = (java.util.List<Map<String, Object>>) summary.get("keyMetrics");
-                                if (keyMetrics != null && !keyMetrics.isEmpty()) {
-                                    PdfPTable table = new PdfPTable(3);
-                                    table.addCell("Metric");
-                                    table.addCell("Value");
-                                    table.addCell("Change");
-                                    for (Map<String, Object> metric : keyMetrics) {
-                                        table.addCell((String) metric.getOrDefault("name", ""));
-                                        table.addCell((String) metric.getOrDefault("value", ""));
-                                        table.addCell((String) metric.getOrDefault("change", ""));
+                            Object summaryObj = content.get("summary");
+                            if (summaryObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> summary = (Map<String, Object>) summaryObj;
+                                
+                                Object keyMetricsObj = summary.get("keyMetrics");
+                                if (keyMetricsObj instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<Map<String, Object>> keyMetrics = (List<Map<String, Object>>) keyMetricsObj;
+                                    if (!keyMetrics.isEmpty()) {
+                                        PdfPTable table = new PdfPTable(3);
+                                        table.addCell("Metric");
+                                        table.addCell("Value");
+                                        table.addCell("Change");
+                                        for (Map<String, Object> metric : keyMetrics) {
+                                            table.addCell((String) metric.getOrDefault("name", ""));
+                                            table.addCell((String) metric.getOrDefault("value", ""));
+                                            table.addCell((String) metric.getOrDefault("change", ""));
+                                        }
+                                        document.add(table);
                                     }
-                                    document.add(table);
                                 }
-                                java.util.List<String> highlights = (java.util.List<String>) summary.get("highlights");
-                                if (highlights != null && !highlights.isEmpty()) {
-                                    document.add(new Paragraph("Highlights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    for (String h : highlights) {
-                                        document.add(new Paragraph("- " + h));
+                                
+                                Object highlightsObj = summary.get("highlights");
+                                if (highlightsObj instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> highlights = (List<String>) highlightsObj;
+                                    if (!highlights.isEmpty()) {
+                                        document.add(new Paragraph("Highlights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        for (String h : highlights) {
+                                            document.add(new Paragraph("- " + h));
+                                        }
                                     }
                                 }
                             }
                             break;
                         case "Financial Highlights":
-                            Map<String, Object> financials = (Map<String, Object>) content.get("financials");
-                            if (financials != null) {
-                                java.util.List<Map<String, Object>> incomeStatement = (java.util.List<Map<String, Object>>) financials.get("incomeStatement");
-                                if (incomeStatement != null && !incomeStatement.isEmpty()) {
-                                    document.add(new Paragraph("Income Statement:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    PdfPTable table = new PdfPTable(3);
-                                    table.addCell("Category");
-                                    table.addCell("Current");
-                                    table.addCell("Previous");
-                                    for (Map<String, Object> row : incomeStatement) {
-                                        table.addCell((String) row.getOrDefault("category", ""));
-                                        table.addCell(String.valueOf(row.getOrDefault("current", "")));
-                                        table.addCell(String.valueOf(row.getOrDefault("previous", "")));
+                            Object financialsObj = content.get("financials");
+                            if (financialsObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> financials = (Map<String, Object>) financialsObj;
+                                
+                                Object incomeStatementObj = financials.get("incomeStatement");
+                                if (incomeStatementObj instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<Map<String, Object>> incomeStatement = (List<Map<String, Object>>) incomeStatementObj;
+                                    if (!incomeStatement.isEmpty()) {
+                                        document.add(new Paragraph("Income Statement:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        PdfPTable table = new PdfPTable(3);
+                                        table.addCell("Category");
+                                        table.addCell("Current");
+                                        table.addCell("Previous");
+                                        for (Map<String, Object> row : incomeStatement) {
+                                            table.addCell((String) row.getOrDefault("category", ""));
+                                            table.addCell(String.valueOf(row.getOrDefault("current", "")));
+                                            table.addCell(String.valueOf(row.getOrDefault("previous", "")));
+                                        }
+                                        document.add(table);
                                     }
-                                    document.add(table);
                                 }
-                                java.util.List<Map<String, Object>> balanceSheet = (java.util.List<Map<String, Object>>) financials.get("balanceSheet");
-                                if (balanceSheet != null && !balanceSheet.isEmpty()) {
-                                    document.add(new Paragraph("Balance Sheet:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    PdfPTable table = new PdfPTable(2);
-                                    table.addCell("Category");
-                                    table.addCell("Value");
-                                    for (Map<String, Object> row : balanceSheet) {
-                                        table.addCell((String) row.getOrDefault("category", ""));
-                                        table.addCell(String.valueOf(row.getOrDefault("value", "")));
+                                
+                                Object balanceSheetObj = financials.get("balanceSheet");
+                                if (balanceSheetObj instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<Map<String, Object>> balanceSheet = (List<Map<String, Object>>) balanceSheetObj;
+                                    if (!balanceSheet.isEmpty()) {
+                                        document.add(new Paragraph("Balance Sheet:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        PdfPTable table = new PdfPTable(2);
+                                        table.addCell("Category");
+                                        table.addCell("Value");
+                                        for (Map<String, Object> row : balanceSheet) {
+                                            table.addCell((String) row.getOrDefault("category", ""));
+                                            table.addCell(String.valueOf(row.getOrDefault("value", "")));
+                                        }
+                                        document.add(table);
                                     }
-                                    document.add(table);
                                 }
                             }
                             break;
                         case "Trend Analysis":
-                            Map<String, Object> trends = (Map<String, Object>) content.get("trends");
-                            if (trends != null) {
-                                document.add(new Paragraph("Trend data available (visualization not implemented in PDF)", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                            Object trendsObj = content.get("trends");
+                            if (trendsObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> trends = (Map<String, Object>) trendsObj;
+                                if (!trends.isEmpty()) {
+                                    document.add(new Paragraph("Trend Analysis:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    
+                                    // 获取可视化类型
+                                    String visualizationType = "bar"; // 默认值
+                                    if (request.getMetadata() != null && request.getMetadata().containsKey("visualization")) {
+                                        visualizationType = (String) request.getMetadata().get("visualization");
+                                    }
+                                    
+                                    // 生成收入趋势图表
+                                    if (trends.containsKey("dailyRevenue")) {
+                                        try {
+                                            // 传递品牌色彩参数
+                                            Map<String, Object> chartTrends = new HashMap<>(trends);
+                                            chartTrends.put("useBrandColors", useBrandColors);
+                                            
+                                            BufferedImage revenueChart = chartService.generateRevenueTrendChart(chartTrends, visualizationType);
+                                            if (revenueChart != null) {
+                                                document.add(new Paragraph("Revenue Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
+                                                javax.imageio.ImageIO.write(revenueChart, "PNG", chartStream);
+                                                byte[] chartBytes = chartStream.toByteArray();
+                                                com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
+                                                chartImage.scaleToFit(500, 350);
+                                                chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
+                                                document.add(chartImage);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        } catch (Exception e) {
+                                            System.err.println("Error generating revenue chart: " + e.getMessage());
+                                        }
+                                    }
+                                    
+                                    // 生成预订趋势图表
+                                    if (trends.containsKey("dailyBookings")) {
+                                        try {
+                                            // 传递品牌色彩参数
+                                            Map<String, Object> chartTrends = new HashMap<>(trends);
+                                            chartTrends.put("useBrandColors", useBrandColors);
+                                            
+                                            BufferedImage bookingChart = chartService.generateBookingTrendChart(chartTrends, visualizationType);
+                                            if (bookingChart != null) {
+                                                document.add(new Paragraph("Booking Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
+                                                javax.imageio.ImageIO.write(bookingChart, "PNG", chartStream);
+                                                byte[] chartBytes = chartStream.toByteArray();
+                                                com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
+                                                chartImage.scaleToFit(500, 350);
+                                                chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
+                                                document.add(chartImage);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        } catch (Exception e) {
+                                            System.err.println("Error generating booking chart: " + e.getMessage());
+                                        }
+                                    }
+                                    
+                                    // 生成用户活动图表
+                                    if (trends.containsKey("activeUsers") || trends.containsKey("userActivityRate")) {
+                                        try {
+                                            // 传递品牌色彩参数
+                                            Map<String, Object> chartTrends = new HashMap<>(trends);
+                                            chartTrends.put("useBrandColors", useBrandColors);
+                                            
+                                            BufferedImage userChart = chartService.generateUserActivityChart(chartTrends, visualizationType);
+                                            if (userChart != null) {
+                                                document.add(new Paragraph("User Activity Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
+                                                javax.imageio.ImageIO.write(userChart, "PNG", chartStream);
+                                                byte[] chartBytes = chartStream.toByteArray();
+                                                com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
+                                                chartImage.scaleToFit(500, 350);
+                                                chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
+                                                document.add(chartImage);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        } catch (Exception e) {
+                                            System.err.println("Error generating user activity chart: " + e.getMessage());
+                                        }
+                                    }
+                                    
+                                    // 显示详细的表格数据作为补充
+                                    document.add(new Paragraph("Detailed Data Tables:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                    
+                                    // 显示每日收入趋势表格
+                                    if (trends.containsKey("dailyRevenue")) {
+                                        Object dailyRevenueObj = trends.get("dailyRevenue");
+                                        if (dailyRevenueObj instanceof Map) {
+                                            @SuppressWarnings("unchecked")
+                                            Map<String, Object> dailyRevenue = (Map<String, Object>) dailyRevenueObj;
+                                            if (!dailyRevenue.isEmpty()) {
+                                                document.add(new Paragraph("Daily Revenue Data:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9)));
+                                                PdfPTable revenueTable = new PdfPTable(2);
+                                                revenueTable.setWidthPercentage(100);
+                                                revenueTable.addCell(new PdfPCell(new Phrase("Date", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                                                revenueTable.addCell(new PdfPCell(new Phrase("Revenue (RM)", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                                                
+                                                // 按日期排序并显示前10个最高收入日
+                                                dailyRevenue.entrySet().stream()
+                                                    .sorted((a, b) -> {
+                                                        Number aValue = (Number) a.getValue();
+                                                        Number bValue = (Number) b.getValue();
+                                                        return Double.compare(bValue.doubleValue(), aValue.doubleValue());
+                                                    })
+                                                    .limit(10)
+                                                    .forEach(entry -> {
+                                                        revenueTable.addCell(new PdfPCell(new Phrase(entry.getKey(), FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                                                        Number value = (Number) entry.getValue();
+                                                        revenueTable.addCell(new PdfPCell(new Phrase(String.format("RM %.2f", value.doubleValue()), FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                                                    });
+                                                document.add(revenueTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 显示收入按状态分布
+                                    if (trends.containsKey("revenueByStatus")) {
+                                        Object revenueByStatusObj = trends.get("revenueByStatus");
+                                        if (revenueByStatusObj instanceof Map) {
+                                            @SuppressWarnings("unchecked")
+                                            Map<String, Object> revenueByStatus = (Map<String, Object>) revenueByStatusObj;
+                                            if (!revenueByStatus.isEmpty()) {
+                                                document.add(new Paragraph("Revenue by Status:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9)));
+                                                PdfPTable statusTable = new PdfPTable(2);
+                                                statusTable.setWidthPercentage(100);
+                                                statusTable.addCell(new PdfPCell(new Phrase("Status", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                                                statusTable.addCell(new PdfPCell(new Phrase("Revenue (RM)", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                                                
+                                                revenueByStatus.forEach((status, revenue) -> {
+                                                    statusTable.addCell(new PdfPCell(new Phrase(status, FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                                                    Number value = (Number) revenue;
+                                                    statusTable.addCell(new PdfPCell(new Phrase(String.format("RM %.2f", value.doubleValue()), FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                                                });
+                                                document.add(statusTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    document.add(new Paragraph("No trend data available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                                }
+                            } else {
+                                document.add(new Paragraph("No trend data available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                            }
+                            break;
+                        case "Detailed Breakdown":
+                            Object breakdownObj = content.get("breakdown");
+                            if (breakdownObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> breakdown = (Map<String, Object>) breakdownObj;
+                                if (!breakdown.isEmpty()) {
+                                    document.add(new Paragraph("Detailed Breakdown:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    
+                                    // 显示最高收入日
+                                    if (breakdown.containsKey("topRevenueDays")) {
+                                        Object topRevenueDaysObj = breakdown.get("topRevenueDays");
+                                        if (topRevenueDaysObj instanceof List) {
+                                            @SuppressWarnings("unchecked")
+                                            List<Map<String, Object>> topRevenueDays = (List<Map<String, Object>>) topRevenueDaysObj;
+                                            if (!topRevenueDays.isEmpty()) {
+                                                document.add(new Paragraph("Top Revenue Days:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                PdfPTable revenueTable = new PdfPTable(2);
+                                                revenueTable.setWidthPercentage(100);
+                                                revenueTable.addCell(new PdfPCell(new Phrase("Date", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                revenueTable.addCell(new PdfPCell(new Phrase("Revenue (RM)", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                
+                                                topRevenueDays.forEach(day -> {
+                                                    revenueTable.addCell(new PdfPCell(new Phrase(String.valueOf(day.get("date")), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                    Number revenue = (Number) day.get("revenue");
+                                                    revenueTable.addCell(new PdfPCell(new Phrase(String.format("RM %.2f", revenue.doubleValue()), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                });
+                                                document.add(revenueTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 显示最高预订日
+                                    if (breakdown.containsKey("topBookingDays")) {
+                                        Object topBookingDaysObj = breakdown.get("topBookingDays");
+                                        if (topBookingDaysObj instanceof List) {
+                                            @SuppressWarnings("unchecked")
+                                            List<Map<String, Object>> topBookingDays = (List<Map<String, Object>>) topBookingDaysObj;
+                                            if (!topBookingDays.isEmpty()) {
+                                                document.add(new Paragraph("Top Booking Days:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                PdfPTable bookingTable = new PdfPTable(2);
+                                                bookingTable.setWidthPercentage(100);
+                                                bookingTable.addCell(new PdfPCell(new Phrase("Date", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                bookingTable.addCell(new PdfPCell(new Phrase("Bookings", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                
+                                                topBookingDays.forEach(day -> {
+                                                    bookingTable.addCell(new PdfPCell(new Phrase(String.valueOf(day.get("date")), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                    Number bookings = (Number) day.get("bookings");
+                                                    bookingTable.addCell(new PdfPCell(new Phrase(String.valueOf(bookings.longValue()), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                });
+                                                document.add(bookingTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 显示最活跃用户
+                                    if (breakdown.containsKey("topActiveUsers")) {
+                                        Object topActiveUsersObj = breakdown.get("topActiveUsers");
+                                        if (topActiveUsersObj instanceof List) {
+                                            @SuppressWarnings("unchecked")
+                                            List<Map<String, Object>> topActiveUsers = (List<Map<String, Object>>) topActiveUsersObj;
+                                            if (!topActiveUsers.isEmpty()) {
+                                                document.add(new Paragraph("Top Active Users:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                PdfPTable userTable = new PdfPTable(2);
+                                                userTable.setWidthPercentage(100);
+                                                userTable.addCell(new PdfPCell(new Phrase("User", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                userTable.addCell(new PdfPCell(new Phrase("Bookings", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                
+                                                topActiveUsers.forEach(user -> {
+                                                    userTable.addCell(new PdfPCell(new Phrase(String.valueOf(user.get("user")), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                    Number bookings = (Number) user.get("bookings");
+                                                    userTable.addCell(new PdfPCell(new Phrase(String.valueOf(bookings.longValue()), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                });
+                                                document.add(userTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 显示按用户预订分布
+                                    if (breakdown.containsKey("bookingsPerUser")) {
+                                        Object bookingsPerUserObj = breakdown.get("bookingsPerUser");
+                                        if (bookingsPerUserObj instanceof Map) {
+                                            @SuppressWarnings("unchecked")
+                                            Map<String, Object> bookingsPerUser = (Map<String, Object>) bookingsPerUserObj;
+                                            if (!bookingsPerUser.isEmpty()) {
+                                                document.add(new Paragraph("Bookings per User:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                                                PdfPTable userTable = new PdfPTable(2);
+                                                userTable.setWidthPercentage(100);
+                                                userTable.addCell(new PdfPCell(new Phrase("User", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                userTable.addCell(new PdfPCell(new Phrase("Total Bookings", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9))));
+                                                
+                                                // 按预订数量排序并显示前10个用户
+                                                bookingsPerUser.entrySet().stream()
+                                                    .sorted((a, b) -> {
+                                                        Number aValue = (Number) a.getValue();
+                                                        Number bValue = (Number) b.getValue();
+                                                        return Long.compare(bValue.longValue(), aValue.longValue());
+                                                    })
+                                                    .limit(10)
+                                                    .forEach(entry -> {
+                                                        userTable.addCell(new PdfPCell(new Phrase(entry.getKey(), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                        Number value = (Number) entry.getValue();
+                                                        userTable.addCell(new PdfPCell(new Phrase(String.valueOf(value.longValue()), FontFactory.getFont(FontFactory.HELVETICA, 9))));
+                                                    });
+                                                document.add(userTable);
+                                                document.add(new Paragraph(" "));
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    document.add(new Paragraph("No detailed breakdown data available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                                }
+                            } else {
+                                document.add(new Paragraph("No detailed breakdown data available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                            }
+                            break;
+                        case "Key Insights":
+                            Object insightsObj = content.get("insights");
+                            if (insightsObj instanceof List) {
+                                @SuppressWarnings("unchecked")
+                                List<String> insights = (List<String>) insightsObj;
+                                if (!insights.isEmpty()) {
+                                    document.add(new Paragraph("Key Insights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    for (String insight : insights) {
+                                        document.add(new Paragraph("- " + insight, FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                                    }
+                                } else {
+                                    document.add(new Paragraph("No insights available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
+                                }
+                            } else {
+                                document.add(new Paragraph("No insights available for the selected period.", FontFactory.getFont(FontFactory.HELVETICA, 10)));
                             }
                             break;
                         case "Recommendations":
-                            java.util.List<String> recs = (java.util.List<String>) content.get("recommendations");
-                            if (recs != null && !recs.isEmpty()) {
-                                document.add(new Paragraph("Recommendations:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                for (String rec : recs) {
-                                    document.add(new Paragraph("- " + rec));
+                            Object recsObj = content.get("recommendations");
+                            if (recsObj instanceof List) {
+                                @SuppressWarnings("unchecked")
+                                List<String> recs = (List<String>) recsObj;
+                                if (!recs.isEmpty()) {
+                                    document.add(new Paragraph("Recommendations:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    for (String rec : recs) {
+                                        document.add(new Paragraph("- " + rec));
+                                    }
                                 }
                             }
                             break;
@@ -707,6 +1035,49 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
         if (!hasContent) {
             document.add(new Paragraph("No data available for the selected report parameters."));
+        }
+
+        // 添加数据附录
+        if (includeAppendix && content != null) {
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Data Appendix", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14)));
+            document.add(new Paragraph("Raw Data Tables", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+            
+            // 添加原始收入数据
+            Object trendsObj = content.get("trends");
+            if (trendsObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> trends = (Map<String, Object>) trendsObj;
+                if (trends.containsKey("dailyRevenue")) {
+                    Object dailyRevenueObj = trends.get("dailyRevenue");
+                    if (dailyRevenueObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> dailyRevenue = (Map<String, Object>) dailyRevenueObj;
+                        if (!dailyRevenue.isEmpty()) {
+                            document.add(new Paragraph("Complete Daily Revenue Data:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+                            PdfPTable appendixTable = new PdfPTable(2);
+                            appendixTable.setWidthPercentage(100);
+                            appendixTable.addCell(new PdfPCell(new Phrase("Date", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                            appendixTable.addCell(new PdfPCell(new Phrase("Revenue (RM)", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8))));
+                            
+                            dailyRevenue.forEach((date, revenue) -> {
+                                appendixTable.addCell(new PdfPCell(new Phrase(date, FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                                Number value = (Number) revenue;
+                                appendixTable.addCell(new PdfPCell(new Phrase(String.format("RM %.2f", value.doubleValue()), FontFactory.getFont(FontFactory.HELVETICA, 8))));
+                            });
+                            document.add(appendixTable);
+                            document.add(new Paragraph(" "));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 添加页脚
+        if (includeHeaderFooter) {
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Generated by Picklefy Pickleball Club Management System", FontFactory.getFont(FontFactory.HELVETICA, 8)));
+            document.add(new Paragraph("For internal use only", FontFactory.getFont(FontFactory.HELVETICA, 8)));
         }
 
         document.close();
@@ -749,18 +1120,18 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     public AdminBookingDto convertToAdminBookingDto(Booking booking) {
         try {
-        AdminBookingDto dto = new AdminBookingDto();
-        dto.setId(booking.getId());
-        dto.setBookingDate(booking.getBookingDate());
-        dto.setTotalAmount(booking.getTotalAmount());
-        dto.setStatus(booking.getStatus());
+            AdminBookingDto dto = new AdminBookingDto();
+            dto.setId(booking.getId());
+            dto.setBookingDate(booking.getBookingDate());
+            dto.setTotalAmount(booking.getTotalAmount());
+            dto.setStatus(booking.getStatus());
 
             // 安全地获取会员信息
             try {
-        if (booking.getMember() != null && booking.getMember().getUser() != null) {
-            dto.setMemberName(booking.getMember().getUser().getName());
-            dto.setMemberPhone(booking.getMember().getUser().getPhone());
-            dto.setMemberEmail(booking.getMember().getUser().getEmail());
+                if (booking.getMember() != null && booking.getMember().getUser() != null) {
+                    dto.setMemberName(booking.getMember().getUser().getName());
+                    dto.setMemberPhone(booking.getMember().getUser().getPhone());
+                    dto.setMemberEmail(booking.getMember().getUser().getEmail());
                     dto.setMemberId(booking.getMember().getId()); // 新增：设置会员ID
                 }
             } catch (Exception e) {
@@ -796,12 +1167,12 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                         // 获取场地信息
                         try {
                             Court court = courtRepository.findById(firstSlot.getCourtId()).orElse(null);
-            if (court != null) {
-                dto.setCourtName(court.getName());
-            }
+                            if (court != null) {
+                                dto.setCourtName(court.getName());
+                            }
                         } catch (Exception e) {
                             System.err.println("Error getting court info for booking " + booking.getId() + ": " + e.getMessage());
-        }
+                        }
 
                         // 设置所有 bookingSlots 信息（用于前端显示）
                         dto.setBookingSlots(sortedSlots.stream()
@@ -811,72 +1182,33 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     slotDto.setId(bs.getId());
                                     slotDto.setStatus(bs.getStatus());
                                     
-                                    // 安全地设置 slot 信息，避免循环引用
+                                    // 设置slot信息
                                     if (bs.getSlot() != null) {
-                                        com.pickleball_backend.pickleball.dto.SlotDto slotDto2 = 
+                                        com.pickleball_backend.pickleball.dto.SlotDto slotInfo = 
                                             new com.pickleball_backend.pickleball.dto.SlotDto();
-                                        slotDto2.setId(bs.getSlot().getId());
-                                        slotDto2.setDate(bs.getSlot().getDate());
-                                        slotDto2.setStartTime(bs.getSlot().getStartTime());
-                                        slotDto2.setEndTime(bs.getSlot().getEndTime());
-                                        slotDto2.setDurationHours(bs.getSlot().getDurationHours());
-                                        slotDto2.setCourtId(bs.getSlot().getCourtId());
-                                        slotDto2.setAvailable(bs.getSlot().isAvailable());
-                                        slotDto.setSlot(slotDto2);
+                                        slotInfo.setId(bs.getSlot().getId());
+                                        slotInfo.setDate(bs.getSlot().getDate());
+                                        slotInfo.setStartTime(bs.getSlot().getStartTime());
+                                        slotInfo.setEndTime(bs.getSlot().getEndTime());
+                                        slotInfo.setDurationHours(bs.getSlot().getDurationHours());
+                                        slotInfo.setCourtId(bs.getSlot().getCourtId());
+                                        slotInfo.setAvailable(bs.getSlot().isAvailable());
+                                        slotDto.setSlot(slotInfo);
                                     }
                                     
                                     return slotDto;
                                 })
                                 .collect(Collectors.toList()));
                     }
-                } else {
-                    System.out.println("AdminDashboardService: Booking " + booking.getId() + " has no booking slots");
                 }
             } catch (Exception e) {
                 System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
             }
 
-            // 安全地添加支付信息
-            try {
-        if (booking.getPayment() != null) {
-            dto.setPaymentMethod(booking.getPayment().getPaymentMethod());
-            dto.setPaymentType(booking.getPayment().getPaymentType());
-            dto.setPaymentStatus(booking.getPayment().getStatus());
-            dto.setTransactionId(booking.getPayment().getTransactionId());
-                    dto.setPaymentId(booking.getPayment().getId()); // 新增：设置支付ID
-                }
-            } catch (Exception e) {
-                System.err.println("Error getting payment info for booking " + booking.getId() + ": " + e.getMessage());
-        }
-
-        dto.setPurpose(booking.getPurpose());
-        dto.setNumberOfPlayers(booking.getNumberOfPlayers());
-            dto.setNumPaddles(booking.getNumPaddles());
-            dto.setBuyBallSet(booking.getBuyBallSet());
-            
-            // 安全地处理取消请求
-            try {
-        CancellationRequest cancellationRequest = booking.getCancellationRequest();
-        if (cancellationRequest != null) {
-            dto.setAdminRemark(cancellationRequest.getAdminRemark());
-            // 新增：组装 CancellationRequestDto
-            com.pickleball_backend.pickleball.dto.CancellationRequestDto crDto = new com.pickleball_backend.pickleball.dto.CancellationRequestDto();
-            crDto.setId(cancellationRequest.getId());
-            crDto.setReason(cancellationRequest.getReason());
-            crDto.setStatus(cancellationRequest.getStatus());
-            crDto.setAdminRemark(cancellationRequest.getAdminRemark());
-            crDto.setRequestDate(cancellationRequest.getRequestDate());
-            dto.setCancellationRequest(crDto);
-        }
-            } catch (Exception e) {
-                System.err.println("Error getting cancellation request for booking " + booking.getId() + ": " + e.getMessage());
-            }
-            
-        return dto;
+            return dto;
         } catch (Exception e) {
-            System.err.println("Error in convertToAdminBookingDto for booking " + booking.getId() + ": " + e.getMessage());
-            e.printStackTrace();
-            throw e;
+            System.err.println("Error converting booking to DTO: " + e.getMessage());
+            return null;
         }
     }
 }

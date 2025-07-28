@@ -1,5 +1,6 @@
 package com.pickleball_backend.pickleball.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,18 +15,11 @@ import java.time.LocalDate;
 public class VoucherDto {
     private Integer id;
     private String code;
-    private double discountValue;  // Changed from discountAmount to discountValue
+    private Double discountValue;  // Changed from discountAmount to discountValue
     private String discountType;  // Added discount type field
-    private int requestPoints;
-    private LocalDate expiryDate;
+    private Integer requestPoints;
+    private String tierName;  // Added tier name field
     
-    // Add constructor without discountType for backward compatibility
-    public VoucherDto(Integer id, String code, double discountValue, int requestPoints, LocalDate expiryDate) {
-        this.id = id;
-        this.code = code;
-        this.discountValue = discountValue;  // Changed from discountAmount
-        this.discountType = "amount"; // Default to amount type
-        this.requestPoints = requestPoints;
-        this.expiryDate = expiryDate;
-    }
+    @JsonFormat(pattern = "dd-MM-yyyy")
+    private LocalDate expiryDate;
 }

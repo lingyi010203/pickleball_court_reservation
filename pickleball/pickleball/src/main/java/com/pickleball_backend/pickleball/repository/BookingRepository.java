@@ -91,4 +91,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "AND b.status = 'COMPLETED' " +
            "ORDER BY b.bookingDate DESC")
     List<Booking> findCompletedBookingsByUserIdAndCourtId(Integer userId, Integer courtId);
+
+    // 根据日期范围查找预订
+    List<Booking> findByBookingDateBetween(java.time.LocalDateTime startDate, java.time.LocalDateTime endDate);
+    
+    // 新的查询方法，使用@Query注解明确指定参数类型
+    @Query("SELECT b FROM Booking b WHERE b.bookingDate >= :startDate AND b.bookingDate <= :endDate")
+    List<Booking> findBookingsByDateRange(
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate
+    );
 }

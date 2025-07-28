@@ -1,6 +1,6 @@
 package com.pickleball_backend.pickleball.service;
 
-import com.pickleball_backend.pickleball.dto.AdminProfileDto;
+import com.pickleball_backend.pickleball.dto.ProfileDto;
 import com.pickleball_backend.pickleball.dto.AdminRegistrationDTO;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.*;
@@ -85,19 +85,19 @@ public class AdminServiceImpl implements AdminService {
 
     // --- Profile methods ---
     @Override
-    public AdminProfileDto getProfileByUsername(String username) {
+    public ProfileDto getProfileByUsername(String username) {
         Admin admin = adminRepository.findByUser_UserAccount_Username(username)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
-        AdminProfileDto dto = new AdminProfileDto();
+        ProfileDto dto = new ProfileDto();
         dto.setName(admin.getUser().getName());
-        dto.setEmail(admin.getUser().getEmail()); // 改为真实邮箱
+        dto.setEmail(admin.getUser().getEmail());
         dto.setPhone(admin.getUser().getPhone());
-        // dto.setAvatar(admin.getAvatar()); // 如果有头像字段
+        dto.setProfileImage(admin.getUser().getProfileImage()); // Add profile image
         return dto;
     }
 
     @Override
-    public AdminProfileDto updateProfile(String username, AdminProfileDto dto) {
+    public ProfileDto updateProfile(String username, ProfileDto dto) {
         Admin admin = adminRepository.findByUser_UserAccount_Username(username)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
         admin.getUser().setName(dto.getName());

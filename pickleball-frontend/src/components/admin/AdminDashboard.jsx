@@ -36,7 +36,6 @@ import { Chart } from 'chart.js/auto';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import ReportGenerator from './ReportGenerator';
-import AdminSettings from './AdminSettings';
 import { useTheme, alpha } from '@mui/material/styles';
 
 dayjs.extend(relativeTime);
@@ -51,11 +50,12 @@ const AdminDashboard = () => {
   const theme = useTheme();
 
   const [adminUsername, setAdminUsername] = useState(UserService.getAdminUsername() || 'Admin');
+  const [adminProfile, setAdminProfile] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
-  const [summaryLoading, setSummaryLoading] = useState(true);
-  const [bookingTrendsLoading, setBookingTrendsLoading] = useState(true);
-  const [revenueTrendsLoading, setRevenueTrendsLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [bookingTrendsLoading, setBookingTrendsLoading] = useState(false);
+  const [revenueTrendsLoading, setRevenueTrendsLoading] = useState(false);
   const [dashboardData, setDashboardData] = useState({
     totalUsers: 0,
     totalUsersChange: 0,
@@ -77,43 +77,47 @@ const AdminDashboard = () => {
 
   // Fetch Booking Trends from backend
   useEffect(() => {
-    setBookingTrendsLoading(true);
-    const fetchBookingTrends = async () => {
-      try {
-        const token = UserService.getAdminToken();
-        const res = await axios.get(
-          `http://localhost:8081/api/admin/dashboard/booking-trends?range=${bookingTimeRange}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setBookingTrends(res.data);
-      } catch (err) {
-        setBookingTrends({ labels: [], data: [] });
-      } finally {
-        setBookingTrendsLoading(false);
-      }
-    };
-    fetchBookingTrends();
-  }, [bookingTimeRange]);
+    if (getCurrentTab() === 'dashboard') {
+      setBookingTrendsLoading(true);
+      const fetchBookingTrends = async () => {
+        try {
+          const token = UserService.getAdminToken();
+          const res = await axios.get(
+            `http://localhost:8081/api/admin/dashboard/booking-trends?range=${bookingTimeRange}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setBookingTrends(res.data);
+        } catch (err) {
+          setBookingTrends({ labels: [], data: [] });
+        } finally {
+          setBookingTrendsLoading(false);
+        }
+      };
+      fetchBookingTrends();
+    }
+  }, [bookingTimeRange, location.pathname]);
 
   // Fetch Revenue Trends from backend
   useEffect(() => {
-    setRevenueTrendsLoading(true);
-    const fetchRevenueTrends = async () => {
-      try {
-        const token = UserService.getAdminToken();
-        const res = await axios.get(
-          `http://localhost:8081/api/admin/dashboard/revenue-trends?range=${revenueTimeRange}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setRevenueTrends(res.data);
-      } catch (err) {
-        setRevenueTrends({ labels: [], data: [] });
-      } finally {
-        setRevenueTrendsLoading(false);
-      }
-    };
-    fetchRevenueTrends();
-  }, [revenueTimeRange]);
+    if (getCurrentTab() === 'dashboard') {
+      setRevenueTrendsLoading(true);
+      const fetchRevenueTrends = async () => {
+        try {
+          const token = UserService.getAdminToken();
+          const res = await axios.get(
+            `http://localhost:8081/api/admin/dashboard/revenue-trends?range=${revenueTimeRange}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setRevenueTrends(res.data);
+        } catch (err) {
+          setRevenueTrends({ labels: [], data: [] });
+        } finally {
+          setRevenueTrendsLoading(false);
+        }
+      };
+      fetchRevenueTrends();
+    }
+  }, [revenueTimeRange, location.pathname]);
 
   // 拆分图表初始化函数
   const initBookingChart = () => {
@@ -208,8 +212,10 @@ const AdminDashboard = () => {
   }, [revenueTrends.labels, revenueTrends.data, revenueTimeRange]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (getCurrentTab() === 'dashboard') {
+      fetchDashboardData();
+    }
+  }, [location.pathname]);
 
   const fetchDashboardData = async () => {
     try {
@@ -342,15 +348,25 @@ const AdminDashboard = () => {
   const generateReport = async (report) => {
     try {
       const token = UserService.getAdminToken();
+      
+      // 从ReportGenerator的复杂数据结构中提取需要的字段
+      const reportRequest = {
+        type: report.configuration?.type || report.type,
+        startDate: report.metadata?.period?.start || report.startDate,
+        endDate: report.metadata?.period?.end || report.endDate,
+        format: report.configuration?.format || report.format,
+        filters: {
+          includeUsers: true,
+          includeBookings: true,
+          includeRevenue: true
+        },
+        metadata: report.metadata,
+        content: report.content
+      };
+      
       const res = await axios.post(
         'http://localhost:8081/api/admin/dashboard/generate-report',
-        {
-          type: report.type,
-          startDate: report.startDate,
-          endDate: report.endDate,
-          format: report.format,
-          filters: report.filters
-        },
+        reportRequest,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob'
@@ -359,7 +375,7 @@ const AdminDashboard = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `report.${report.format === 'excel' ? 'xlsx' : report.format}`);
+      link.setAttribute('download', `report.${reportRequest.format === 'excel' ? 'xlsx' : reportRequest.format}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -374,16 +390,58 @@ const AdminDashboard = () => {
 
   // Helper to determine current tab
   const getCurrentTab = () => {
-    if (location.pathname.startsWith('/admin/users')) return 'users';
-    if (location.pathname.startsWith('/admin/tiers')) return 'tiers';
-    if (location.pathname.startsWith('/admin/courts')) return 'courts';
-    if (location.pathname.startsWith('/admin/dashboard')) return 'dashboard';
-    if (location.pathname.startsWith('/admin/bookings')) return 'bookings';
-    if (location.pathname.startsWith('/admin/settings')) return 'settings';
+    const path = location.pathname;
+    if (path.includes('/admin/dashboard')) return 'dashboard';
+    if (path.includes('/admin/users')) return 'users';
+    if (path.includes('/admin/courts')) return 'courts';
+    if (path.includes('/admin/tiers')) return 'tiers';
+    if (path.includes('/admin/bookings')) return 'bookings';
+    if (path.includes('/admin/settings')) return 'settings';
     return 'dashboard';
   };
-  // 页面主 loading 状态
-  const loading = summaryLoading || bookingTrendsLoading || revenueTrendsLoading;
+
+  // Fetch admin profile
+  const fetchAdminProfile = async () => {
+    try {
+      const token = UserService.getAdminToken();
+      const response = await axios.get('http://localhost:8081/api/admin/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAdminProfile(response.data);
+    } catch (error) {
+      console.error('Failed to fetch admin profile:', error);
+    }
+  };
+
+  // Fetch admin profile on component mount
+  useEffect(() => {
+    fetchAdminProfile();
+  }, []);
+
+  // Listen for avatar updates from AdminSettings
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'adminAvatarUpdated') {
+        fetchAdminProfile();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event
+    const handleAvatarUpdate = () => {
+      fetchAdminProfile();
+    };
+    
+    window.addEventListener('adminAvatarUpdated', handleAvatarUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('adminAvatarUpdated', handleAvatarUpdate);
+    };
+  }, []);
+  // 页面主 loading 状态 - 只在dashboard页面显示
+  const loading = getCurrentTab() === 'dashboard' && (summaryLoading || bookingTrendsLoading || revenueTrendsLoading);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.palette.background.default }}>
@@ -415,8 +473,10 @@ const AdminDashboard = () => {
               width: 48,
               height: 48,
               fontSize: '1.25rem'
-            }}>
-              👨‍💼
+            }}
+            src={adminProfile?.profileImage ? `http://localhost:8081/uploads/${adminProfile.profileImage}` : null}
+            >
+              {adminProfile?.name ? adminProfile.name.charAt(0).toUpperCase() : 'A'}
             </Avatar>
             <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
               Admin Portal
@@ -461,7 +521,10 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'users' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
               <PeopleIcon />
             </ListItemIcon>
             <ListItemText primary="User Management" />
@@ -478,10 +541,13 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'courts' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
               <CourtsIcon />
             </ListItemIcon>
-            <ListItemText primary="Manage Courts" />
+            <ListItemText primary="Court Management" />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/tiers')}
@@ -495,10 +561,13 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'tiers' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
               <TierIcon />
             </ListItemIcon>
-            <ListItemText primary="Membership Tiers" />
+            <ListItemText primary="Membership Management" />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/bookings')}
@@ -512,10 +581,13 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'bookings' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
               <BookingsIcon />
             </ListItemIcon>
-            <ListItemText primary="Manage Bookings" />
+            <ListItemText primary="Booking Management" />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/settings')}
@@ -528,30 +600,15 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'settings' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
               <SettingsIcon />
             </ListItemIcon>
             <ListItemText primary="Settings" />
           </ListItem>
         </List>
-        <Box sx={{ mt: 'auto', p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<LogoutIcon />}
-            onClick={handleLogout}
-            sx={{
-              borderColor: theme.palette.error.main,
-              color: theme.palette.error.main,
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.error.light, 0.15),
-                borderColor: theme.palette.error.dark
-              }
-            }}
-          >
-            Logout
-          </Button>
-        </Box>
       </Paper>
       {/* Main Content */}
       <Box sx={{ flexGrow: 1, ml: '280px', p: 3 }}>
@@ -580,19 +637,18 @@ const AdminDashboard = () => {
             />
           </Paper>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton>
-              <NotificationsIcon />
-            </IconButton>
             <Box sx={{ position: 'relative' }}>
               <Button
                 variant="text"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
               >
-                <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
-                  {usernameInitial}
+                <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}
+                src={adminProfile?.profileImage ? `http://localhost:8081/uploads/${adminProfile.profileImage}` : null}
+                >
+                  {adminProfile?.name ? adminProfile.name.charAt(0).toUpperCase() : usernameInitial}
                 </Avatar>
-                <Typography>{adminUsername}</Typography>
+                <Typography>{adminProfile?.name || adminUsername}</Typography>
               </Button>
               {showUserMenu && (
                 <Paper sx={{
@@ -866,8 +922,6 @@ const AdminDashboard = () => {
 
             </Grid>
           </>
-        ) : getCurrentTab() === 'settings' && location.pathname === '/admin/settings' ? (
-          <AdminSettings />
         ) : null}
         <Outlet />
       </Box>

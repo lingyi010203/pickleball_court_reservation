@@ -392,7 +392,7 @@ const AdminManageBookings = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#5d3587' }}>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
             Booking Management
           </Typography>
           <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>

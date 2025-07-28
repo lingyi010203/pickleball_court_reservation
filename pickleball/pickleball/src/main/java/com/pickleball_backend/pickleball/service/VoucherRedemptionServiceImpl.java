@@ -46,7 +46,9 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
         // Validate voucher
-        if (voucher.getTier().getId() != member.getTier().getId()) {
+        if (voucher.getTier() == null || voucher.getTier().getId() == null || 
+            member.getTier() == null || member.getTier().getId() == null ||
+            !voucher.getTier().getId().equals(member.getTier().getId())) {
             throw new ValidationException("Voucher not available for your tier");
         }
 
@@ -224,7 +226,9 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
             }
 
             // Check tier and points
-            return voucher.getTier().getId().equals(member.getTier().getId()) &&
+            return voucher.getTier() != null && voucher.getTier().getId() != null &&
+                   member.getTier() != null && member.getTier().getId() != null &&
+                   voucher.getTier().getId().equals(member.getTier().getId()) &&
                    member.getPointBalance() >= voucher.getRequestPoints();
         } catch (Exception e) {
             return false;

@@ -11,7 +11,9 @@ public interface TierService {
     MembershipTier createTier(TierDto tierDto);
     void deleteTier(Integer id);
     MembershipTier addVoucherToTier(String tierName, VoucherDto voucherDto);
+    Voucher addGeneralVoucher(VoucherDto voucherDto);
     List<MembershipTier> getAllTiers();
+    List<Voucher> getAllVouchers();
     MembershipTier createOrUpdateTier(MembershipTier tier);
 
 

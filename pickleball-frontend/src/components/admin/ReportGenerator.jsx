@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Paper, Typography, Grid, FormControl, InputLabel, Select, MenuItem, TextField,
   FormControlLabel, Checkbox, Button, Box, CircularProgress, IconButton, Divider
@@ -10,13 +10,16 @@ import {
   FileDownload as FileDownloadIcon, Close as CloseIcon, Business as BusinessIcon,
   PieChart as PieChartIcon, Visibility as VisibilityIcon, InsertChart as InsertChartIcon
 } from '@mui/icons-material';
+import axios from 'axios';
+import UserService from '../../service/UserService';
+import ReportChart from './ReportChart';
 
 // 配置
 const REPORT_CONFIG = {
   types: [
-    { value: 'executive', label: 'Executive Summary', icon: <AnalyticsIcon />, description: 'High-level KPIs and trends for management' },
-    { value: 'operational', label: 'Operational Report', icon: <EventNoteIcon />, description: 'Detailed day-to-day operations analysis' },
-    { value: 'financial', label: 'Financial Report', icon: <AttachMoneyIcon />, description: 'Revenue, costs, and profitability metrics' }
+    { value: 'revenue', label: 'Revenue Report', icon: <AttachMoneyIcon />, description: 'Detailed revenue analysis and financial metrics' },
+    { value: 'booking', label: 'Booking Analytics', icon: <EventNoteIcon />, description: 'Booking patterns, trends, and performance analysis' },
+    { value: 'user', label: 'User Activity Report', icon: <PeopleIcon />, description: 'User engagement, growth, and activity patterns' }
   ],
   formats: [
     { value: 'pdf', label: 'PDF (Formal)', icon: <PictureAsPdfIcon />, color: '#e53e3e' },
@@ -29,33 +32,23 @@ const REPORT_CONFIG = {
     { value: 'pie', label: 'Pie Charts', icon: <PieChartIcon /> }
   ],
   sections: [
-    { name: 'executiveSummary', label: 'Executive Summary', default: true },
-    { name: 'financialHighlights', label: 'Financial Highlights', default: true },
-    { name: 'departmentBreakdown', label: 'Department Breakdown', default: false },
-    { name: 'recommendations', label: 'Recommendations', default: true }
+    { name: 'summary', label: 'Executive Summary', default: true },
+    { name: 'trends', label: 'Trend Analysis', default: true },
+    { name: 'breakdown', label: 'Detailed Breakdown', default: false },
+    { name: 'insights', label: 'Key Insights', default: true }
   ],
   formattingOptions: [
     { name: 'includeHeaderFooter', label: 'Header & Footer', description: 'Include company header and page numbers' },
     { name: 'useBrandColors', label: 'Brand Colors', description: 'Use company colors in charts and tables' },
     { name: 'includeAppendix', label: 'Data Appendix', description: 'Include raw data tables in appendix' }
-  ],
-  dataOptions: [
-    { name: 'includeTrends', label: 'Trend Analysis', description: 'Year-over-year and period comparisons' },
-    { name: 'includeForecasts', label: 'Forecast Projections', description: 'Predictive models and future estimates' },
-    { name: 'includeBenchmarks', label: 'Industry Benchmarks', description: 'Comparison against industry standards' }
   ]
 };
 
 const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   // State
-  const [reportType, setReportType] = useState('executive');
+  const [reportType, setReportType] = useState('revenue');
   const [exportFormat, setExportFormat] = useState('pdf');
   const [visualizationType, setVisualizationType] = useState('bar');
-  const [dataOptions, setDataOptions] = useState({
-    includeTrends: true,
-    includeForecasts: false,
-    includeBenchmarks: false
-  });
   const [reportSections, setReportSections] = useState(
     REPORT_CONFIG.sections.reduce((acc, section) => {
       acc[section.name] = section.default;
@@ -72,82 +65,136 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   const [reportTitle, setReportTitle] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  
+  // 真实数据状态
+  const [reportData, setReportData] = useState(null);
+  const [dataLoading, setDataLoading] = useState(false);
 
-  // 内容生成函数
-  const generateExecutiveSummary = () => ({
-    keyMetrics: [
-      { name: 'Revenue Growth', value: '12%', change: '+3% YoY' },
-      { name: 'Customer Acquisition', value: '1,240', change: '+18% MoM' },
-      { name: 'Operational Efficiency', value: '84%', change: '+5% QoQ' }
-    ],
-    highlights: [
-      'Record quarterly revenue achieved',
-      'New customer acquisition up 18% month-over-month',
-      'Operational costs reduced by 7% through automation'
-    ]
-  });
-
-  const generateFinancialData = () => ({
-    incomeStatement: [
-      { category: 'Revenue', current: 4200000, previous: 3800000 },
-      { category: 'Cost of Goods', current: 2100000, previous: 1900000 },
-      { category: 'Operating Expenses', current: 1200000, previous: 1300000 },
-      { category: 'Net Income', current: 900000, previous: 600000 }
-    ],
-    balanceSheet: [
-      { category: 'Assets', value: 5000000 },
-      { category: 'Liabilities', value: 2000000 },
-      { category: 'Equity', value: 3000000 }
-    ]
-  });
-
-  const generateTrendAnalysis = () => ({
-    timePeriods: ['Current', 'Previous', 'YoY Change'],
-    metrics: [
-      {
-        name: 'Revenue',
-        values: ['$4.2M', '$3.8M', '+10.5%'],
-        chartData: [4200000, 3800000]
-      },
-      {
-        name: 'Active Users',
-        values: ['12,450', '10,890', '+14.3%'],
-        chartData: [12450, 10890]
+  // 数据转换函数
+  const convertDataForCharts = (data) => {
+    if (!data) return data;
+    
+    const converted = { ...data };
+    
+    // 转换趋势数据
+    if (converted.trends) {
+      // 转换每日收入数据
+      if (converted.trends.dailyRevenue) {
+        const revenueData = {};
+        Object.entries(converted.trends.dailyRevenue).forEach(([key, value]) => {
+          revenueData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.dailyRevenue = revenueData;
       }
-    ]
-  });
-
-  const generateForecasts = () => ({
-    nextQuarter: {
-      revenue: { low: 4500000, high: 4800000 },
-      expenses: { low: 2200000, high: 2400000 },
-      profitMargin: '18-22%'
-    },
-    nextYear: {
-      revenue: { low: 20000000, high: 22000000 },
-      expenses: { low: 9000000, high: 10000000 },
-      profitMargin: '20-25%'
+      
+      // 转换每日预订数据
+      if (converted.trends.dailyBookings) {
+        const bookingData = {};
+        Object.entries(converted.trends.dailyBookings).forEach(([key, value]) => {
+          bookingData[key] = typeof value === 'object' ? value.longValue() : value;
+        });
+        converted.trends.dailyBookings = bookingData;
+      }
+      
+      // 转换收入按状态分布
+      if (converted.trends.revenueByStatus) {
+        const statusData = {};
+        Object.entries(converted.trends.revenueByStatus).forEach(([key, value]) => {
+          statusData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.revenueByStatus = statusData;
+      }
+      
+      // 转换预订按状态分布
+      if (converted.trends.bookingsByStatus) {
+        const statusData = {};
+        Object.entries(converted.trends.bookingsByStatus).forEach(([key, value]) => {
+          statusData[key] = typeof value === 'object' ? value.longValue() : value;
+        });
+        converted.trends.bookingsByStatus = statusData;
+      }
     }
-  });
+    
+    // 转换详细数据
+    if (converted.breakdown) {
+      // 转换顶级收入日
+      if (converted.breakdown.topRevenueDays) {
+        const revenueData = {};
+        converted.breakdown.topRevenueDays.forEach(item => {
+          if (item.date && item.revenue) {
+            revenueData[item.date] = typeof item.revenue === 'object' ? item.revenue.doubleValue() : item.revenue;
+          }
+        });
+        converted.breakdown.topRevenueDays = revenueData;
+      }
+      
+      // 转换顶级预订日
+      if (converted.breakdown.topBookingDays) {
+        const bookingData = {};
+        converted.breakdown.topBookingDays.forEach(item => {
+          if (item.date && item.bookings) {
+            bookingData[item.date] = typeof item.bookings === 'object' ? item.bookings.longValue() : item.bookings;
+          }
+        });
+        converted.breakdown.topBookingDays = bookingData;
+      }
+      
+      // 转换顶级活跃用户
+      if (converted.breakdown.topActiveUsers) {
+        const userData = {};
+        converted.breakdown.topActiveUsers.forEach(item => {
+          if (item.user && item.bookings) {
+            userData[item.user] = typeof item.bookings === 'object' ? item.bookings.longValue() : item.bookings;
+          }
+        });
+        converted.breakdown.topActiveUsers = userData;
+      }
+    }
+    
+    return converted;
+  };
 
-  const generateBenchmarks = () => ({
-    industryAverage: {
-      revenueGrowth: '8%',
-      profitMargin: '15%',
-      customerAcquisitionCost: '$120'
-    },
-    competitors: [
-      { name: 'Competitor A', revenueGrowth: '10%', marketShare: '22%' },
-      { name: 'Competitor B', revenueGrowth: '9%', marketShare: '18%' },
-      { name: 'Competitor C', revenueGrowth: '7%', marketShare: '15%' }
-    ]
-  });
+  // 获取真实数据
+  const fetchReportData = async () => {
+    if (!dateRange.start || !dateRange.end) return;
+    
+    setDataLoading(true);
+    setError(null); // 清除之前的错误
+    try {
+      const token = UserService.getAdminToken();
+      const response = await axios.get(`http://localhost:8081/api/admin/reports/${reportType}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          startDate: dateRange.start,
+          endDate: dateRange.end
+        }
+      });
+      // 转换数据格式
+      const convertedData = convertDataForCharts(response.data);
+      setReportData(convertedData);
+    } catch (err) {
+      console.error('Failed to fetch report data:', err);
+      // 只有在用户明确操作时才显示错误
+      if (dateRange.start && dateRange.end) {
+        setError('Failed to load report data. Please check your date range and try again.');
+      }
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
-  const generateRecommendations = () => [
-    'Expand marketing efforts in Q3 to capitalize on seasonal trends',
-    'Invest in automation to further reduce operational costs',
-    'Consider strategic partnerships to enter new markets'
-  ];
+  // 当报表类型或日期范围改变时重新获取数据
+  useEffect(() => {
+    // 只有当两个日期都选择了才获取数据
+    if (dateRange.start && dateRange.end) {
+      // 添加一个小延迟，避免用户快速选择日期时的频繁请求
+      const timeoutId = setTimeout(() => {
+        fetchReportData();
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [reportType, dateRange.start, dateRange.end]);
 
   // 生成报表数据
   const generateReportData = () => {
@@ -167,17 +214,9 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
       },
       configuration: {
         type: reportType,
-        format: exportFormat || 'pdf',
-        dataOptions
+        format: exportFormat || 'pdf'
       },
-      content: {
-        summary: generateExecutiveSummary(),
-        financials: generateFinancialData(),
-        trends: dataOptions.includeTrends ? generateTrendAnalysis() : null,
-        forecasts: dataOptions.includeForecasts ? generateForecasts() : null,
-        benchmarks: dataOptions.includeBenchmarks ? generateBenchmarks() : null,
-        recommendations: generateRecommendations()
-      }
+      content: reportData || {}
     };
   };
 
@@ -309,10 +348,15 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                 InputLabelProps={{ shrink: true }}
                 label="Start Date"
+                disabled={dataLoading}
               />
             </Grid>
             <Grid item xs={2} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowForwardIcon sx={{ color: '#a0aec0' }} />
+              {dataLoading ? (
+                <CircularProgress size={20} />
+              ) : (
+                <ArrowForwardIcon sx={{ color: '#a0aec0' }} />
+              )}
             </Grid>
             <Grid item xs={5}>
               <TextField
@@ -323,43 +367,20 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                 InputLabelProps={{ shrink: true }}
                 label="End Date"
+                disabled={dataLoading}
               />
             </Grid>
           </Grid>
-        </Grid>
-        {/* 数据选项 */}
-        <Grid item xs={12}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: '#4a5568' }}>
-            Data Options
-          </Typography>
-          <Paper sx={{ p: 2 }}>
-            <Grid container spacing={2}>
-              {REPORT_CONFIG.dataOptions.map((option) => (
-                <Grid item xs={12} sm={4} key={option.name}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={dataOptions[option.name]}
-                        onChange={(e) => setDataOptions({
-                          ...dataOptions,
-                          [option.name]: e.target.checked
-                        })}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography>{option.label}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.description}
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
+          {dataLoading && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Loading report data...
+            </Typography>
+          )}
+          {error && (
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+              {error}
+            </Typography>
+          )}
         </Grid>
         {/* 报表部分 */}
         <Grid item xs={12}>
@@ -439,57 +460,192 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 {companyInfo?.name || 'Company'} | {dateRange.start && dateRange.end ? `${new Date(dateRange.start).toLocaleDateString()} - ${new Date(dateRange.end).toLocaleDateString()}` : ''}
               </Typography>
               <Divider sx={{ my: 2 }} />
-              {reportSections.executiveSummary && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>Executive Summary</Typography>
-                  <Typography paragraph>
-                    This report provides a comprehensive analysis of {companyInfo?.name || 'our company'}'s performance during the specified period.
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {generateExecutiveSummary().keyMetrics.map((metric, index) => (
-                      <Grid item xs={12} sm={4} key={index}>
-                        <Paper sx={{ p: 2, textAlign: 'center' }}>
-                          <Typography variant="subtitle2">{metric.name}</Typography>
-                          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{metric.value}</Typography>
-                          <Typography variant="caption" color={metric.change.startsWith('+') ? 'success.main' : 'error.main'}>
-                            {metric.change}
-                          </Typography>
-                        </Paper>
+              
+              {dataLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : reportData ? (
+                <>
+                  {reportSections.summary && reportData.summary && (
+                    <Box sx={{ mb: 4 }}>
+                      <Typography variant="h6" gutterBottom>Executive Summary</Typography>
+                      <Grid container spacing={2}>
+                        {reportData.summary.keyMetrics?.map((metric, index) => (
+                          <Grid item xs={12} sm={4} key={index}>
+                            <Paper sx={{ p: 2, textAlign: 'center' }}>
+                              <Typography variant="subtitle2">{metric.name}</Typography>
+                              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{metric.value}</Typography>
+                              <Typography variant="caption" color={metric.change?.startsWith('+') ? 'success.main' : 'error.main'}>
+                                {metric.change}
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                        ))}
                       </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-              {reportSections.financialHighlights && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>Financial Highlights</Typography>
-                  <Typography paragraph>
-                    Key financial metrics for the reporting period.
-                  </Typography>
-                  <Box sx={{ height: 300, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography>Chart visualization would appear here ({visualizationType} chart)</Typography>
-                  </Box>
-                </Box>
-              )}
-              {dataOptions.includeTrends && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>Trend Analysis</Typography>
-                  <Typography paragraph>
-                    Performance trends over time.
-                  </Typography>
-                  <Box sx={{ height: 300, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography>Trend visualization would appear here</Typography>
-                  </Box>
-                </Box>
-              )}
-              {reportSections.recommendations && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>Recommendations</Typography>
-                  <ul>
-                    {generateRecommendations().map((rec, index) => (
-                      <li key={index}><Typography>{rec}</Typography></li>
-                    ))}
-                  </ul>
+                      {reportData.summary.highlights && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="subtitle1" gutterBottom>Key Highlights:</Typography>
+                          <ul>
+                            {reportData.summary.highlights.map((highlight, index) => (
+                              <li key={index}><Typography>{highlight}</Typography></li>
+                            ))}
+                          </ul>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  
+                  {reportSections.trends && reportData.trends && (
+                    <Box sx={{ mb: 4 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6">Trend Analysis</Typography>
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <InputLabel>Chart Type</InputLabel>
+                          <Select
+                            value={visualizationType}
+                            onChange={(e) => setVisualizationType(e.target.value)}
+                            label="Chart Type"
+                          >
+                            {REPORT_CONFIG.visualizationOptions.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Box sx={{ mr: 1 }}>{option.icon}</Box>
+                                  {option.label}
+                                </Box>
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Box>
+                      
+                      {/* 收入趋势图表 */}
+                      {reportData.trends.dailyRevenue && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Revenue Trend</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type={visualizationType}
+                              data={reportData.trends.dailyRevenue}
+                              title="Daily Revenue Trend"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* 预订趋势图表 */}
+                      {reportData.trends.dailyBookings && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Booking Trend</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type={visualizationType}
+                              data={reportData.trends.dailyBookings}
+                              title="Daily Booking Trend"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* 收入按状态分布 */}
+                      {reportData.trends.revenueByStatus && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Revenue by Status</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type="pie"
+                              data={reportData.trends.revenueByStatus}
+                              title="Revenue Distribution by Status"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* 预订按状态分布 */}
+                      {reportData.trends.bookingsByStatus && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Bookings by Status</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type="pie"
+                              data={reportData.trends.bookingsByStatus}
+                              title="Booking Distribution by Status"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  
+                  {reportSections.breakdown && reportData.breakdown && (
+                    <Box sx={{ mb: 4 }}>
+                      <Typography variant="h6" gutterBottom>Detailed Breakdown</Typography>
+                      
+                      {/* 顶级收入日 */}
+                      {reportData.breakdown.topRevenueDays && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Top Revenue Days</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type="bar"
+                              data={reportData.breakdown.topRevenueDays}
+                              title="Top Revenue Days"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* 顶级预订日 */}
+                      {reportData.breakdown.topBookingDays && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Top Booking Days</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type="bar"
+                              data={reportData.breakdown.topBookingDays}
+                              title="Top Booking Days"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* 顶级活跃用户 */}
+                      {reportData.breakdown.topActiveUsers && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" gutterBottom>Top Active Users</Typography>
+                          <Box sx={{ height: 300, position: 'relative' }}>
+                            <ReportChart
+                              type="bar"
+                              data={reportData.breakdown.topActiveUsers}
+                              title="Top Active Users"
+                              useBrandColors={formattingOptions.useBrandColors}
+                            />
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  
+                  {reportSections.insights && reportData.insights && (
+                    <Box sx={{ mb: 4 }}>
+                      <Typography variant="h6" gutterBottom>Key Insights</Typography>
+                      <ul>
+                        {reportData.insights.map((insight, index) => (
+                          <li key={index}><Typography>{insight}</Typography></li>
+                        ))}
+                      </ul>
+                    </Box>
+                  )}
+                </>
+              ) : (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No data available for the selected period</Typography>
                 </Box>
               )}
             </Paper>
@@ -502,6 +658,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             variant="outlined"
             size="large"
             onClick={handlePreview}
+            disabled={dataLoading || !reportData}
             startIcon={<VisibilityIcon />}
           >
             Preview Report
@@ -513,7 +670,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
             variant="contained"
             size="large"
             onClick={handleGenerate}
-            disabled={isGenerating}
+            disabled={isGenerating || dataLoading || !reportData}
             startIcon={isGenerating ? <CircularProgress size={24} /> : <FileDownloadIcon />}
             sx={{
               py: 2,
@@ -533,11 +690,6 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
           </Button>
         </Grid>
       </Grid>
-      {error && (
-        <Typography color="error" sx={{ mt: 2 }}>
-          {error}
-        </Typography>
-      )}
     </Paper>
   );
 };

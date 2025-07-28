@@ -1,14 +1,15 @@
 // src/pages/ResetPasswordEmailSent.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Container, AppBar, Toolbar } from '@mui/material';
+import { Box, Typography, Button, Container, AppBar, Toolbar, useTheme } from '@mui/material';
 
 const ResetPasswordEmailSent = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: '#8e44ad' }}>
+      <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             PICKLEBALL
@@ -25,27 +26,27 @@ const ResetPasswordEmailSent = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
           <Box
             sx={{
-              backgroundColor: 'white',
+              backgroundColor: theme.palette.background.paper,
               borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow: theme.shadows[2],
               padding: 4,
               textAlign: 'center',
             }}
           >
-            <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
+            <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold', color: theme.palette.text.primary }}>
               Check Your Email!
             </Typography>
             
-            <Typography variant="body1" sx={{ mb: 3 }}>
+            <Typography variant="body1" sx={{ mb: 3, color: theme.palette.text.secondary }}>
               We've sent password reset instructions to your email address.
             </Typography>
             
-            <Typography variant="body1" sx={{ mb: 4 }}>
+            <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
               Didn't receive the email? Check your spam folder or contact support.
             </Typography>
             
@@ -53,8 +54,8 @@ const ResetPasswordEmailSent = () => {
               variant="contained"
               sx={{
                 py: 1.5,
-                backgroundColor: '#8e44ad',
-                '&:hover': { backgroundColor: '#732d91' },
+                backgroundColor: theme.palette.primary.main,
+                '&:hover': { backgroundColor: theme.palette.primary.dark },
                 fontSize: '1rem',
                 fontWeight: 'bold',
               }}

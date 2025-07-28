@@ -7,13 +7,16 @@ import com.pickleball_backend.pickleball.service.AdminService;
 import com.pickleball_backend.pickleball.service.BookingService;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.service.TierService;
+import com.pickleball_backend.pickleball.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -32,12 +35,14 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final UserAccountRepository userAccountRepository;
+    private final AdminRepository adminRepository;
     private final AdminService adminService;
     private final BookingService bookingService;
     private final TierService tierService;
     private final EmailService emailService;
     private final MemberRepository memberRepository;
     private final TierAutoUpgradeService tierAutoUpgradeService;
+    private final FileStorageService fileStorageService;
 
     // User Type Change Management
     @GetMapping("/pending-type-changes")
@@ -172,12 +177,34 @@ public class AdminController {
                 .collect(Collectors.toList()));
     }
 
+    @GetMapping("/vouchers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<VoucherDto>> getAllVouchers() {
+        return ResponseEntity.ok(tierService.getAllVouchers().stream()
+                .map(voucher -> new VoucherDto(
+                        voucher.getId(),
+                        voucher.getCode(),
+                        voucher.getDiscountValue(),
+                        voucher.getDiscountType(),
+                        voucher.getRequestPoints(),
+                        voucher.getTier() != null ? voucher.getTier().getTierName() : null,
+                        voucher.getExpiryDate()
+                ))
+                .collect(Collectors.toList()));
+    }
+
     @PostMapping("/{tierName}/vouchers")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MembershipTier> addVoucher(
             @PathVariable String tierName,
             @RequestBody VoucherDto voucherDto) {
         return ResponseEntity.ok(tierService.addVoucherToTier(tierName, voucherDto));
+    }
+
+    @PostMapping("/vouchers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Voucher> addGeneralVoucher(@RequestBody VoucherDto voucherDto) {
+        return ResponseEntity.ok(tierService.addGeneralVoucher(voucherDto));
     }
 
     @PutMapping("/vouchers/{id}")
@@ -235,6 +262,101 @@ public class AdminController {
         return convertToProfileDto(user);
     }
 
+    @GetMapping("/profile")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProfileDto> getAdminProfile() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+            return ResponseEntity.ok(convertToProfileDto(user));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProfileDto> updateAdminProfile(@RequestBody ProfileDto profileDto) {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+            
+            // Update user information
+            user.setName(profileDto.getName());
+            user.setEmail(profileDto.getEmail());
+            user.setPhone(profileDto.getPhone());
+            userRepository.save(user);
+            
+            return ResponseEntity.ok(convertToProfileDto(user));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @PostMapping("/change-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> request) {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            String currentPassword = request.get("currentPassword");
+            String newPassword = request.get("newPassword");
+            
+            // 验证输入
+            if (currentPassword == null || newPassword == null) {
+                return ResponseEntity.badRequest().body("Current password and new password are required");
+            }
+            
+            // 密码复杂度验证
+            String passwordValidation = validatePassword(newPassword);
+            if (passwordValidation != null) {
+                return ResponseEntity.badRequest().body("Password requirements not met: " + passwordValidation);
+            }
+            
+            UserAccount account = userAccountRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Admin account not found"));
+            
+            // Verify current password
+            if (!account.getPassword().equals(currentPassword)) {
+                return ResponseEntity.badRequest().body("Current password is incorrect");
+            }
+            
+            // Update password
+            account.setPassword(newPassword);
+            account.setPasswordChangedAt(java.time.LocalDateTime.now());
+            userAccountRepository.save(account);
+            
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to change password: " + e.getMessage());
+        }
+    }
+
+    private String validatePassword(String password) {
+        if (password == null || password.length() < 8) {
+            return "Minimum 8 characters required";
+        }
+        
+        if (!password.matches(".*[A-Z].*")) {
+            return "Requires uppercase letter";
+        }
+        
+        if (!password.matches(".*[a-z].*")) {
+            return "Requires lowercase letter";
+        }
+        
+        if (!password.matches(".*[0-9].*")) {
+            return "Requires number";
+        }
+        
+        if (!password.matches(".*[!@#$%^&*(),.?\":{}|<>].*")) {
+            return "Requires special character";
+        }
+        
+        return null;
+    }
+
     private ProfileDto convertToProfileDto(User user) {
         ProfileDto dto = new ProfileDto();
         dto.setId(user.getId());
@@ -244,6 +366,7 @@ public class AdminController {
         dto.setPhone(user.getPhone());
         dto.setDob(user.getDob());
         dto.setUserType(user.getUserType());
+        dto.setProfileImage(user.getProfileImage()); // Use correct field name
         // Add more fields as needed
         return dto;
     }
@@ -335,11 +458,88 @@ public class AdminController {
     @PostMapping("/tier/upgrade-member/{memberId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> upgradeSpecificMember(@PathVariable Integer memberId) {
-        boolean upgraded = tierAutoUpgradeService.upgradeSpecificMember(memberId);
-        if (upgraded) {
-            return ResponseEntity.ok("Member " + memberId + " tier upgraded successfully");
-        } else {
-            return ResponseEntity.ok("Member " + memberId + " tier upgrade not needed");
+        try {
+            tierAutoUpgradeService.upgradeSpecificMember(memberId);
+            return ResponseEntity.ok("Member tier upgraded successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to upgrade member tier: " + e.getMessage());
+        }
+    }
+
+    // Avatar upload and management
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadAvatar(@RequestParam("avatar") MultipartFile file) {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            String filename = fileStorageService.store(file);
+            
+            // Update admin's profile image
+            UserAccount account = userAccountRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Admin account not found"));
+            account.setProfileImage(filename);
+            userAccountRepository.save(account);
+
+            return ResponseEntity.ok().body(filename);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/avatar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> removeAvatar() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            UserAccount account = userAccountRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Admin account not found"));
+            
+            // Delete old file if exists
+            if (account.getProfileImage() != null) {
+                fileStorageService.delete(account.getProfileImage());
+            }
+            
+            account.setProfileImage(null);
+            userAccountRepository.save(account);
+            
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to remove avatar: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/delete-account")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteAccount() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            
+            // Find admin account
+            Admin admin = adminRepository.findByUser_UserAccount_Username(username)
+                    .orElseThrow(() -> new RuntimeException("Admin not found"));
+            
+            User user = admin.getUser();
+            UserAccount userAccount = user.getUserAccount();
+            
+            // Delete profile image if exists
+            if (userAccount.getProfileImage() != null) {
+                fileStorageService.delete(userAccount.getProfileImage());
+            }
+            
+            // Delete admin first (due to foreign key constraints)
+            adminRepository.delete(admin);
+            
+            // Delete user account
+            userAccountRepository.delete(userAccount);
+            
+            // Delete user
+            userRepository.delete(user);
+            
+            return ResponseEntity.ok().body("Account deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to delete account: " + e.getMessage());
         }
     }
 }

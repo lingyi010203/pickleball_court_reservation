@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
+import { getStatusChip } from './statusConfig';
 
 
 const AdminManageCourts = () => {
@@ -482,7 +483,7 @@ const AdminManageCourts = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ background: `linear-gradient(90deg, ${theme.palette.primary.main} 60%, ${alpha(theme.palette.primary.light, 0.85)})`, color: theme.palette.getContrastText(theme.palette.primary.main), fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { background: `linear-gradient(90deg, ${theme.palette.primary.dark} 60%, ${theme.palette.primary.main})`, boxShadow: theme.shadows[4] } }}
+          sx={{ backgroundColor: theme.palette.primary.main, color: theme.palette.primary.contrastText, fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] } }}
         >
           Add New Court
         </Button>
@@ -600,16 +601,7 @@ const AdminManageCourts = () => {
                   <TableCell>{court.name}</TableCell>
                   <TableCell>{court.venue ? `${court.venue.name} (${court.venue.location})` : 'N/A'}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={court.status}
-                      sx={{
-                        backgroundColor: court.status === 'ACTIVE' ? theme.palette.success.light :
-                          court.status === 'MAINTENANCE' ? theme.palette.warning.light : theme.palette.error.light,
-                        color: court.status === 'ACTIVE' ? theme.palette.success.dark :
-                          court.status === 'MAINTENANCE' ? theme.palette.warning.dark : theme.palette.error.dark,
-                        fontWeight: 'bold'
-                      }}
-                    />
+                    {getStatusChip(court.status?.toUpperCase() || 'UNKNOWN')}
                   </TableCell>
                   <TableCell>
                     {court.operatingDays
@@ -913,7 +905,7 @@ const AdminManageCourts = () => {
             onClick={handleSubmit}
             variant="contained"
             disabled={loading}
-            sx={{ background: `linear-gradient(90deg, ${theme.palette.primary.main} 60%, ${alpha(theme.palette.primary.light, 0.85)})`, color: theme.palette.getContrastText(theme.palette.primary.main), fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { background: `linear-gradient(90deg, ${theme.palette.primary.dark} 60%, ${theme.palette.primary.main})`, boxShadow: theme.shadows[4] } }}
+            sx={{ backgroundColor: theme.palette.primary.main, color: theme.palette.primary.contrastText, fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] } }}
           >
             {loading ? <CircularProgress size={24} /> : currentCourt ? 'Update' : 'Create'}
           </Button>
