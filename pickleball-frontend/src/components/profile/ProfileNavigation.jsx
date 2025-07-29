@@ -20,7 +20,8 @@ import {
   Settings as SettingsIcon,
   Notifications as NotificationsIcon,
   RateReview as FeedbackIcon,
-  Language as LanguageIcon
+  Language as LanguageIcon,
+  AccountBalance as WalletIcon
 } from '@mui/icons-material';
 
 const ProfileNavigation = (props) => {
@@ -156,6 +157,24 @@ const ProfileNavigation = (props) => {
               <FeedbackIcon />
             </ListItemIcon>
             <ListItemText primary="My Feedback" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/wallet')}
+            selected={isActive('/profile/wallet')}
+            sx={isActive('/profile/wallet') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
+            <ListItemIcon>
+              <WalletIcon />
+            </ListItemIcon>
+            <ListItemText primary="My Wallet" />
           </ListItemButton>
         </ListItem>
       </List>

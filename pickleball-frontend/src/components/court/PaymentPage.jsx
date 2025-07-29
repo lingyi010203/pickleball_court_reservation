@@ -87,6 +87,11 @@ const PaymentPage = () => {
         useWallet: paymentMethod === 'wallet'
       };
 
+      console.log('=== PaymentPage Debug ===');
+      console.log('Payment Method:', paymentMethod);
+      console.log('Use Wallet:', paymentMethod === 'wallet');
+      console.log('Booking Request:', bookingRequest);
+
       const response = await api.post('/member/bookings', bookingRequest);
 
       console.log('=== PaymentPage Debug ===');

@@ -13,6 +13,7 @@ import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.repository.WalletRepository;
 import com.pickleball_backend.pickleball.service.WalletService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@Slf4j
 @RequestMapping("/api/member/wallet")
 @RequiredArgsConstructor
 public class WalletController {
@@ -143,6 +145,8 @@ public class WalletController {
             details.put("status", wallet.getStatus());
             details.put("lastUpdated", wallet.getLastUpdated());
             details.put("availableBalance", wallet.getBalance() - wallet.getFrozenBalance());
+            
+            log.info("Wallet details for user {}: totalSpent={}, balance={}", username, wallet.getTotalSpent(), wallet.getBalance());
 
             return ResponseEntity.ok().body(details);
         } catch (Exception e) {

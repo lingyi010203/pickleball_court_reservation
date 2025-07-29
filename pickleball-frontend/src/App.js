@@ -24,6 +24,8 @@ import BookingHistory from './components/court/BookingHistory';
 import BookingConfirmationPage from './components/court/BookingConfirmationPage'; 
 import PaymentPage from './components/court/PaymentPage';
 import WalletTopUpPage from './components/profile/WalletTopUpPage';
+import WalletPage from './components/profile/WalletPage';
+import WalletTransactionHistory from './components/profile/WalletTransactionHistory';
 import EventPage from './components/event/EventPage';
 import EventCreatePage from './components/event/EventCreatePage';
 import EventEditPage from './components/event/EventEditPage';
@@ -79,6 +81,8 @@ function App() {
           </Route>
           <Route path="profile/rewards" element={<RewardsPage />} />
           <Route path="profile/my-feedback" element={<MyFeedbackPage />} />
+          <Route path="profile/wallet" element={<WalletPage />} />
+          <Route path="profile/wallet/transactions" element={<WalletTransactionHistory />} />
           <Route path="feedback" element={<FeedbackPage />} />
           <Route path="courts" element={<CourtListPage />} />
           <Route path="courts/:id" element={<CourtDetailPage />} />

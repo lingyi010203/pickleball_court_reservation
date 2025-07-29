@@ -101,4 +101,12 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate
     );
+
+    // 查找使用钱包支付的已完成预订
+    @Query("SELECT b FROM Booking b JOIN b.payment p WHERE p.paymentMethod = :paymentMethod AND p.status = :status")
+    List<Booking> findByPaymentPaymentMethodAndPaymentStatus(@Param("paymentMethod") String paymentMethod, @Param("status") String status);
+
+    // 查找已退款的预订
+    @Query("SELECT b FROM Booking b JOIN b.payment p WHERE p.status = :status")
+    List<Booking> findByPaymentStatus(@Param("status") String status);
 }

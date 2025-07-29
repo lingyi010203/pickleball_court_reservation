@@ -1,33 +1,36 @@
 import React from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Line, Pie } from 'react-chartjs-2';
 
-// 尝试导入Chart.js组件，如果失败则显示降级内容
-let ChartJS, Bar, Line, Pie;
-try {
-  const chartJS = require('chart.js');
-  const reactChartJS2 = require('react-chartjs-2');
-  
-  ChartJS = chartJS.Chart;
-  Bar = reactChartJS2.Bar;
-  Line = reactChartJS2.Line;
-  Pie = reactChartJS2.Pie;
-  
-  // 注册Chart.js组件
-  ChartJS.register(
-    chartJS.CategoryScale,
-    chartJS.LinearScale,
-    chartJS.BarElement,
-    chartJS.LineElement,
-    chartJS.PointElement,
-    chartJS.ArcElement,
-    chartJS.Title,
-    chartJS.Tooltip,
-    chartJS.Legend
-  );
-} catch (error) {
-  console.warn('Chart.js or react-chartjs-2 not available:', error);
-}
+// 注册Chart.js组件
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const ReportChart = ({ type, data, title, useBrandColors = true }) => {
+  // 调试信息
+  console.log('ReportChart props:', { type, data, title, useBrandColors });
+  console.log('Chart components available:', { Bar, Line, Pie });
+  
   // 品牌色彩方案
   const brandColors = {
     primary: '#667eea',
@@ -296,29 +299,6 @@ const ReportChart = ({ type, data, title, useBrandColors = true }) => {
         <div style={{ textAlign: 'center', color: '#666' }}>
           <div style={{ fontSize: '48px', marginBottom: '10px' }}>📊</div>
           <div>No data available for this chart</div>
-        </div>
-      </div>
-    );
-  }
-
-  // 如果Chart.js组件不可用，显示降级内容
-  if (!Bar || !Line || !Pie) {
-    return (
-      <div style={{
-        height: '300px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
-        borderRadius: '8px',
-        border: '2px dashed #ddd'
-      }}>
-        <div style={{ textAlign: 'center', color: '#666' }}>
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>📈</div>
-          <div>Chart visualization not available</div>
-          <div style={{ fontSize: '12px', marginTop: '8px' }}>
-            Please install react-chartjs-2: npm install react-chartjs-2
-          </div>
         </div>
       </div>
     );

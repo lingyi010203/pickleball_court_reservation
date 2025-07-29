@@ -917,7 +917,13 @@ const AdminDashboard = () => {
               </Grid>
 
               <Grid item xs={12} md={8}>
-                <ReportGenerator onGenerateReport={generateReport} companyInfo={{ name: 'Pickleball Club' }} />
+                <ReportGenerator onGenerateReport={generateReport} companyInfo={{ 
+                  name: 'Picklefy',
+                  address: 'Professional Picklefy Court Management',
+                  phone: '+60 12-345 6789',
+                  email: 'info@picklefy.com',
+                  website: 'www.picklefy.com'
+                }} />
               </Grid>
 
             </Grid>

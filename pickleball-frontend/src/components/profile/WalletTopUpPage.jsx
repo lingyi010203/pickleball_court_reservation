@@ -93,16 +93,18 @@ const WalletTopUpPage = () => {
         variant="text"
         onClick={() => navigate(-1)}
         sx={{
-          mb: 3,
+          mb: 4,
           display: 'flex',
           alignItems: 'center',
           textTransform: 'none',
-          fontWeight: 500,
+          fontWeight: 600,
+          fontSize: '1rem',
           color: theme.palette.primary.main,
           '&:hover': {
-            backgroundColor: 'transparent',
-            textDecoration: 'underline'
-          }
+            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+            transform: 'translateX(-4px)'
+          },
+          transition: 'all 0.3s ease'
         }}
         startIcon={<BackIcon />}
       >
@@ -111,29 +113,58 @@ const WalletTopUpPage = () => {
 
       <Card sx={{
         borderRadius: 3,
-        boxShadow: theme.shadows[4],
-        background: `linear-gradient(135deg, ${theme.palette.background.paper}, ${theme.palette.background.paper})`
+        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        background: `linear-gradient(135deg, ${theme.palette.background.paper}, ${alpha(theme.palette.background.paper, 0.8)})`
       }}>
-        <CardContent sx={{ p: 4 }}>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, textAlign: 'center' }}>
-            Top Up Wallet
-          </Typography>
-          
-          <Typography variant="body1" sx={{ mb: 4, textAlign: 'center', color: theme.palette.text.secondary }}>
-            Add money to your wallet for easy payments
-          </Typography>
+        <CardContent sx={{ p: 5 }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                fontWeight: 800,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 2
+              }}
+            >
+              Top Up Wallet
+            </Typography>
+            
+            <Typography variant="body1" sx={{ fontSize: '1.1rem', color: theme.palette.text.secondary }}>
+              Add money to your wallet for easy payments
+            </Typography>
+          </Box>
 
           {/* Current Balance */}
           <Box sx={{ 
-            mb: 4, 
-            p: 3, 
-            bgcolor: alpha(theme.palette.success.light, 0.1), 
-            borderRadius: '12px',
-            border: `1px solid ${alpha(theme.palette.success.light, 0.2)}`,
-            textAlign: 'center'
+            mb: 5, 
+            p: 4, 
+            background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)}, ${alpha(theme.palette.success.light, 0.05)})`,
+            borderRadius: 3,
+            border: `2px solid ${alpha(theme.palette.success.main, 0.2)}`,
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '60px',
+              height: '60px',
+              background: `radial-gradient(circle, ${alpha(theme.palette.success.main, 0.1)} 0%, transparent 70%)`,
+              borderRadius: '50%',
+              transform: 'translate(20px, -20px)'
+            }
           }}>
-            <Typography variant="h6" fontWeight="bold" color={theme.palette.success.main}>
-              Current Balance: RM{walletBalance.toFixed(2)}
+            <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.success.main, mb: 1 }}>
+              Current Balance
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 800, color: theme.palette.success.dark }}>
+              RM{walletBalance.toFixed(2)}
             </Typography>
           </Box>
 
@@ -150,12 +181,12 @@ const WalletTopUpPage = () => {
           )}
 
           {/* Amount Selection */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          <Box sx={{ mb: 5 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, color: theme.palette.text.primary }}>
               Select Amount
             </Typography>
             
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
               {predefinedAmounts.map((predefinedAmount) => (
                 <Grid item xs={4} sm={2} key={predefinedAmount}>
                   <Button
@@ -163,13 +194,23 @@ const WalletTopUpPage = () => {
                     variant={amount === predefinedAmount.toString() ? "contained" : "outlined"}
                     onClick={() => setAmount(predefinedAmount.toString())}
                     sx={{
-                      py: 1.5,
-                      borderRadius: '8px',
+                      py: 2,
+                      borderRadius: 2,
                       fontWeight: 600,
+                      fontSize: '0.9rem',
+                      transition: 'all 0.3s ease',
                       ...(amount === predefinedAmount.toString() && {
-                        background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
-                        color: theme.palette.common.white
-                      })
+                        background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+                        color: theme.palette.common.white,
+                        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                        transform: 'translateY(-2px)'
+                      }),
+                      '&:hover': {
+                        transform: amount === predefinedAmount.toString() ? 'translateY(-2px)' : 'translateY(-1px)',
+                        boxShadow: amount === predefinedAmount.toString() ? 
+                          `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}` : 
+                          `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
+                      }
                     }}
                   >
                     RM{predefinedAmount}
@@ -185,25 +226,52 @@ const WalletTopUpPage = () => {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Enter amount"
-              sx={{ mb: 2 }}
+              sx={{ 
+                mb: 2,
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: 2
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: 2
+                  }
+                }
+              }}
               InputProps={{
-                startAdornment: <Typography sx={{ mr: 1 }}>RM</Typography>
+                startAdornment: <Typography sx={{ mr: 1, fontWeight: 600, color: theme.palette.primary.main }}>RM</Typography>
               }}
             />
           </Box>
 
           {/* Payment Source */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          <Box sx={{ mb: 5 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, color: theme.palette.text.primary }}>
               Payment Method
             </Typography>
             
             <FormControl fullWidth>
-              <InputLabel>Payment Source</InputLabel>
+              <InputLabel sx={{ fontWeight: 500 }}>Payment Source</InputLabel>
               <Select
                 value={paymentSource}
                 onChange={(e) => setPaymentSource(e.target.value)}
                 label="Payment Source"
+                sx={{
+                  borderRadius: 2,
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: alpha(theme.palette.divider, 0.3)
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: 2
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: 2
+                  }
+                }}
               >
                 <MenuItem value="BANK_CARD">Credit/Debit Card</MenuItem>
                 <MenuItem value="BANK_TRANSFER">Bank Transfer</MenuItem>
@@ -220,17 +288,29 @@ const WalletTopUpPage = () => {
             onClick={handleTopUp}
             disabled={isProcessing || !amount || parseFloat(amount) <= 0}
             sx={{
-              py: 1.5,
-              fontWeight: 'bold',
-              background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+              py: 3,
+              px: 4,
+              borderRadius: 2,
+              fontWeight: 700,
+              fontSize: '1.1rem',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
               '&:hover': {
-                background: 'linear-gradient(90deg, #2575fc 0%, #6a11cb 100%)',
-                boxShadow: theme.shadows[6]
-              }
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                transform: 'translateY(-2px)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[300],
+                color: theme.palette.grey[500],
+                boxShadow: 'none',
+                transform: 'none'
+              },
+              transition: 'all 0.3s ease'
             }}
           >
             {isProcessing ? (
-              <CircularProgress size={24} color="inherit" />
+              <CircularProgress size={28} color="inherit" />
             ) : (
               `Top Up RM${amount || '0.00'}`
             )}

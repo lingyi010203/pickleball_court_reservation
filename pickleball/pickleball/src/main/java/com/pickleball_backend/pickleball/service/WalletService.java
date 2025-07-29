@@ -386,6 +386,32 @@ public class WalletService {
         walletTransactionRepository.save(transaction);
     }
 
+    @Transactional
+    public void createWalletTransactionForBooking(Wallet wallet, double amount, double balanceBefore, double balanceAfter, 
+                                                 com.pickleball_backend.pickleball.entity.Booking booking, 
+                                                 com.pickleball_backend.pickleball.entity.Payment payment) {
+        log.info("Creating wallet transaction for booking: walletId={}, amount={}, bookingId={}, paymentId={}, purpose={}", 
+                wallet.getId(), amount, booking.getId(), payment.getId(), booking.getPurpose());
+        
+        createWalletTransaction(wallet, "WITHDRAWAL", amount, balanceBefore, balanceAfter, 
+                              "PAYMENT", payment.getId(), "Court booking payment - " + booking.getPurpose());
+        
+        log.info("Successfully created wallet transaction for booking {} with payment {}", booking.getId(), payment.getId());
+    }
+
+    @Transactional
+    public void createWalletTransactionForRefund(Wallet wallet, double amount, double balanceBefore, double balanceAfter, 
+                                                com.pickleball_backend.pickleball.entity.Booking booking) {
+        log.info("Creating wallet transaction for refund: walletId={}, amount={}, bookingId={}, paymentId={}", 
+                wallet.getId(), amount, booking.getId(), booking.getPayment().getId());
+        
+        createWalletTransaction(wallet, "REFUND", amount, balanceBefore, balanceAfter, 
+                              "PAYMENT", booking.getPayment().getId(), "Booking cancellation refund - " + booking.getPurpose());
+        
+        log.info("Successfully created wallet transaction for refund of booking {} with payment {}", 
+                booking.getId(), booking.getPayment().getId());
+    }
+
     private com.pickleball_backend.pickleball.dto.WalletTransactionDto.TransactionDto mapToTransactionDto(WalletTransaction transaction) {
         return com.pickleball_backend.pickleball.dto.WalletTransactionDto.TransactionDto.builder()
                 .id(transaction.getId())
