@@ -13,4 +13,5 @@ public class RegistrationDto {
     private String phone;
     private String password;
     private String position;
+    private Integer experienceYear;
 }

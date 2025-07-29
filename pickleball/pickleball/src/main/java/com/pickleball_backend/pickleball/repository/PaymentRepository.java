@@ -4,6 +4,9 @@ import com.pickleball_backend.pickleball.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Optional;
+import java.util.List;
+
 public interface PaymentRepository extends JpaRepository<Payment, Integer> {
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(CASE WHEN p.status IN ('PAID', 'COMPLETED') THEN p.amount WHEN p.status = 'REFUNDED' THEN -p.amount ELSE 0 END), 0) FROM Payment p WHERE p.paymentType = 'BOOKING'")
     Double sumTotalRevenue();
@@ -13,4 +16,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(CASE WHEN p.status IN ('PAID', 'COMPLETED') THEN p.amount WHEN p.status = 'REFUNDED' THEN -p.amount ELSE 0 END), 0) FROM Payment p WHERE p.paymentType = :paymentType AND p.paymentDate BETWEEN :start AND :end")
     Double sumRevenueByDateAndType(java.time.LocalDateTime start, java.time.LocalDateTime end, String paymentType);
+
+    @Query("SELECT p FROM Payment p WHERE LOWER(TRIM(p.groupBookingId)) = LOWER(TRIM(:groupBookingId))")
+    Optional<Payment> findByGroupBookingId(String groupBookingId);
+    
+    @Query("SELECT p FROM Payment p WHERE p.paymentType = :paymentType AND p.status = :status")
+    List<Payment> findByPaymentTypeAndStatus(String paymentType, String status);
 }

@@ -68,6 +68,7 @@ const LoginPage = () => {
     if (error) setError('');
   };
 
+  // Update handleLogin function with coach routing logic:
   const handleLogin = async () => {
     setIsLoading(true);
     setError('');
@@ -79,8 +80,16 @@ const LoginPage = () => {
       });
       
       if (response.data.token) {
+        // 用 context 的 login 方法同步状态
         login(response.data.token);
-        navigate('/home');
+        // 解析 userType
+        const payload = JSON.parse(atob(response.data.token.split('.')[1]));
+        const userType = payload.userType || payload.role || '';
+        if (userType === 'Coach' || userType === 'COACH') {
+          navigate('/coaching');
+        } else {
+          navigate('/home');
+        }
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');

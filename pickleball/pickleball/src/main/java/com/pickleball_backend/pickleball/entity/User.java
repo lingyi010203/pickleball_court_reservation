@@ -10,6 +10,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 @Entity
 @Data
 @NoArgsConstructor
@@ -71,5 +75,6 @@ public class User {
     private List<Message> receivedMessages;
 
     @OneToMany(mappedBy = "coach", cascade = CascadeType.ALL)
+    @JsonIgnore // 或 @JsonBackReference
     private List<ClassSession> coachSessions;
 }

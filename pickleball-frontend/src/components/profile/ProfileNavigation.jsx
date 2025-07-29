@@ -21,7 +21,8 @@ import {
   Notifications as NotificationsIcon,
   RateReview as FeedbackIcon,
   Language as LanguageIcon,
-  AccountBalance as WalletIcon
+  AccountBalance as WalletIcon,
+  School as ClassSessionsIcon
 } from '@mui/icons-material';
 
 const ProfileNavigation = (props) => {
@@ -157,6 +158,24 @@ const ProfileNavigation = (props) => {
               <FeedbackIcon />
             </ListItemIcon>
             <ListItemText primary="My Feedback" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => handleNavigation('/profile/my-class-sessions')}
+            selected={isActive('/profile/my-class-sessions')}
+            sx={isActive('/profile/my-class-sessions') ? {
+              background: alpha(theme.palette.primary.main, 0.12),
+              color: theme.palette.primary.main,
+              fontWeight: 700,
+              '& .MuiListItemIcon-root': { color: theme.palette.primary.main },
+              '&:hover': { background: alpha(theme.palette.primary.main, 0.18) }
+            } : {}}
+          >
+            <ListItemIcon>
+              <ClassSessionsIcon />
+            </ListItemIcon>
+            <ListItemText primary="My Class Sessions" />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>

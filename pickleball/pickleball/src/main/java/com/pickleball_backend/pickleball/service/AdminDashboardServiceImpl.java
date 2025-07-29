@@ -46,7 +46,6 @@ import java.util.Map;
 import com.pickleball_backend.pickleball.service.ChartService;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
-import java.awt.Color;
 
 @Service
 @RequiredArgsConstructor
@@ -659,17 +658,17 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     @SuppressWarnings("unchecked")
                                     List<Map<String, Object>> keyMetrics = (List<Map<String, Object>>) keyMetricsObj;
                                     if (!keyMetrics.isEmpty()) {
-                                    PdfPTable table = new PdfPTable(3);
-                                    table.addCell("Metric");
-                                    table.addCell("Value");
-                                    table.addCell("Change");
-                                    for (Map<String, Object> metric : keyMetrics) {
-                                        table.addCell((String) metric.getOrDefault("name", ""));
-                                        table.addCell((String) metric.getOrDefault("value", ""));
-                                        table.addCell((String) metric.getOrDefault("change", ""));
+                                        PdfPTable table = new PdfPTable(3);
+                                        table.addCell("Metric");
+                                        table.addCell("Value");
+                                        table.addCell("Change");
+                                        for (Map<String, Object> metric : keyMetrics) {
+                                            table.addCell((String) metric.getOrDefault("name", ""));
+                                            table.addCell((String) metric.getOrDefault("value", ""));
+                                            table.addCell((String) metric.getOrDefault("change", ""));
+                                        }
+                                        document.add(table);
                                     }
-                                    document.add(table);
-                                }
                                 }
                                 
                                 Object highlightsObj = summary.get("highlights");
@@ -677,9 +676,9 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     @SuppressWarnings("unchecked")
                                     List<String> highlights = (List<String>) highlightsObj;
                                     if (!highlights.isEmpty()) {
-                                    document.add(new Paragraph("Highlights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    for (String h : highlights) {
-                                        document.add(new Paragraph("- " + h));
+                                        document.add(new Paragraph("Highlights:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        for (String h : highlights) {
+                                            document.add(new Paragraph("- " + h));
                                         }
                                     }
                                 }
@@ -696,18 +695,18 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     @SuppressWarnings("unchecked")
                                     List<Map<String, Object>> incomeStatement = (List<Map<String, Object>>) incomeStatementObj;
                                     if (!incomeStatement.isEmpty()) {
-                                    document.add(new Paragraph("Income Statement:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    PdfPTable table = new PdfPTable(3);
-                                    table.addCell("Category");
-                                    table.addCell("Current");
-                                    table.addCell("Previous");
-                                    for (Map<String, Object> row : incomeStatement) {
-                                        table.addCell((String) row.getOrDefault("category", ""));
-                                        table.addCell(String.valueOf(row.getOrDefault("current", "")));
-                                        table.addCell(String.valueOf(row.getOrDefault("previous", "")));
+                                        document.add(new Paragraph("Income Statement:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        PdfPTable table = new PdfPTable(3);
+                                        table.addCell("Category");
+                                        table.addCell("Current");
+                                        table.addCell("Previous");
+                                        for (Map<String, Object> row : incomeStatement) {
+                                            table.addCell((String) row.getOrDefault("category", ""));
+                                            table.addCell(String.valueOf(row.getOrDefault("current", "")));
+                                            table.addCell(String.valueOf(row.getOrDefault("previous", "")));
+                                        }
+                                        document.add(table);
                                     }
-                                    document.add(table);
-                                }
                                 }
                                 
                                 Object balanceSheetObj = financials.get("balanceSheet");
@@ -715,15 +714,15 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     @SuppressWarnings("unchecked")
                                     List<Map<String, Object>> balanceSheet = (List<Map<String, Object>>) balanceSheetObj;
                                     if (!balanceSheet.isEmpty()) {
-                                    document.add(new Paragraph("Balance Sheet:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                    PdfPTable table = new PdfPTable(2);
-                                    table.addCell("Category");
-                                    table.addCell("Value");
-                                    for (Map<String, Object> row : balanceSheet) {
-                                        table.addCell((String) row.getOrDefault("category", ""));
-                                        table.addCell(String.valueOf(row.getOrDefault("value", "")));
-                                    }
-                                    document.add(table);
+                                        document.add(new Paragraph("Balance Sheet:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                        PdfPTable table = new PdfPTable(2);
+                                        table.addCell("Category");
+                                        table.addCell("Value");
+                                        for (Map<String, Object> row : balanceSheet) {
+                                            table.addCell((String) row.getOrDefault("category", ""));
+                                            table.addCell(String.valueOf(row.getOrDefault("value", "")));
+                                        }
+                                        document.add(table);
                                     }
                                 }
                             }
@@ -751,16 +750,13 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                             
                                             BufferedImage revenueChart = chartService.generateRevenueTrendChart(chartTrends, visualizationType);
                                             if (revenueChart != null) {
-                                                document.add(new Paragraph("Revenue Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                                document.add(new Paragraph("Revenue Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
                                                 ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
-                                                javax.imageio.ImageIO.write(revenueChart, "JPEG", chartStream);
+                                                javax.imageio.ImageIO.write(revenueChart, "PNG", chartStream);
                                                 byte[] chartBytes = chartStream.toByteArray();
                                                 com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
-                                                chartImage.scaleToFit(450, 300); // 调整缩放尺寸
+                                                chartImage.scaleToFit(500, 350);
                                                 chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
-                                                chartImage.setBorder(com.lowagie.text.Rectangle.BOX);
-                                                chartImage.setBorderWidth(1.0f);
-                                                chartImage.setBorderColor(new Color(200, 200, 200));
                                                 document.add(chartImage);
                                                 document.add(new Paragraph(" "));
                                             }
@@ -778,16 +774,13 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                             
                                             BufferedImage bookingChart = chartService.generateBookingTrendChart(chartTrends, visualizationType);
                                             if (bookingChart != null) {
-                                                document.add(new Paragraph("Booking Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                                document.add(new Paragraph("Booking Trend Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
                                                 ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
-                                                javax.imageio.ImageIO.write(bookingChart, "JPEG", chartStream);
+                                                javax.imageio.ImageIO.write(bookingChart, "PNG", chartStream);
                                                 byte[] chartBytes = chartStream.toByteArray();
                                                 com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
-                                                chartImage.scaleToFit(450, 300); // 调整缩放尺寸
+                                                chartImage.scaleToFit(500, 350);
                                                 chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
-                                                chartImage.setBorder(com.lowagie.text.Rectangle.BOX);
-                                                chartImage.setBorderWidth(1.0f);
-                                                chartImage.setBorderColor(new Color(200, 200, 200));
                                                 document.add(chartImage);
                                                 document.add(new Paragraph(" "));
                                             }
@@ -797,35 +790,21 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     }
                                     
                                     // 生成用户活动图表
-                                    if (trends.containsKey("activeUsers") || trends.containsKey("userActivityRate") || 
-                                        trends.containsKey("bookingsPerUser") || trends.containsKey("topActiveUsers")) {
+                                    if (trends.containsKey("activeUsers") || trends.containsKey("userActivityRate")) {
                                         try {
-                                            // 传递品牌色彩参数和所有用户相关数据
+                                            // 传递品牌色彩参数
                                             Map<String, Object> chartTrends = new HashMap<>(trends);
                                             chartTrends.put("useBrandColors", useBrandColors);
                                             
-                                            // 如果有breakdown数据，也添加到图表数据中
-                                            if (content.containsKey("breakdown")) {
-                                                Object breakdownObj = content.get("breakdown");
-                                                if (breakdownObj instanceof Map) {
-                                                    @SuppressWarnings("unchecked")
-                                                    Map<String, Object> breakdown = (Map<String, Object>) breakdownObj;
-                                                    chartTrends.putAll(breakdown);
-                                                }
-                                            }
-                                            
                                             BufferedImage userChart = chartService.generateUserActivityChart(chartTrends, visualizationType);
                                             if (userChart != null) {
-                                                document.add(new Paragraph("User Activity Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                                document.add(new Paragraph("User Activity Chart:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
                                                 ByteArrayOutputStream chartStream = new ByteArrayOutputStream();
-                                                javax.imageio.ImageIO.write(userChart, "JPEG", chartStream);
+                                                javax.imageio.ImageIO.write(userChart, "PNG", chartStream);
                                                 byte[] chartBytes = chartStream.toByteArray();
                                                 com.lowagie.text.Image chartImage = com.lowagie.text.Image.getInstance(chartBytes);
-                                                chartImage.scaleToFit(450, 300); // 调整缩放尺寸
+                                                chartImage.scaleToFit(500, 350);
                                                 chartImage.setAlignment(com.lowagie.text.Image.MIDDLE);
-                                                chartImage.setBorder(com.lowagie.text.Rectangle.BOX);
-                                                chartImage.setBorderWidth(1.0f);
-                                                chartImage.setBorderColor(new Color(200, 200, 200));
                                                 document.add(chartImage);
                                                 document.add(new Paragraph(" "));
                                             }
@@ -1040,9 +1019,9 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                 @SuppressWarnings("unchecked")
                                 List<String> recs = (List<String>) recsObj;
                                 if (!recs.isEmpty()) {
-                                document.add(new Paragraph("Recommendations:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                                for (String rec : recs) {
-                                    document.add(new Paragraph("- " + rec));
+                                    document.add(new Paragraph("Recommendations:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                                    for (String rec : recs) {
+                                        document.add(new Paragraph("- " + rec));
                                     }
                                 }
                             }
@@ -1141,18 +1120,18 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     public AdminBookingDto convertToAdminBookingDto(Booking booking) {
         try {
-        AdminBookingDto dto = new AdminBookingDto();
-        dto.setId(booking.getId());
-        dto.setBookingDate(booking.getBookingDate());
-        dto.setTotalAmount(booking.getTotalAmount());
-        dto.setStatus(booking.getStatus());
+            AdminBookingDto dto = new AdminBookingDto();
+            dto.setId(booking.getId());
+            dto.setBookingDate(booking.getBookingDate());
+            dto.setTotalAmount(booking.getTotalAmount());
+            dto.setStatus(booking.getStatus());
 
             // 安全地获取会员信息
             try {
-        if (booking.getMember() != null && booking.getMember().getUser() != null) {
-            dto.setMemberName(booking.getMember().getUser().getName());
-            dto.setMemberPhone(booking.getMember().getUser().getPhone());
-            dto.setMemberEmail(booking.getMember().getUser().getEmail());
+                if (booking.getMember() != null && booking.getMember().getUser() != null) {
+                    dto.setMemberName(booking.getMember().getUser().getName());
+                    dto.setMemberPhone(booking.getMember().getUser().getPhone());
+                    dto.setMemberEmail(booking.getMember().getUser().getEmail());
                     dto.setMemberId(booking.getMember().getId()); // 新增：设置会员ID
                 }
             } catch (Exception e) {
@@ -1188,12 +1167,12 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                         // 获取场地信息
                         try {
                             Court court = courtRepository.findById(firstSlot.getCourtId()).orElse(null);
-            if (court != null) {
-                dto.setCourtName(court.getName());
-            }
+                            if (court != null) {
+                                dto.setCourtName(court.getName());
+                            }
                         } catch (Exception e) {
                             System.err.println("Error getting court info for booking " + booking.getId() + ": " + e.getMessage());
-        }
+                        }
 
                         // 设置所有 bookingSlots 信息（用于前端显示）
                         dto.setBookingSlots(sortedSlots.stream()
@@ -1225,8 +1204,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             } catch (Exception e) {
                 System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
             }
-            
-        return dto;
+
+            return dto;
         } catch (Exception e) {
             System.err.println("Error converting booking to DTO: " + e.getMessage());
             return null;

@@ -101,6 +101,24 @@ public class ProfileController {
         }
     }
 
+    @PutMapping("/user-type")
+    public ResponseEntity<String> requestUserTypeChange(
+            @RequestBody ProfileDto profileDto,
+            Authentication authentication
+    ) {
+        String username = authentication.getName();
+        User user = userRepository.findByUserAccount_Username(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserAccount account = userAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User account not found"));
+
+        // 直接設置 requestedUserType
+        user.setRequestedUserType(profileDto.getRequestedUserType());
+        userRepository.save(user);
+
+        return ResponseEntity.ok("User type change requested successfully");
+    }
+
     // In UserController.java
     @GetMapping("/search")
     public ResponseEntity<List<UserSearchDto>> searchUsers(@RequestParam String q) {
@@ -115,6 +133,8 @@ public class ProfileController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
+
+    
 
   /*  @PostMapping("/upload-documents")
     public ResponseEntity<String> uploadDocument(
@@ -138,32 +158,5 @@ public class ProfileController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Upload failed: " + e.getMessage());
         }
-    }
-
-   @PutMapping("/user-type")
-    public ResponseEntity<String> requestUserTypeChange(
-            @RequestBody UserTypeRequestDto requestDto,
-            Authentication authentication
-    ) {
-        String username = authentication.getName();
-        User user = userRepository.findByUserAccount_Username(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        UserAccount account = userAccountRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User account not found"));
-
-        // Validate document exists
-        if (account.getVerificationDocuments() == null ||
-                account.getVerificationDocuments().isEmpty()) {
-            return ResponseEntity.badRequest().body("Please upload verification documents first");
-        }
-
-        // Set requested type and status
-        user.setRequestedUserType(requestDto.getRequestedUserType());
-        account.setVerificationStatus("PENDING");
-
-        userRepository.save(user);
-        userAccountRepository.save(account);
-
-        return ResponseEntity.ok("User type change requested successfully");
     }*/
 }

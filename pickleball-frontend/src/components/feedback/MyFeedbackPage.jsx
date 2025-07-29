@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   CircularProgress,
   Snackbar,
@@ -31,8 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../service/api';
 import StarRating from './StarRating';
 import CourtService from '../../service/CourtService';
-import ProfileHeader from '../profile/ProfileHeader';
-import ProfileNavigation from '../profile/ProfileNavigation';
+
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import EditIcon from '@mui/icons-material/Edit';
@@ -302,230 +300,213 @@ const MyFeedbackPage = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', py: 1, backgroundColor: theme.palette.background.default }}>
-      <Container maxWidth={false} sx={{ maxWidth: '1200px', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
-        <Box sx={{ display: 'flex', gap: { xs: 2, lg: 3 }, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' }, width: '100%' }}>
-          {/* 左侧栏 */}
-          <Box sx={{ width: { xs: '100%', lg: '260px' }, flexShrink: 0, position: { lg: 'sticky' }, top: { lg: 20 }, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 2.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, position: 'relative' }}>
-              <ProfileHeader profile={userData} />
-            </Box>
-            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 1.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-              <ProfileNavigation />
-            </Box>
+    <Box sx={{ width: '100%', overflow: 'hidden' }}>
+      <Snackbar open={!!error || !!success} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity={error ? 'error' : 'success'} onClose={handleCloseSnackbar} sx={{ width: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(10px)', background: alpha(theme.palette.background.paper, 0.9) }}>{error || success}</Alert>
+      </Snackbar>
+      
+      {/* 主内容卡片 */}
+      <Card sx={{ 
+        borderRadius: 3, 
+        boxShadow: '0 8px 32px rgba(0,0,0,0.08)', 
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        overflow: 'hidden',
+        background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
+      }}>
+        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+          {/* 页面标题 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <RateReviewIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+            <Typography variant="h4" fontWeight="bold">
+              My Feedback
+            </Typography>
           </Box>
-          
-          {/* 右侧内容区 */}
-          <Box sx={{ flex: 1, minWidth: 0, width: { xs: '100%', lg: 'calc(100% - 260px - 24px)' }, overflow: 'hidden' }}>
-            <Snackbar open={!!error || !!success} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-              <Alert severity={error ? 'error' : 'success'} onClose={handleCloseSnackbar} sx={{ width: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(10px)', background: alpha(theme.palette.background.paper, 0.9) }}>{error || success}</Alert>
-            </Snackbar>
-            
-            {/* 主内容卡片 */}
-            <Card sx={{ 
-              borderRadius: 3, 
-              boxShadow: '0 8px 32px rgba(0,0,0,0.08)', 
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              overflow: 'hidden',
-              background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
-            }}>
-              <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-                {/* 页面标题 */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <RateReviewIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
-                  <Typography variant="h4" fontWeight="bold">
-                    My Feedback
+
+          {/* 统计卡片 */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ 
+                borderRadius: 3,
+                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`
+              }}>
+                <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                  <RateReviewIcon sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 1 }} />
+                  <Typography variant="h3" fontWeight="bold" color={theme.palette.primary.main}>
+                    {feedbackList.length}
                   </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Total Feedback
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ 
+                borderRadius: 3,
+                background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`
+              }}>
+                <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                  <StarIcon sx={{ fontSize: 48, color: theme.palette.warning.main, mb: 1 }} />
+                  <Typography variant="h3" fontWeight="bold" color={theme.palette.warning.main}>
+                    {calculateAverageRating(feedbackList)}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Average Rating
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* 删除后提示 */}
+          {deletedFeedback && (
+            <Card sx={{ 
+              mb: 3,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
+              border: `2px solid ${theme.palette.success.main}`
+            }}>
+              <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="h6" fontWeight="bold" color={theme.palette.success.main} sx={{ mb: 1 }}>
+                  ✨ Ready to review again?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  You just deleted a review for {deletedFeedback.targetName}. You can now leave a new review!
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={() => {
+                      setDeletedFeedback(null);
+                      navigate('/profile/my-bookings');
+                    }}
+                  >
+                    Leave New Review
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="success"
+                    onClick={() => setDeletedFeedback(null)}
+                  >
+                    Dismiss
+                  </Button>
                 </Box>
-
-                {/* 统计卡片 */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                  <Grid item xs={12} md={6}>
-                    <Card sx={{ 
-                      borderRadius: 3,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`
-                    }}>
-                      <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                        <RateReviewIcon sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 1 }} />
-                        <Typography variant="h3" fontWeight="bold" color={theme.palette.primary.main}>
-            {feedbackList.length}
-                        </Typography>
-                        <Typography variant="body1" color="text.secondary">
-                          Total Feedback
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Card sx={{ 
-                      borderRadius: 3,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`
-                    }}>
-                      <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                        <StarIcon sx={{ fontSize: 48, color: theme.palette.warning.main, mb: 1 }} />
-                        <Typography variant="h3" fontWeight="bold" color={theme.palette.warning.main}>
-                          {calculateAverageRating(feedbackList)}
-                        </Typography>
-                        <Typography variant="body1" color="text.secondary">
-                          Average Rating
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-
-                {/* 删除后提示 */}
-      {deletedFeedback && (
-                  <Card sx={{ 
-                    mb: 3,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
-                    border: `2px solid ${theme.palette.success.main}`
-                  }}>
-                    <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                      <Typography variant="h6" fontWeight="bold" color={theme.palette.success.main} sx={{ mb: 1 }}>
-            ✨ Ready to review again?
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            You just deleted a review for {deletedFeedback.targetName}. You can now leave a new review!
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <Button
-                          variant="contained"
-                          color="success"
-              onClick={() => {
-                setDeletedFeedback(null);
-                navigate('/profile/my-bookings');
-              }}
-            >
-              Leave New Review
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          color="success"
-              onClick={() => setDeletedFeedback(null)}
-            >
-              Dismiss
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-      )}
-
-      {/* Feedback List */}
-                {feedbackList.length === 0 ? (
-                  <Card sx={{ 
-                    borderRadius: 3,
-                    background: alpha(theme.palette.grey[50], 0.5),
-                    border: `2px dashed ${alpha(theme.palette.divider, 0.3)}`
-                  }}>
-                    <CardContent sx={{ p: 6, textAlign: 'center' }}>
-                      <Typography variant="h1" sx={{ fontSize: 80, mb: 2, opacity: 0.3 }}>💬</Typography>
-                      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                        No feedback yet
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Be the first to share your thoughts!
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {feedbackList.map(item => (
-                      <Card key={item.id} sx={{ 
-                        borderRadius: 3,
-                        boxShadow: theme.shadows[1],
-                        transition: 'box-shadow 0.2s',
-                        '&:hover': { boxShadow: theme.shadows[3] }
-                      }}>
-                        <CardContent sx={{ p: 3 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-                            <Avatar sx={{ 
-                              bgcolor: theme.palette.primary.main,
-                              width: 50,
-                              height: 50
-                            }}>
-                              {item.userName ? item.userName.charAt(0).toUpperCase() : '?'}
-                            </Avatar>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
-                                {item.targetName || 'Untitled'}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
-                                <Chip 
-                                  label={item.targetType} 
-                                  size="small" 
-                                  color="primary" 
-                                  variant="outlined"
-                                />
-                                <Typography variant="body2" color="text.secondary">
-                                  {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
-                                </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <StarRating rating={item.rating} />
-                                  <Typography variant="body2" color="text.secondary">
-                                    ({item.rating}/5)
-                                  </Typography>
-                                </Box>
-                              </Box>
-                              <Typography variant="body1" sx={{ lineHeight: 1.6, mb: 2 }}>
-                                {item.review}
-                              </Typography>
-                {item.tags && item.tags.length > 0 && (
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                    {item.tags.map(tag => (
-                                    <Chip 
-                                      key={tag} 
-                                      label={tag} 
-                                      size="small" 
-                                      color="primary" 
-                                      variant="outlined"
-                                    />
-                                  ))}
-                                </Box>
-                )}
-                {/* Edit status indicator */}
-                {editMode && editingId === item.id && (
-                                <Chip
-                                  label="Currently editing this review"
-                                  color="success"
-                                  icon={<EditIcon />}
-                                  sx={{ mb: 2 }}
-                                />
-                              )}
-                              {/* Action buttons */}
-                {currentUser && item.userUsername === currentUser.username && (
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<EditIcon />}
-                      onClick={() => handleOpenDialog(item)}
-                    >
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    color="error"
-                                    startIcon={<DeleteIcon />}
-                      onClick={() => handleDeleteClick(item)}
-                    >
-                                    Delete
-                                  </Button>
-                                </Box>
-                              )}
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </Box>
-                )}
               </CardContent>
             </Card>
-          </Box>
-        </Box>
-      </Container>
+          )}
+
+          {/* Feedback List */}
+          {feedbackList.length === 0 ? (
+            <Card sx={{ 
+              borderRadius: 3,
+              background: alpha(theme.palette.grey[50], 0.5),
+              border: `2px dashed ${alpha(theme.palette.divider, 0.3)}`
+            }}>
+              <CardContent sx={{ p: 6, textAlign: 'center' }}>
+                <Typography variant="h1" sx={{ fontSize: 80, mb: 2, opacity: 0.3 }}>💬</Typography>
+                <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                  No feedback yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Be the first to share your thoughts!
+                </Typography>
+              </CardContent>
+            </Card>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {feedbackList.map(item => (
+                <Card key={item.id} sx={{ 
+                  borderRadius: 3,
+                  boxShadow: theme.shadows[1],
+                  transition: 'box-shadow 0.2s',
+                  '&:hover': { boxShadow: theme.shadows[3] }
+                }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+                      <Avatar sx={{ 
+                        bgcolor: theme.palette.primary.main,
+                        width: 50,
+                        height: 50
+                      }}>
+                        {item.userName ? item.userName.charAt(0).toUpperCase() : '?'}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                          {item.targetName || 'Untitled'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                          <Chip 
+                            label={item.targetType} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <StarRating rating={item.rating} />
+                            <Typography variant="body2" color="text.secondary">
+                              ({item.rating}/5)
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Typography variant="body1" sx={{ lineHeight: 1.6, mb: 2 }}>
+                          {item.review}
+                        </Typography>
+                        {item.tags && item.tags.length > 0 && (
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                            {item.tags.map(tag => (
+                              <Chip 
+                                key={tag} 
+                                label={tag} 
+                                size="small" 
+                                color="primary" 
+                                variant="outlined"
+                              />
+                            ))}
+                          </Box>
+                        )}
+                        {/* Edit status indicator */}
+                        {editMode && editingId === item.id && (
+                          <Chip
+                            label="Currently editing this review"
+                            color="success"
+                            icon={<EditIcon />}
+                            sx={{ mb: 2 }}
+                          />
+                        )}
+                        {/* Action buttons */}
+                        {currentUser && item.userUsername === currentUser.username && (
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<EditIcon />}
+                              onClick={() => handleOpenDialog(item)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              startIcon={<DeleteIcon />}
+                              onClick={() => handleDeleteClick(item)}
+                            >
+                              Delete
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Floating Action Button */}
       <Box
@@ -656,9 +637,9 @@ const MyFeedbackPage = () => {
                 ))}
               </Box>
               <TextField
-                  value={tagInput}
-                  onChange={handleTagInputChange}
-                  onKeyDown={handleTagInputKeyDown}
+                value={tagInput}
+                onChange={handleTagInputChange}
+                onKeyDown={handleTagInputKeyDown}
                 placeholder="Type and press Enter to add tags"
                 fullWidth
                 size="small"
@@ -669,12 +650,12 @@ const MyFeedbackPage = () => {
         <Divider />
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={handleCloseDialog} variant="outlined">
-                Cancel
+            Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
-                disabled={submitting || !isFormValid() || (editMode && !isFormChanged())}
+            disabled={submitting || !isFormValid() || (editMode && !isFormChanged())}
             startIcon={submitting ? <CircularProgress size={16} /> : null}
           >
             {submitting ? (editMode ? 'Updating...' : 'Submitting...') : (editMode ? 'Update' : 'Submit')}
@@ -701,7 +682,7 @@ const MyFeedbackPage = () => {
             Cancel
           </Button>
           <Button onClick={handleDeleteConfirm} variant="contained" color="error">
-                Delete
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
@@ -723,43 +704,43 @@ const MyFeedbackPage = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-              {feedbackErrorDialog.message.includes('deleted successfully') && (
-                <>
+          {feedbackErrorDialog.message.includes('deleted successfully') && (
+            <>
               <Button
-                    onClick={() => {
-                      setFeedbackErrorDialog({ open: false, message: '' });
-                      navigate('/profile/my-bookings');
-                    }}
+                onClick={() => {
+                  setFeedbackErrorDialog({ open: false, message: '' });
+                  navigate('/profile/my-bookings');
+                }}
                 variant="contained"
-                  >
-                    Review Again
+              >
+                Review Again
               </Button>
               <Button
-                    onClick={() => {
-                      setFeedbackErrorDialog({ open: false, message: '' });
-                      setDeletedFeedback(null);
-                    }}
+                onClick={() => {
+                  setFeedbackErrorDialog({ open: false, message: '' });
+                  setDeletedFeedback(null);
+                }}
                 variant="outlined"
-                  >
-                    Great!
+              >
+                Great!
               </Button>
-                </>
-              )}
-              {!feedbackErrorDialog.message.includes('deleted successfully') && (
+            </>
+          )}
+          {!feedbackErrorDialog.message.includes('deleted successfully') && (
             <Button
-                  onClick={() => {
-                    setFeedbackErrorDialog({ open: false, message: '' });
-                    if (feedbackErrorDialog.message.includes('successfully')) {
-                      setOpenDialog(false);
-                    } else {
-                      setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
-                      setEditMode(false);
-                      setEditingId(null);
-                    }
-                  }}
+              onClick={() => {
+                setFeedbackErrorDialog({ open: false, message: '' });
+                if (feedbackErrorDialog.message.includes('successfully')) {
+                  setOpenDialog(false);
+                } else {
+                  setFormData({ targetType: '', targetId: '', rating: 0, review: '', tags: [] });
+                  setEditMode(false);
+                  setEditingId(null);
+                }
+              }}
               variant="contained"
-                >
-                  {feedbackErrorDialog.message.includes('successfully') ? 'Great!' : 'OK'}
+            >
+              {feedbackErrorDialog.message.includes('successfully') ? 'Great!' : 'OK'}
             </Button>
           )}
         </DialogActions>

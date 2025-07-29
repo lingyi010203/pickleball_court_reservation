@@ -1,6 +1,7 @@
 package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.dto.CoachSlotDto;
+import com.pickleball_backend.pickleball.dto.RecurringSessionRequestDto;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.*;
 import com.pickleball_backend.pickleball.repository.*;
@@ -12,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -20,21 +23,31 @@ public class CoachCourtServiceImpl implements CoachCourtService {
     private static final Logger log = LoggerFactory.getLogger(CoachCourtServiceImpl.class);
 
     private final CourtRepository courtRepository;
+    private final CoachRepository coachRepository;
     private final ClassSessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final WalletRepository walletRepository;
     private final CancellationRequestRepository cancellationRequestRepository;
     private final EmailService emailService;
+    private final ClassRegistrationRepository classRegistrationRepository;
 
     @Override
     public List<Court> getAvailableCourtsForCoach(Integer coachId) {
-        return courtRepository.findCourtsByCoachId(coachId);
+        Coach coach = coachRepository.findById(coachId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coach not found with ID: " + coachId));
+        Set<Venue> venues = coach.getVenues();
+        if (venues == null || venues.isEmpty()) return List.of();
+        return courtRepository.findByVenueIn(venues);
+    }
+    @Override
+    public List<ClassSession> findScheduleByCoachIdAndPeriod(Integer coachId, LocalDateTime from, LocalDateTime to) {
+        return sessionRepository.findScheduleByCoachIdAndPeriodWithVenue(coachId, from, to);
     }
 
     @Override
-    public List<ClassSession> findScheduleByCoachIdAndPeriod(Integer coachId, LocalDateTime from, LocalDateTime to) {
-        return sessionRepository.findScheduleByCoachIdAndPeriod(coachId, from, to);
+    public List<ClassSession> findScheduleByCoachIdAndPeriodWithVenue(Integer coachId, LocalDateTime from, LocalDateTime to) {
+        return sessionRepository.findScheduleByCoachIdAndPeriodWithVenue(coachId, from, to);
     }
 
     @Transactional
@@ -56,6 +69,9 @@ public class CoachCourtServiceImpl implements CoachCourtService {
             throw new ConflictException("Court is already booked at this time");
         }
 
+        // 防呆：title 不可為 null
+        String title = (slotDto.getTitle() == null || slotDto.getTitle().trim().isEmpty()) ? "Coaching Session" : slotDto.getTitle();
+
         ClassSession session = new ClassSession();
         session.setCoach(coach);
         session.setCourt(court);
@@ -64,6 +80,11 @@ public class CoachCourtServiceImpl implements CoachCourtService {
         session.setStatus("AVAILABLE");
         session.setSlotType("COACH_AVAILABILITY");
         session.setCreatedAt(LocalDateTime.now());
+        session.setExperienceYear(slotDto.getExperienceYear());
+        session.setTitle(title); // <--- 這裡一定要設
+        session.setDescription(slotDto.getDescription());
+        session.setMaxParticipants(slotDto.getMaxParticipants());
+        session.setPrice(slotDto.getPrice());
 
         log.info("Coach {} created new availability slot on court {} from {} to {}",
                 coachId, court.getId(), slotDto.getStartTime(), slotDto.getEndTime());
@@ -96,6 +117,7 @@ public class CoachCourtServiceImpl implements CoachCourtService {
         session.setStartTime(slotDto.getStartTime());
         session.setEndTime(slotDto.getEndTime());
         session.setUpdatedAt(LocalDateTime.now());
+        session.setExperienceYear(slotDto.getExperienceYear());
         sessionRepository.save(session);
 
         log.info("Coach {} updated slot {}: new time {} to {}",
@@ -145,7 +167,7 @@ public class CoachCourtServiceImpl implements CoachCourtService {
         // 3. Create cancellation request
         createCancellationRequest(session, "Coach initiated cancellation");
 
-        log.warn("Coach {} force-removed booked session {}. Player {} notified and refunded.",
+        log.warn("Coach {} force-cancelled booked session {}. Player {} notified and refunded.",
                 session.getCoach().getId(), session.getId(), player.getId());
     }
 
@@ -186,4 +208,38 @@ public class CoachCourtServiceImpl implements CoachCourtService {
 public List<ClassSession> findAvailableSlotsByCoachAndCourt(Integer coachId, Integer courtId) {
     return sessionRepository.findAvailableSlotsByCoachAndCourt(coachId, courtId);
 }
+
+    @Override
+    public List<Object[]> getAllStudentsForCoach(Integer coachId) {
+        return classRegistrationRepository.findStudentsByCoachId(coachId);
+    }
+
+    @Transactional
+    public void createRecurringClass(Integer coachId, RecurringSessionRequestDto dto) {
+        // Defensive: ensure title is not null or blank
+        String title = (dto.getTitle() == null || dto.getTitle().trim().isEmpty()) ? "Recurring Class" : dto.getTitle();
+        LocalDate current = dto.getStartDate();
+        while (!current.isAfter(dto.getEndDate())) {
+            if (dto.getDaysOfWeek().contains(current.getDayOfWeek())) {
+                LocalDateTime start = LocalDateTime.of(current, dto.getStartTime());
+                LocalDateTime end = LocalDateTime.of(current, dto.getEndTime());
+                if (!sessionRepository.existsByCourtIdAndStartTimeBetweenAndStatusNot(
+                        dto.getCourtId(), start, end, "CANCELLED")) {
+                    ClassSession session = new ClassSession();
+                    session.setCoach(coachRepository.findById(coachId).orElseThrow().getUser());
+                    session.setCourt(courtRepository.findById(dto.getCourtId()).orElseThrow());
+                    session.setStartTime(start);
+                    session.setEndTime(end);
+                    session.setStatus("AVAILABLE");
+                    session.setSlotType("COACH_SESSION");
+                    session.setTitle(title);
+                    session.setDescription(dto.getDescription());
+                    session.setMaxParticipants(dto.getMaxParticipants());
+                    session.setPrice(dto.getPrice());
+                    sessionRepository.save(session);
+                }
+            }
+            current = current.plusDays(1);
+        }
+    }
 }

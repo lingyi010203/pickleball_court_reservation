@@ -18,8 +18,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 import com.pickleball_backend.pickleball.dto.BookingHistoryDto;
+import com.pickleball_backend.pickleball.entity.Booking;
+import com.pickleball_backend.pickleball.repository.BookingRepository;
+import com.pickleball_backend.pickleball.dto.BookingSimpleDto;
+import com.pickleball_backend.pickleball.entity.Court;
+import com.pickleball_backend.pickleball.repository.CourtRepository;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +39,8 @@ public class BookingController {
     private final MemberService memberService;
     private final MemberRepository memberRepository;
     private final UserAccountRepository userAccountRepository;
+    private final BookingRepository bookingRepository;
+    private final CourtRepository courtRepository;
 
     @PostMapping("/bookings")
     @PreAuthorize("hasRole('USER')")
@@ -67,6 +75,40 @@ public class BookingController {
 
         return ResponseEntity.ok(bookingService.getBookingDetails(id, memberId));
     }*/
+
+    @GetMapping("/my-upcoming")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> getMyUpcomingBookings(Principal principal) {
+        String username = principal.getName();
+        Member member = memberRepository.findByUsername(username);
+        if (member == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No member found for user: " + username);
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalTime nowTime = java.time.LocalTime.now();
+        List<Booking> bookings = bookingRepository.findUpcomingBookingsByMember(member, today, nowTime);
+        // 直接複用 BookingHistoryDto，確保欄位一致
+        List<BookingHistoryDto> dtos = bookings.stream().map(b -> {
+            BookingHistoryDto dto = new BookingHistoryDto();
+            dto.setId(b.getId());
+            if (b.getBookingSlots() != null && !b.getBookingSlots().isEmpty() && b.getBookingSlots().get(0).getSlot() != null) {
+                var slot = b.getBookingSlots().get(0).getSlot();
+                dto.setCourtName(slot.getCourtId() != null ? (courtRepository.findById(slot.getCourtId()).map(c -> c.getName()).orElse("Court")) : "Court");
+                dto.setDate(slot.getDate());
+                dto.setStartTime(slot.getStartTime());
+                dto.setEndTime(slot.getEndTime());
+            }
+            dto.setStatus(b.getStatus());
+            dto.setCreatedAt(b.getBookingDate());
+            dto.setPurpose(b.getPurpose());
+            dto.setNumberOfPlayers(b.getNumberOfPlayers());
+            dto.setNumPaddles(b.getNumPaddles());
+            dto.setBuyBallSet(b.getBuyBallSet());
+            // 其他欄位可依需求補充
+            return dto;
+        }).toList();
+        return ResponseEntity.ok(dtos);
+    }
 
     @PostMapping("/cleanup-duplicates")
     @PreAuthorize("hasRole('ADMIN')")

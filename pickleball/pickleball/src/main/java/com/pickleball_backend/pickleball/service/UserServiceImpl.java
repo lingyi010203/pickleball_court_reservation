@@ -38,6 +38,9 @@ public class UserServiceImpl implements UserService {
     private final FeedbackRepository feedbackRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final FriendRequestRepository friendRequestRepository;
+    // 你要注入 CoachRepository
+    @Autowired
+    private CoachRepository coachRepository;
 
     @Override
     public void register(RegistrationDto dto) {
@@ -67,6 +70,7 @@ public class UserServiceImpl implements UserService {
         account.setUsername(dto.getUsername());
         account.setPassword(passwordEncoder.encode(dto.getPassword()));
         account.setUser(user);
+        account.setStatus("ACTIVE"); // 設置狀態為ACTIVE
         userAccountRepository.save(account);
 
         if ("ADMIN".equalsIgnoreCase(dto.getUserType())) {
@@ -81,6 +85,13 @@ public class UserServiceImpl implements UserService {
             eventOrganizer.setUser(user);
             eventOrganizer.setOrganizerRating(0.0);
             eventOrganizerRepository.save(eventOrganizer);
+        }
+
+        if ("COACH".equalsIgnoreCase(dto.getUserType())) {
+            Coach coach = new Coach();
+            coach.setUser(user);
+            coach.setExperienceYear(dto.getExperienceYear());
+            coachRepository.save(coach);
         }
 
         // Create membership tier assignment
@@ -127,10 +138,15 @@ public class UserServiceImpl implements UserService {
 
         Optional<String> token = accountOpt
                 .filter(account -> passwordEncoder.matches(dto.getPassword(), account.getPassword()))
-                .map(account -> jwtService.generateToken(
-                        account.getUsername(),
-                        account.getUser().getUserType().toUpperCase() // Send uppercase role
-                ));
+                .map(account -> {
+                    String userType = account.getUser().getUserType();
+                    String role = "ROLE_" + userType.toUpperCase(); // 添加ROLE_前綴
+                    return jwtService.generateTokenWithUserId(
+                            account.getUsername(),
+                            role, // 使用正確的角色格式
+                            account.getUser().getId() // Include user ID
+                    );
+                });
 
         if (token.isPresent()) {
             log.info("Login successful for: {}", dto.getUsernameOrEmail());

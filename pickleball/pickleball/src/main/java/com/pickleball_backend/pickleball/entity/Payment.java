@@ -12,7 +12,7 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, columnDefinition = "double(5,2)")
+    @Column(nullable = false, columnDefinition = "decimal(10,2)")
     private double amount;
 
     @Column(name = "payment_date")
@@ -56,6 +56,9 @@ public class Payment {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "group_booking_id")
+    private String groupBookingId; // UUID字串
 
     @OneToOne(mappedBy = "payment")
     private Booking booking;

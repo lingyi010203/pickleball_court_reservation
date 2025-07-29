@@ -42,6 +42,9 @@ public class Booking {
     @Column(name = "buy_ball_set")
     private Boolean buyBallSet; // 新增：购买球组
 
+    @Column(name = "purpose_id")
+    private Integer purposeId;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL)
     private java.util.List<BookingSlot> bookingSlots;
 

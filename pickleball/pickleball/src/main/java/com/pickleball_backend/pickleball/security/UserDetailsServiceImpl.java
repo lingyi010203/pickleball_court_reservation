@@ -39,6 +39,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         }
         if ("Coach".equalsIgnoreCase(account.getUser().getUserType())) {
             authorities.add(new SimpleGrantedAuthority("ROLE_COACH"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_USER")); // 教練也應該有USER權限
         }
 
         return new org.springframework.security.core.userdetails.User(

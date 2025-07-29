@@ -69,6 +69,8 @@ function Navbar() {
     else if (path === '/profile' || path.startsWith('/profile/')) setActiveTab('');
     else if (path === '/messages' || path.startsWith('/messages/')) setActiveTab('messages');
     else if (path === '/helpdesk' || path.startsWith('/helpdesk/')) setActiveTab('helpdesk');
+    else if (path === '/friendly-matches' || path.startsWith('/friendly-matches/')) setActiveTab('friendly-matches');
+    else if (path === '/coaching' || path.startsWith('/coaching/')) setActiveTab('coaching');
   }, [location]);
 
   useEffect(() => {
@@ -114,16 +116,16 @@ function Navbar() {
     setAnchorEl(null);
   }, []);
 
-
   const navItems = useMemo(() => {
     const baseItems = [
       { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/' },
       { id: 'book', label: 'Book', icon: <BookIcon />, path: '/book' },
       { id: 'events', label: 'Events', icon: <EventIcon />, path: '/events' },
-      { id: 'friendly-match', label: 'Friendly Match', icon: <Group />, path: '/friendly-match' },
+      { id: 'friendly-matches', label: 'Friendly Match', icon: <Group />, path: '/friendly-matches' },
       { id: 'courts', label: 'Courts', icon: <CourtsIcon />, path: '/courts' },
       { id: 'deals', label: 'Deals', icon: <DealsIcon />, path: '/deals' },
       { id: 'helpdesk', label: 'Help', icon: <HelpIcon />, path: '/helpdesk' },
+      { id: 'coaching', label: 'Coaching', icon: <BookIcon />, path: '/coaching/browse' },
     ];
     let items = [...baseItems];
     if (isLoggedIn && (role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer')) {
@@ -173,9 +175,9 @@ function Navbar() {
               left: 0,
               right: 0,
               height: activeTab === item.id ? '3px' : 0,
-              borderRadius: '3px', // 添加圆角
+              borderRadius: '3px',
               backgroundColor: isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary,
-              transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)', // 缩放动画
+              transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)',
               transition: 'height 0.3s ease, transform 0.3s ease',
             },
             '&:hover': {
@@ -221,8 +223,8 @@ function Navbar() {
       <Container maxWidth={false} sx={{ maxWidth: '1200px', width: '100%', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
         <Toolbar sx={{
           justifyContent: 'space-between',
-          py: { xs: 1, sm: 1.5 }, // 响应式垂直间距
-          px: { xs: 1, sm: 0 }    // 响应式水平间距
+          py: { xs: 1, sm: 1.5 },
+          px: { xs: 1, sm: 0 }
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {isMobile && (
@@ -308,7 +310,6 @@ function Navbar() {
                 )}
               </>
             ) : (
-
               <Box
                 onClick={handleOpenMenu}
                 sx={{
@@ -335,7 +336,7 @@ function Navbar() {
                   <Skeleton variant="circular" width={40} height={40} />
                 ) : (
                   <Avatar
-                    src={profileImage ? `http://localhost:8081/uploads/${profileImage}?ts=${Date.now()}` : null}
+                    src={profileImage ? `${API_URL}/uploads/${profileImage}?ts=${Date.now()}` : null}
                     onError={e => {
                       e.target.onerror = null;
                       e.target.src = null;

@@ -7,6 +7,7 @@ import com.pickleball_backend.pickleball.exception.ConflictException;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.pickleball_backend.pickleball.dto.RecurringSessionRequestDto;
 
 public interface CoachCourtService {
     List<Court> getAvailableCourtsForCoach(Integer coachId);
@@ -15,4 +16,7 @@ public interface CoachCourtService {
     void removeCoachSlot(Integer coachId, Integer sessionId, boolean forceRemove) throws ResourceNotFoundException;
     List<ClassSession> findScheduleByCoachIdAndPeriod(Integer coachId, LocalDateTime from, LocalDateTime to);
     List<ClassSession> findAvailableSlotsByCoachAndCourt(Integer coachId, Integer courtId);
+    void createRecurringClass(Integer coachId, RecurringSessionRequestDto dto);
+    List<ClassSession> findScheduleByCoachIdAndPeriodWithVenue(Integer coachId, LocalDateTime from, LocalDateTime to);
+    List<Object[]> getAllStudentsForCoach(Integer coachId);
 }

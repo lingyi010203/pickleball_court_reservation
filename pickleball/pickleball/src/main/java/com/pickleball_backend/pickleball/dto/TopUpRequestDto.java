@@ -7,7 +7,7 @@ import lombok.Data;
 public class TopUpRequestDto {
     @NotNull(message = "Amount is required")
     @DecimalMin(value = "20.0", message = "Minimum top-up amount is RM20")
-    @DecimalMax(value = "500.0", message = "Maximum top-up amount is RM500")
+    @DecimalMax(value = "1000.0", message = "Maximum top-up amount is RM1000")
     private Double amount;
 
     @NotBlank(message = "Source is required")

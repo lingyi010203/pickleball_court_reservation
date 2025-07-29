@@ -25,6 +25,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.service.TierAutoUpgradeService;
 import com.pickleball_backend.pickleball.repository.MemberRepository;
+import com.pickleball_backend.pickleball.service.EscrowAccountService;
+import com.pickleball_backend.pickleball.repository.ClassSessionRepository;
+import com.pickleball_backend.pickleball.repository.PaymentRepository;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -43,6 +47,9 @@ public class AdminController {
     private final MemberRepository memberRepository;
     private final TierAutoUpgradeService tierAutoUpgradeService;
     private final FileStorageService fileStorageService;
+    private final EscrowAccountService escrowAccountService;
+    private final ClassSessionRepository classSessionRepository;
+    private final PaymentRepository paymentRepository;
 
     // User Type Change Management
     @GetMapping("/pending-type-changes")
@@ -282,13 +289,13 @@ public class AdminController {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userRepository.findByUserAccount_Username(username)
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
-            
+
             // Update user information
             user.setName(profileDto.getName());
             user.setEmail(profileDto.getEmail());
             user.setPhone(profileDto.getPhone());
             userRepository.save(user);
-            
+
             return ResponseEntity.ok(convertToProfileDto(user));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(null);
@@ -302,31 +309,31 @@ public class AdminController {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             String currentPassword = request.get("currentPassword");
             String newPassword = request.get("newPassword");
-            
+
             // 验证输入
             if (currentPassword == null || newPassword == null) {
                 return ResponseEntity.badRequest().body("Current password and new password are required");
             }
-            
+
             // 密码复杂度验证
             String passwordValidation = validatePassword(newPassword);
             if (passwordValidation != null) {
                 return ResponseEntity.badRequest().body("Password requirements not met: " + passwordValidation);
             }
-            
+
             UserAccount account = userAccountRepository.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("Admin account not found"));
-            
+
             // Verify current password
             if (!account.getPassword().equals(currentPassword)) {
                 return ResponseEntity.badRequest().body("Current password is incorrect");
             }
-            
+
             // Update password
             account.setPassword(newPassword);
             account.setPasswordChangedAt(java.time.LocalDateTime.now());
             userAccountRepository.save(account);
-            
+
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Failed to change password: " + e.getMessage());
@@ -337,23 +344,23 @@ public class AdminController {
         if (password == null || password.length() < 8) {
             return "Minimum 8 characters required";
         }
-        
+
         if (!password.matches(".*[A-Z].*")) {
             return "Requires uppercase letter";
         }
-        
+
         if (!password.matches(".*[a-z].*")) {
             return "Requires lowercase letter";
         }
-        
+
         if (!password.matches(".*[0-9].*")) {
             return "Requires number";
         }
-        
+
         if (!password.matches(".*[!@#$%^&*(),.?\":{}|<>].*")) {
             return "Requires special character";
         }
-        
+
         return null;
     }
 
@@ -437,14 +444,14 @@ public class AdminController {
 
         // Get current tier before recalculation
         String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
-        
+
         // Trigger tier recalculation
         tierService.recalculateMemberTier(member);
-        
+
         // Refresh member data
         member = memberRepository.findByUserId(account.getUser().getId());
         String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NULL";
-        
+
         return ResponseEntity.ok("Tier recalculated: " + oldTierName + " -> " + newTierName);
     }
 
@@ -473,7 +480,7 @@ public class AdminController {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             String filename = fileStorageService.store(file);
-            
+
             // Update admin's profile image
             UserAccount account = userAccountRepository.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("Admin account not found"));
@@ -493,15 +500,15 @@ public class AdminController {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             UserAccount account = userAccountRepository.findByUsername(username)
                     .orElseThrow(() -> new RuntimeException("Admin account not found"));
-            
+
             // Delete old file if exists
             if (account.getProfileImage() != null) {
                 fileStorageService.delete(account.getProfileImage());
             }
-            
+
             account.setProfileImage(null);
             userAccountRepository.save(account);
-            
+
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -514,32 +521,95 @@ public class AdminController {
     public ResponseEntity<?> deleteAccount() {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            
+
             // Find admin account
             Admin admin = adminRepository.findByUser_UserAccount_Username(username)
                     .orElseThrow(() -> new RuntimeException("Admin not found"));
-            
+
             User user = admin.getUser();
             UserAccount userAccount = user.getUserAccount();
-            
+
             // Delete profile image if exists
             if (userAccount.getProfileImage() != null) {
                 fileStorageService.delete(userAccount.getProfileImage());
             }
-            
+
             // Delete admin first (due to foreign key constraints)
             adminRepository.delete(admin);
-            
+
             // Delete user account
             userAccountRepository.delete(userAccount);
-            
+
             // Delete user
             userRepository.delete(user);
-            
+
             return ResponseEntity.ok().body("Account deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to delete account: " + e.getMessage());
+        }
+    }
+
+    // 新增：測試收入分配機制
+    @PostMapping("/test-revenue-distribution")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> testRevenueDistribution() {
+        try {
+            Map<String, Object> result = new HashMap<>();
+
+            // 1. 檢查託管餘額
+            double platformEscrowBalance = escrowAccountService.getPlatformEscrowBalance();
+            result.put("platformEscrowBalance", platformEscrowBalance);
+
+            // 2. 檢查平台收入
+            double platformRevenue = escrowAccountService.getPlatformRevenue();
+            result.put("platformRevenue", platformRevenue);
+
+            // 3. 檢查教練收入
+            double coachRevenue = escrowAccountService.getCoachRevenue();
+            result.put("coachRevenue", coachRevenue);
+
+            // 4. 檢查所有支付記錄
+            List<Payment> allPayments = paymentRepository.findAll();
+            Map<String, Long> paymentTypeCounts = allPayments.stream()
+                .collect(Collectors.groupingBy(Payment::getPaymentType, Collectors.counting()));
+            result.put("paymentTypeCounts", paymentTypeCounts);
+
+            // 5. 檢查COMPLETED課程
+            List<ClassSession> completedSessions = classSessionRepository.findByStatus("COMPLETED");
+            result.put("completedSessionsCount", completedSessions.size());
+            result.put("completedSessions", completedSessions.stream()
+                .map(s -> Map.of(
+                    "id", s.getId(),
+                    "title", s.getTitle(),
+                    "startTime", s.getStartTime(),
+                    "price", s.getPrice(),
+                    "currentParticipants", s.getCurrentParticipants(),
+                    "note", s.getNote()
+                ))
+                .collect(Collectors.toList()));
+
+            // 6. 檢查託管支付記錄
+            List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED");
+            result.put("escrowedPaymentsCount", escrowedPayments.size());
+            result.put("escrowedPayments", escrowedPayments.stream()
+                .map(p -> Map.of(
+                    "id", p.getId(),
+                    "amount", p.getAmount(),
+                    "transactionId", p.getTransactionId(),
+                    "paymentDate", p.getPaymentDate()
+                ))
+                .collect(Collectors.toList()));
+
+            // 7. 檢查結算記錄
+            List<Payment> coachIncomePayments = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED");
+            List<Payment> platformFeePayments = paymentRepository.findByPaymentTypeAndStatus("PLATFORM_FEE", "COMPLETED");
+            result.put("coachIncomePaymentsCount", coachIncomePayments.size());
+            result.put("platformFeePaymentsCount", platformFeePayments.size());
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error testing revenue distribution: " + e.getMessage());
         }
     }
 }

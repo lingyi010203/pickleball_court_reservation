@@ -197,6 +197,9 @@ public class FeedbackService {
         } else if (feedback.getTargetType() == Feedback.TargetType.EVENT) {
             Event event = eventRepository.findById(feedback.getTargetId()).orElse(null);
             dto.setTargetName(event != null ? event.getTitle() : "Unknown Event");
+        } else if (feedback.getTargetType() == Feedback.TargetType.COACH) {
+            User coach = userRepository.findById(feedback.getTargetId()).orElse(null);
+            dto.setTargetName(coach != null ? coach.getName() : "Unknown Coach");
         } else {
             dto.setTargetName("Unknown Target");
         }

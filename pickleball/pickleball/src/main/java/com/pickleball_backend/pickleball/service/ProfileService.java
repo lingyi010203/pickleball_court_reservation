@@ -30,6 +30,7 @@ public class ProfileService {
         User user = account.getUser();
 
         return ProfileDto.builder()
+                .id(user.getId())
                 .username(account.getUsername())
                 .name(user.getName())
                 .email(user.getEmail())
