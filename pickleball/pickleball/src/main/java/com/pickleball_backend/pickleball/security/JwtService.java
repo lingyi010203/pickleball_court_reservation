@@ -24,6 +24,19 @@ public class JwtService {
                 .compact();
     }
 
+    public String generateTokenWithUserId(String subject, String role, Integer userId) {
+        String cleanedRole = role.toUpperCase().replace("ROLE_", "");
+        return Jwts.builder()
+                .subject(subject)
+                .claim("role", cleanedRole)
+                .claim("userType", cleanedRole) // 添加 userType 聲明
+                .claim("userId", userId)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+    }
+
     public String extractUsername(String token) {
         return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload().getSubject();
     }

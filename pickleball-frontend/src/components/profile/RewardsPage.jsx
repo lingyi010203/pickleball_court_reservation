@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
   Typography,
   Tabs,
   Tab,
@@ -16,8 +15,7 @@ import {
   Chip,
   Button
 } from '@mui/material';
-import ProfileHeader from './ProfileHeader';
-import ProfileNavigation from './ProfileNavigation';
+
 import ActiveVouchers from './ActiveVouchers';
 import RedeemHistory from './RedeemHistory';
 import RedeemVoucherPage from './RedeemVoucherPage';
@@ -192,248 +190,231 @@ const RewardsPage = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', py: 1, backgroundColor: theme.palette.background.default }}>
-      <Container maxWidth={false} sx={{ maxWidth: '1200px', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
-        <Box sx={{ display: 'flex', gap: { xs: 2, lg: 3 }, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' }, width: '100%' }}>
-          {/* 左侧栏 */}
-          <Box sx={{ width: { xs: '100%', lg: '260px' }, flexShrink: 0, position: { lg: 'sticky' }, top: { lg: 20 }, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 2.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, position: 'relative' }}>
-              <ProfileHeader profile={userData} />
-            </Box>
-            <Box sx={{ backgroundColor: theme.palette.background.paper, borderRadius: 2, boxShadow: theme.shadows[1], p: 1.5, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-              <ProfileNavigation />
-            </Box>
-          </Box>
-          
-          {/* 右侧内容区 - 改进版 */}
-          <Box sx={{ flex: 1, minWidth: 0, width: { xs: '100%', lg: 'calc(100% - 260px - 24px)' }, overflow: 'hidden' }}>
-            <Snackbar open={!!error || !!success} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-              <Alert severity={error ? 'error' : 'success'} onClose={handleCloseSnackbar} sx={{ width: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(10px)', background: alpha(theme.palette.background.paper, 0.9) }}>{error || success}</Alert>
-            </Snackbar>
-            
-            {/* 主内容卡片 */}
-            <Card sx={{ 
-              borderRadius: 3, 
-              boxShadow: '0 8px 32px rgba(0,0,0,0.08)', 
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              overflow: 'hidden',
-              background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
-            }}>
-              {/* 标签栏 */}
-              <Box sx={{ 
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                background: alpha(theme.palette.background.paper, 0.8),
-                backdropFilter: 'blur(10px)'
-              }}>
-                <Tabs 
-                  value={tab} 
-                  onChange={handleTabChange} 
-                  variant="scrollable" 
-                  scrollButtons="auto"
-                  sx={{ 
-                    px: 3,
-                    '& .MuiTab-root': {
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      fontSize: '1rem',
-                      minHeight: 60,
-                      color: theme.palette.text.secondary,
-                      '&.Mui-selected': {
-                        color: theme.palette.primary.main
-                      }
-                    },
-                    '& .MuiTabs-indicator': {
-                      height: 3,
-                      borderRadius: '3px 3px 0 0'
-                    }
+    <Box sx={{ width: '100%', overflow: 'hidden' }}>
+      <Snackbar open={!!error || !!success} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity={error ? 'error' : 'success'} onClose={handleCloseSnackbar} sx={{ width: 'auto', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', backdropFilter: 'blur(10px)', background: alpha(theme.palette.background.paper, 0.9) }}>{error || success}</Alert>
+      </Snackbar>
+      
+      {/* 主内容卡片 */}
+      <Card sx={{ 
+        borderRadius: 3, 
+        boxShadow: '0 8px 32px rgba(0,0,0,0.08)', 
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        overflow: 'hidden',
+        background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`
+      }}>
+        {/* 标签栏 */}
+        <Box sx={{ 
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          background: alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: 'blur(10px)'
+        }}>
+          <Tabs 
+            value={tab} 
+            onChange={handleTabChange} 
+            variant="scrollable" 
+            scrollButtons="auto"
+            sx={{ 
+              px: 3,
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '1rem',
+                minHeight: 60,
+                color: theme.palette.text.secondary,
+                '&.Mui-selected': {
+                  color: theme.palette.primary.main
+                }
+              },
+              '& .MuiTabs-indicator': {
+                height: 3,
+                borderRadius: '3px 3px 0 0'
+              }
+            }}
+          >
+            <Tab label="Rewards Dashboard" icon={<WorkspacePremiumIcon />} iconPosition="start" />
+            <Tab label="Active Vouchers" icon={<LocalOfferIcon />} iconPosition="start" />
+            <Tab label="Redeem History" icon={<TrendingUpIcon />} iconPosition="start" />
+            <Tab label="Redeem Voucher" icon={<StarIcon />} iconPosition="start" />
+          </Tabs>
+        </Box>
+
+        {/* 内容区域 */}
+        <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+          {tab === 0 && (
+            <Box
+              sx={{
+                backgroundColor: theme.palette.background.paper,
+                borderRadius: 3,
+                boxShadow: theme.shadows[2],
+                border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                p: { xs: 2, md: 4 },
+                mb: 3,
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* 头部徽章与积分 */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+                <Box
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: '50%',
+                    background: theme.palette.background.default,
+                    border: `5px solid ${currentTier.color}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mb: 1.5,
+                    boxShadow: theme.shadows[2],
                   }}
                 >
-                  <Tab label="Rewards Dashboard" icon={<WorkspacePremiumIcon />} iconPosition="start" />
-                  <Tab label="Active Vouchers" icon={<LocalOfferIcon />} iconPosition="start" />
-                  <Tab label="Redeem History" icon={<TrendingUpIcon />} iconPosition="start" />
-                  <Tab label="Redeem Voucher" icon={<StarIcon />} iconPosition="start" />
-                </Tabs>
+                  <Diamond sx={{ color: currentTier.color, fontSize: 44 }} />
+                </Box>
+                <Typography variant="h3" fontWeight="bold" color={theme.palette.text.primary}>
+                  {currentPoints}
+                </Typography>
+                <Chip
+                  label={`${currentTier.name} Tier`}
+                  size="small"
+                  sx={{
+                    mt: 1,
+                    fontWeight: 600,
+                    color: currentTier.color,
+                    borderColor: currentTier.color,
+                    background: alpha(currentTier.color, 0.08),
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    letterSpacing: 1,
+                  }}
+                  variant="outlined"
+                />
               </Box>
-
-              {/* 内容区域 */}
-              <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-                {tab === 0 && (
+              {/* 进度条与标签 */}
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box
                     sx={{
-                      backgroundColor: theme.palette.background.paper,
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: currentTier.color,
+                    }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={progressToNextTier}
+                      sx={{
+                        height: 12,
+                        borderRadius: 6,
+                        background: alpha(currentTier.color, 0.08),
+                        '& .MuiLinearProgress-bar': {
+                          backgroundColor: currentTier.color,
+                        },
+                      }}
+                    />
+                  </Box>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      background: nextTier ? (tierConfig[nextTier.name?.toUpperCase()]?.color || theme.palette.grey[400]) : currentTier.color,
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ ml: 2, minWidth: 60, textAlign: 'right', color: currentTier.color }}>
+                    {progressToNextTier.toFixed(0)}%
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <Chip
+                    label={
+                      pointsToNext > 0
+                        ? `还需 ${pointsToNext} 分升级到 ${nextTier?.name || ''}`
+                        : '已达最高等级'
+                    }
+                    size="small"
+                    sx={{
+                      background: pointsToNext > 0 ? alpha(currentTier.color, 0.12) : alpha(theme.palette.success.main, 0.12),
+                      color: pointsToNext > 0 ? currentTier.color : theme.palette.success.main,
+                      fontWeight: 500,
+                      fontSize: 14,
+                    }}
+                  />
+                </Box>
+              </Box>
+              {/* 统计卡片 */}
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12} md={4}>
+                  <Card
+                    sx={{
                       borderRadius: 3,
-                      boxShadow: theme.shadows[2],
-                      border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-                      p: { xs: 2, md: 4 },
-                      mb: 3,
-                      width: '100%',
-                      boxSizing: 'border-box',
+                      boxShadow: theme.shadows[1],
+                      transition: 'box-shadow 0.2s',
+                      '&:hover': { boxShadow: theme.shadows[4] },
+                      p: 2,
+                      textAlign: 'center',
                     }}
                   >
-                    {/* 头部徽章与积分 */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                      <Box
-                        sx={{
-                          width: 80,
-                          height: 80,
-                          borderRadius: '50%',
-                          background: theme.palette.background.default,
-                          border: `5px solid ${currentTier.color}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mb: 1.5,
-                          boxShadow: theme.shadows[2],
-                        }}
-                      >
-                        <Diamond sx={{ color: currentTier.color, fontSize: 44 }} />
-                      </Box>
-                      <Typography variant="h3" fontWeight="bold" color={theme.palette.text.primary}>
-                        {currentPoints}
-                      </Typography>
-                      <Chip
-                        label={`${currentTier.name} Tier`}
-                        size="small"
-                        sx={{
-                          mt: 1,
-                          fontWeight: 600,
-                          color: currentTier.color,
-                          borderColor: currentTier.color,
-                          background: alpha(currentTier.color, 0.08),
-                          borderWidth: 1,
-                          borderStyle: 'solid',
-                          letterSpacing: 1,
-                        }}
-                        variant="outlined"
-                      />
-                    </Box>
-                    {/* 进度条与标签 */}
-                    <Box sx={{ mb: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            background: currentTier.color,
-                          }}
-                        />
-                        <Box sx={{ flex: 1 }}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={progressToNextTier}
-                            sx={{
-                              height: 12,
-                              borderRadius: 6,
-                              background: alpha(currentTier.color, 0.08),
-                              '& .MuiLinearProgress-bar': {
-                                backgroundColor: currentTier.color,
-                              },
-                            }}
-                          />
-                        </Box>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            background: nextTier ? (tierConfig[nextTier.name?.toUpperCase()]?.color || theme.palette.grey[400]) : currentTier.color,
-                          }}
-                        />
-                        <Typography variant="body2" sx={{ ml: 2, minWidth: 60, textAlign: 'right', color: currentTier.color }}>
-                          {progressToNextTier.toFixed(0)}%
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-                        <Chip
-                          label={
-                            pointsToNext > 0
-                              ? `还需 ${pointsToNext} 分升级到 ${nextTier?.name || ''}`
-                              : '已达最高等级'
-                          }
-                          size="small"
-                          sx={{
-                            background: pointsToNext > 0 ? alpha(currentTier.color, 0.12) : alpha(theme.palette.success.main, 0.12),
-                            color: pointsToNext > 0 ? currentTier.color : theme.palette.success.main,
-                            fontWeight: 500,
-                            fontSize: 14,
-                          }}
-                        />
-                      </Box>
-                    </Box>
-                    {/* 统计卡片 */}
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={12} md={4}>
-                        <Card
-                          sx={{
-                            borderRadius: 3,
-                            boxShadow: theme.shadows[1],
-                            transition: 'box-shadow 0.2s',
-                            '&:hover': { boxShadow: theme.shadows[4] },
-                            p: 2,
-                            textAlign: 'center',
-                          }}
-                        >
-                          <EmojiEventsIcon color="primary" sx={{ fontSize: 36, mb: 1 }} />
-                          <Typography variant="h5" fontWeight="bold" color={theme.palette.primary.main}>
-                            {dashboardData?.rewardsEarned || 0}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Rewards Earned
-                          </Typography>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Card
-                          sx={{
-                            borderRadius: 3,
-                            boxShadow: theme.shadows[1],
-                            transition: 'box-shadow 0.2s',
-                            '&:hover': { boxShadow: theme.shadows[4] },
-                            p: 2,
-                            textAlign: 'center',
-                          }}
-                        >
-                          <TrendingUpIcon color="success" sx={{ fontSize: 36, mb: 1 }} />
-                          <Typography variant="h5" fontWeight="bold" color={theme.palette.success.main}>
-                            {dashboardData?.monthsActive || 0}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Months Active
-                          </Typography>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Card
-                          sx={{
-                            borderRadius: 3,
-                            boxShadow: theme.shadows[1],
-                            transition: 'box-shadow 0.2s',
-                            '&:hover': { boxShadow: theme.shadows[4] },
-                            p: 2,
-                            textAlign: 'center',
-                          }}
-                        >
-                          <LocalOfferIcon color="info" sx={{ fontSize: 36, mb: 1 }} />
-                          <Typography variant="h5" fontWeight="bold" color={theme.palette.info.main}>
-                            {vouchers.length}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Available Vouchers
-                          </Typography>
-                        </Card>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                )}
-                {tab === 1 && <ActiveVouchers />}
-                {tab === 2 && <RedeemHistory />}
-                {tab === 3 && <RedeemVoucherPage onSuccess={setSuccess} onError={setError} />}
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-      </Container>
+                    <EmojiEventsIcon color="primary" sx={{ fontSize: 36, mb: 1 }} />
+                    <Typography variant="h5" fontWeight="bold" color={theme.palette.primary.main}>
+                      {dashboardData?.rewardsEarned || 0}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Rewards Earned
+                    </Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card
+                    sx={{
+                      borderRadius: 3,
+                      boxShadow: theme.shadows[1],
+                      transition: 'box-shadow 0.2s',
+                      '&:hover': { boxShadow: theme.shadows[4] },
+                      p: 2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <TrendingUpIcon color="success" sx={{ fontSize: 36, mb: 1 }} />
+                    <Typography variant="h5" fontWeight="bold" color={theme.palette.success.main}>
+                      {dashboardData?.monthsActive || 0}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Months Active
+                    </Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card
+                    sx={{
+                      borderRadius: 3,
+                      boxShadow: theme.shadows[1],
+                      transition: 'box-shadow 0.2s',
+                      '&:hover': { boxShadow: theme.shadows[4] },
+                      p: 2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <LocalOfferIcon color="info" sx={{ fontSize: 36, mb: 1 }} />
+                    <Typography variant="h5" fontWeight="bold" color={theme.palette.info.main}>
+                      {vouchers.length}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Available Vouchers
+                    </Typography>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+          {tab === 1 && <ActiveVouchers />}
+          {tab === 2 && <RedeemHistory />}
+          {tab === 3 && <RedeemVoucherPage onSuccess={setSuccess} onError={setError} />}
+        </CardContent>
+      </Card>
     </Box>
   );
 };

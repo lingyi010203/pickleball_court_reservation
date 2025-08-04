@@ -123,6 +123,10 @@ public class SecurityConfig {
                         // General Admin Access
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
 
+                        .requestMatchers(HttpMethod.POST, "/api/coach/recurring-sessions").hasAuthority("ROLE_COACH")
+                        .requestMatchers(HttpMethod.POST, "/api/coach/courses/**").hasAuthority("ROLE_COACH")
+                        .requestMatchers("/api/coach/**").hasAuthority("ROLE_COACH")
+
                         // User Endpoints
                         .requestMatchers("/api/profile").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/profile/photo").authenticated()

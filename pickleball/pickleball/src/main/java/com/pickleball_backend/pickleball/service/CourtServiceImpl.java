@@ -31,6 +31,7 @@ public class CourtServiceImpl implements CourtService {
     private final EmailService emailService;
     private final PaymentRepository paymentRepository;
     private final BookingSlotRepository bookingSlotRepository;
+    private final FriendlyMatchService friendlyMatchService;
     @Autowired
     private VenueRepository venueRepository;
     private static final Map<String, DayOfWeek> DAY_OF_WEEK_MAP = Map.of(
@@ -236,6 +237,8 @@ public class CourtServiceImpl implements CourtService {
         if (!activeBookings.isEmpty()) {
             for (Booking booking : activeBookings) {
                 try {
+                    // 新增：同步取消 FriendlyMatch
+                    friendlyMatchService.cancelReservationAndMatch(booking.getId());
                     refundBooking(booking);
                     // Slot slot = booking.getSlot();
                     Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0).getSlot() : null;

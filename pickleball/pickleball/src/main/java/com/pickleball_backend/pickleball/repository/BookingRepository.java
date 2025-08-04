@@ -109,12 +109,4 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     // 查找已退款的预订
     @Query("SELECT b FROM Booking b JOIN b.payment p WHERE p.status = :status")
     List<Booking> findByPaymentStatus(@Param("status") String status);
-    
-    // 统计用户的总预订数
-    @Query("SELECT COUNT(b) FROM Booking b JOIN b.member m WHERE m.user.id = :userId")
-    Long countByUserId(@Param("userId") Integer userId);
-    
-    // 统计用户已完成的预订数
-    @Query("SELECT COUNT(b) FROM Booking b JOIN b.member m WHERE m.user.id = :userId AND b.status = 'COMPLETED'")
-    Long countCompletedByUserId(@Param("userId") Integer userId);
 }

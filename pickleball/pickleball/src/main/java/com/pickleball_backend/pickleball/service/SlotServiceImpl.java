@@ -4,10 +4,13 @@ import com.pickleball_backend.pickleball.dto.SlotDto;
 import com.pickleball_backend.pickleball.dto.SlotResponseDto;
 import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.entity.Slot;
+
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.exception.ValidationException;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.SlotRepository;
+import com.pickleball_backend.pickleball.repository.ClassSessionRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +19,7 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,6 +29,7 @@ public class SlotServiceImpl implements SlotService {
 
     private final SlotRepository slotRepository;
     private final CourtRepository courtRepository;
+    private final ClassSessionRepository classSessionRepository;
 
     @Override
     public List<SlotResponseDto> getSlots(List<Integer> courtIds, LocalDate startDate, LocalDate endDate) {
@@ -112,10 +117,49 @@ public class SlotServiceImpl implements SlotService {
         Court court = courtRepository.findById(courtId)
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found with id: " + courtId));
 
-        List<Slot> slots = slotRepository.findByCourtIdAndDateBetweenAndIsAvailableTrue(
-                courtId, today, endDate);
+        // 查找所有slots，包括isAvailable=false的，然后过滤掉PENDING状态的
+        List<Slot> allSlots = slotRepository.findByCourtIdAndDateBetween(courtId, today, endDate);
+        List<Slot> slots = allSlots.stream()
+            .filter(slot -> !"PENDING".equals(slot.getStatus()))
+            .collect(Collectors.toList());
+        
+        System.out.println("=== getAvailableSlotsByCourt Debug ===");
+        System.out.println("Court ID: " + courtId);
+        System.out.println("Total slots found: " + allSlots.size());
+        System.out.println("Slots after PENDING filter: " + slots.size());
+        
+        // 显示被过滤掉的PENDING slots
+        List<Slot> pendingSlots = allSlots.stream()
+            .filter(slot -> "PENDING".equals(slot.getStatus()))
+            .collect(Collectors.toList());
+        
+        if (!pendingSlots.isEmpty()) {
+            System.out.println("PENDING slots found:");
+            for (Slot slot : pendingSlots) {
+                System.out.println("  - Slot ID: " + slot.getId() + 
+                    ", Date: " + slot.getDate() + 
+                    ", Time: " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                    ", Status: " + slot.getStatus());
+            }
+        }
+        System.out.println("=== End Debug ===");
 
-        return slots.stream().map(slot -> {
+        // 查詢所有未取消的 class session
+        final List<com.pickleball_backend.pickleball.entity.ClassSession> filteredSessions = classSessionRepository.findByCourtIdAndStartTimeBetween(
+            courtId,
+            today.atStartOfDay(),
+            endDate.atTime(23, 59, 59)
+        ).stream().filter(s -> !"CANCELLED".equalsIgnoreCase(s.getStatus())).toList();
+
+        return slots.stream().filter(slot -> {
+            LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+            LocalDateTime slotEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+            // 只要有任何 class session 時間重疊，該 slot 就不能預約
+            boolean overlap = filteredSessions.stream().anyMatch(s ->
+                slotStart.isBefore(s.getEndTime()) && slotEnd.isAfter(s.getStartTime())
+            );
+            return !overlap;
+        }).map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
             dto.setId(slot.getId());
             dto.setCourtId(slot.getCourtId());
@@ -126,7 +170,6 @@ public class SlotServiceImpl implements SlotService {
             dto.setDurationHours(calculateDurationHours(slot));
             dto.setCourtName(court.getName());
             dto.setCourtLocation(court.getLocation());
-
             return dto;
         }).collect(Collectors.toList());
     }
@@ -214,4 +257,5 @@ public class SlotServiceImpl implements SlotService {
             return false;
         }
     }
+
 }

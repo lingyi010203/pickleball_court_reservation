@@ -46,13 +46,9 @@ public class MatchReminderService {
                 }
             }
 
-            // Notify approved participants
-            List<JoinRequest> approvedRequests = joinRequestRepository.findByFriendlyMatchIdAndStatus(
-                    match.getId(),
-                    JoinRequest.Status.APPROVED
-            );
-
-            for (JoinRequest request : approvedRequests) {
+            // Notify all participants
+            List<JoinRequest> allRequests = match.getJoinRequests();
+            for (JoinRequest request : allRequests) {
                 Member member = request.getMember();
                 if (member != null && member.getUser() != null) {
                     String playerEmail = member.getUser().getEmail();

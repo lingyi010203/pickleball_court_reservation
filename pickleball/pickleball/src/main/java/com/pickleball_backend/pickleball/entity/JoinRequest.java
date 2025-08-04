@@ -15,15 +15,25 @@ public class JoinRequest {
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING; // PENDING, APPROVED, REJECTED
 
-    @Column(name = "request_date")
-    private LocalDateTime requestDate = LocalDateTime.now();
+    @Column(name = "request_date", nullable = false)
+    private LocalDateTime requestDate;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.requestDate == null) {
+            this.requestDate = LocalDateTime.now();
+        }
+    }
+
+    @Column(name = "request_time")
+    private java.time.LocalDateTime requestTime;
 
     @ManyToOne
     @JoinColumn(name = "member_id")
     private Member member;
 
     @ManyToOne
-    @JoinColumn(name = "friendly_match_id")
+    @JoinColumn(name = "match_id", nullable = false)
     private FriendlyMatch friendlyMatch;
 
     public enum Status {

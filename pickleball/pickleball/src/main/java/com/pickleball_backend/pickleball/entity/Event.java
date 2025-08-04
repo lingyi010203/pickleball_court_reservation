@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Data
@@ -33,19 +34,10 @@ public class Event {
     @Positive(message = "Capacity must be positive")
     private Integer capacity;
     
-    @NotBlank(message = "Location is required")
-    private String location;
-    
     private String status;
 
     @Column(name = "organizer_id")
     private Integer organizerId;
-    
-    @NotBlank(message = "Skill level is required")
-    private String skillLevel;
-
-    @NotBlank(message = "Eligibility is required")
-    private String eligibility;
 
     @NotBlank(message = "Schedule is required")
     @Column(columnDefinition = "TEXT")
@@ -55,5 +47,17 @@ public class Event {
     private Double feeAmount;
 
     private int registeredCount = 0;
+
+    @ManyToMany
+    @JoinTable(
+        name = "event_court",
+        joinColumns = @JoinColumn(name = "event_id"),
+        inverseJoinColumns = @JoinColumn(name = "court_id")
+    )
+    private Set<Court> courts;
+
+    @ManyToOne
+    @JoinColumn(name = "venue_id")
+    private Venue venue; // optional, for full venue booking
 
 }

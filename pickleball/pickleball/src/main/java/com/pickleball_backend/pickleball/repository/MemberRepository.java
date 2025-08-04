@@ -34,4 +34,10 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
 
     @Query("SELECT m.user FROM Member m WHERE m.tier.tierName IN :tierNames")
     List<User> findUsersByTierNames(@Param("tierNames") List<String> tierNames);
+
+    @Query("SELECT m FROM Member m WHERE m.user.userAccount.username = :username")
+    Member findByUsername(@Param("username") String username);
+    
+    // 根據User查找Member
+    Member findByUser(User user);
 }

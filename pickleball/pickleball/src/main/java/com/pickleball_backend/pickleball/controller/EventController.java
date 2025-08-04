@@ -2,6 +2,8 @@ package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.dto.EventDetailDto;
 import com.pickleball_backend.pickleball.dto.EventFilterDto;
+import com.pickleball_backend.pickleball.dto.EventCreateDto;
+import com.pickleball_backend.pickleball.dto.EventUpdateDto;
 import com.pickleball_backend.pickleball.entity.Event;
 import com.pickleball_backend.pickleball.repository.EventRepository;
 import com.pickleball_backend.pickleball.service.EventService;
@@ -25,20 +27,20 @@ public class EventController {
 
     @PostMapping
     @PreAuthorize("hasRole('EVENTORGANIZER')")
-    public ResponseEntity<Event> createEvent(@Valid @RequestBody Event event, Principal principal) {
+    public ResponseEntity<Event> createEvent(@Valid @RequestBody EventCreateDto eventDto, Principal principal) {
         String username = principal.getName();
-        return ResponseEntity.ok(eventService.createEvent(event, username));
+        return ResponseEntity.ok(eventService.createEvent(eventDto, username));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('EVENTORGANIZER')")
     public ResponseEntity<Event> updateEvent(
             @PathVariable Integer id,
-            @Valid @RequestBody Event event,
+            @Valid @RequestBody EventUpdateDto eventDto,
             @RequestParam(defaultValue = "false") boolean notifyParticipants,
             Principal principal) {
         String username = principal.getName();
-        return ResponseEntity.ok(eventService.updateEvent(id, event, username, notifyParticipants));
+        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username, notifyParticipants));
     }
 
     /**
@@ -50,10 +52,10 @@ public class EventController {
     @PreAuthorize("hasRole('EVENTORGANIZER')")
     public ResponseEntity<Event> updateEventWithNotification(
             @PathVariable Integer id,
-            @Valid @RequestBody Event event,
+            @Valid @RequestBody EventUpdateDto eventDto,
             Principal principal) {
         String username = principal.getName();
-        return ResponseEntity.ok(eventService.updateEvent(id, event, username, true));
+        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username, true));
     }
 
     @DeleteMapping("/{id}")
@@ -72,11 +74,6 @@ public class EventController {
         String username = principal.getName();
         Event publishedEvent = eventService.publishEvent(id, username);
         return ResponseEntity.ok(publishedEvent);
-    }
-
-    @GetMapping("/published")
-    public List<Event> getPublishedEvents(@RequestParam String tier) {
-        return eventRepository.findByStatusAndEligibilityContaining("PUBLISHED", tier);
     }
 
     // New endpoints for browsing events
@@ -111,9 +108,12 @@ public class EventController {
      * Get all upcoming events
      */
     @GetMapping("/upcoming")
-    public ResponseEntity<Page<Event>> getUpcomingEvents(Principal principal) {
+    public ResponseEntity<Page<Event>> getUpcomingEvents(
+            Principal principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "9") int size) {
         String username = principal.getName();
-        Page<Event> events = eventService.getUpcomingEvents(username);
+        Page<Event> events = eventService.getUpcomingEvents(username, page, size);
         return ResponseEntity.ok(events);
     }
     
@@ -126,18 +126,6 @@ public class EventController {
             Principal principal) {
         String username = principal.getName();
         Page<Event> events = eventService.getEventsByType(eventType, username);
-        return ResponseEntity.ok(events);
-    }
-    
-    /**
-     * Get events by skill level (beginner, intermediate, advanced)
-     */
-    @GetMapping("/skill/{skillLevel}")
-    public ResponseEntity<Page<Event>> getEventsBySkillLevel(
-            @PathVariable String skillLevel,
-            Principal principal) {
-        String username = principal.getName();
-        Page<Event> events = eventService.getEventsBySkillLevel(skillLevel, username);
         return ResponseEntity.ok(events);
     }
     
@@ -181,15 +169,6 @@ public class EventController {
     }
     
     /**
-     * Get available skill levels for filtering
-     */
-    @GetMapping("/skill-levels")
-    public ResponseEntity<List<String>> getAvailableSkillLevels() {
-        List<String> skillLevels = List.of("beginner", "intermediate", "advanced", "all levels");
-        return ResponseEntity.ok(skillLevels);
-    }
-    
-    /**
      * Get event statistics (count by type, upcoming events, etc.)
      */
     @GetMapping("/stats")
@@ -200,7 +179,7 @@ public class EventController {
         Page<Event> tournaments = eventService.getEventsByType("tournament", username);
         Page<Event> leagues = eventService.getEventsByType("league", username);
         Page<Event> friendlyMatches = eventService.getEventsByType("friendly match", username);
-        Page<Event> upcomingEvents = eventService.getUpcomingEvents(username);
+        Page<Event> upcomingEvents = eventService.getUpcomingEvents(username, 0, 9);
         
         var stats = new Object() {
             public final long totalTournaments = tournaments.getTotalElements();

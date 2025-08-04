@@ -1,10 +1,6 @@
 package com.pickleball_backend.pickleball.service;
 
-import com.pickleball_backend.pickleball.entity.Booking;
-import com.pickleball_backend.pickleball.entity.Court;
-import com.pickleball_backend.pickleball.entity.Payment;
-import com.pickleball_backend.pickleball.entity.Slot;
-import com.pickleball_backend.pickleball.entity.Event;
+import com.pickleball_backend.pickleball.entity.*;
 import lombok.Data;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -360,8 +356,7 @@ public class EmailService {
         String content = String.format(
             "Dear user,\n\nA new event \"%s\" has been published!\n\nDate: %s\nLocation: %s\n\nCheck it out in the app!",
             event.getTitle(),
-            event.getStartTime(),
-            event.getLocation()
+            event.getStartTime()
         );
         sendEmail(email, subject, content);
     }
@@ -380,9 +375,7 @@ public class EmailService {
             "End Time: %s\n" +
             "Location: %s\n" +
             "Event Type: %s\n" +
-            "Skill Level: %s\n" +
             "Capacity: %d\n" +
-            "Eligibility: %s\n" +
             "Fee: %s\n" +
             // No description field in Event entity
             // "Description: %s\n\n" +
@@ -392,11 +385,9 @@ public class EmailService {
             event.getStartTime() != null ? event.getStartTime().format(dateFormatter) : "",
             event.getStartTime() != null ? event.getStartTime().format(timeFormatter) : "",
             event.getEndTime() != null ? event.getEndTime().format(timeFormatter) : "",
-            event.getLocation(),
+            event.getVenue() != null ? event.getVenue().getName() : "N/A",
             event.getEventType(),
-            event.getSkillLevel(),
             event.getCapacity(),
-            event.getEligibility(),
             event.getFeeAmount() != null ? event.getFeeAmount() : "Free"
             // No description
         );
@@ -411,7 +402,7 @@ public class EmailService {
             "Dear user,\n\nWe regret to inform you that the event \"%s\" has been cancelled.\n\nEvent Details:\nDate: %s\nLocation: %s\nEvent Type: %s\n\nWe apologize for any inconvenience this may cause. Please check the app for other available events!",
             event.getTitle(),
             event.getStartTime(),
-            event.getLocation(),
+            event.getVenue() != null ? event.getVenue().getName() : "N/A",
             event.getEventType()
         );
         sendEmail(email, subject, content);
@@ -467,6 +458,23 @@ public class EmailService {
         } catch (MailException e) {
             log.error("Failed to send message notification email to {}: {}", toEmail, e.getMessage());
         }
+    }
+
+    public void sendClassRegistrationConfirmation(
+            String email,
+            ClassSession session,
+            Member member) {
+
+        String subject = "課程報名確認: " + session.getCoach().getName() + " 的匹克球課程";
+        String content = "親愛的 " + member.getUser().getName() + ":\n\n" +
+                "您已成功報名以下匹克球課程:\n" +
+                "教練: " + session.getCoach().getName() + "\n" +
+                "球場: " + session.getCourt().getName() + "\n" +
+                "時間: " + session.getStartTime() + " - " + session.getEndTime() + "\n" +
+                "費用: $" + session.getPrice() + "\n\n" +
+                "請準時到達球場，享受您的匹克球體驗！";
+
+        sendEmail(email, subject, content);
     }
 
     public void sendSessionCancellation(String email, LocalDateTime sessionTime, String coachName) {
@@ -535,5 +543,6 @@ public class EmailService {
 
         sendEmail(coachEmail, subject, content);
     }
+
 }
 

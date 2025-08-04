@@ -64,4 +64,5 @@ public class SlotController {
         List<SlotResponseDto> slots = slotService.getAllSlotsByCourt(courtId, start, end);
         return ResponseEntity.ok(slots);
     }
+
 }

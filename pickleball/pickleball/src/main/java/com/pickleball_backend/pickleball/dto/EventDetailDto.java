@@ -12,10 +12,7 @@ public class EventDetailDto {
     private LocalDateTime endTime;
     private String eventType;
     private Integer capacity;
-    private String location;
     private String status;
-    private String skillLevel;
-    private String eligibility;
     private String schedule;
     private Double feeAmount;
     
@@ -27,8 +24,12 @@ public class EventDetailDto {
     
     // Additional details for browsing
     private boolean isUpcoming;
-    private boolean isEligible; // based on user's tier
     private String timeUntilEvent; // e.g., "2 days", "3 hours"
     private Integer currentParticipants; // if tracking participants
     private List<String> availableSlots; // if applicable
+    private Integer venueId;
+    private String venueName;
+    private String venueState; // 新增
+    private String venueLocation; // 新增
+    private List<CourtDto> courts;
 } 

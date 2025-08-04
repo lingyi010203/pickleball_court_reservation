@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
       try {
         // Decode JWT to get user information
         const decodedToken = jwtDecode(authToken);
+        console.log('Decoded JWT token:', decodedToken); // 調試日誌
         
         // Extract user information from token
         const role = decodedToken.role || '';
@@ -25,13 +26,15 @@ export const AuthProvider = ({ children }) => {
 
         
         const user = {
-          id: decodedToken.sub,
+          id: decodedToken.userId || decodedToken.sub, // 優先使用 userId，如果沒有則使用 sub
           username: decodedToken.username || decodedToken.name || decodedToken.sub,
           email: decodedToken.email,
           role: cleanRole,
+          userType: decodedToken.userType || cleanRole, // 優先使用 userType，如果沒有則使用 role
           token: authToken
         };
         
+        console.log('Created user object:', user); // 調試日誌
         setCurrentUser(user);
         localStorage.setItem('currentUser', JSON.stringify(user));
       } catch (error) {
@@ -62,7 +65,9 @@ export const AuthProvider = ({ children }) => {
 
   // Check if user has a specific role
   const hasRole = (role) => {
-    return currentUser?.role === role;
+    if (!currentUser) return false;
+    // 檢查 role 和 userType
+    return currentUser.role === role || currentUser.userType === role;
   };
 
   return (

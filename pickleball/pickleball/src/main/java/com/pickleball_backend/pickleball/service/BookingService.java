@@ -37,8 +37,8 @@ public class BookingService {
     private final BookingSlotRepository bookingSlotRepository;
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
-    private final WalletService walletService;
     private final FeedbackRepository feedbackRepository;
+    private final FriendlyMatchService friendlyMatchService;
     private final TierService tierService;
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
@@ -108,20 +108,18 @@ public class BookingService {
         double ballSetFee = buyBallSet ? 12.0 : 0.0;
         double amount = baseAmount + paddleFee + ballSetFee;
 
-        // 7. Create payment record first
+        // 7. Process wallet payment if requested
         Payment payment = new Payment();
         payment.setAmount(amount);
         payment.setPaymentDate(LocalDateTime.now());
         payment.setPaymentType("BOOKING");
 
-        log.info("Booking request - useWallet: {}, amount: {}, wallet balance: {}", 
-                request.isUseWallet(), amount, wallet.getBalance());
-
         if (request.isUseWallet()) {
             if (wallet.getBalance() < amount) {
                 throw new ValidationException("Insufficient wallet balance. Available: " + wallet.getBalance());
             }
-            
+            wallet.setBalance(wallet.getBalance() - amount);
+            walletRepository.save(wallet);
             payment.setPaymentMethod("WALLET");
             payment.setStatus("COMPLETED");
         } else {
@@ -147,35 +145,7 @@ public class BookingService {
         booking.setBuyBallSet(request.getBuyBallSet());
         booking = bookingRepository.save(booking);
 
-        // 9. Process wallet payment after booking is created
-        if (request.isUseWallet()) {
-            log.info("Processing wallet payment for booking {}: amount={}, current balance={}", 
-                    booking.getId(), amount, wallet.getBalance());
-            
-            try {
-                // Create wallet transaction record for the booking payment
-                double oldBalance = wallet.getBalance();
-                double newBalance = oldBalance - amount;
-                
-                // Update wallet balance and total spent
-                wallet.setBalance(newBalance);
-                wallet.setTotalSpent(wallet.getTotalSpent() + amount);
-                walletRepository.save(wallet);
-                
-                log.info("Updated wallet: balance {} -> {}, totalSpent {} -> {}", 
-                        oldBalance, newBalance, wallet.getTotalSpent() - amount, wallet.getTotalSpent());
-                
-                // Create wallet transaction record
-                walletService.createWalletTransactionForBooking(wallet, amount, oldBalance, newBalance, booking, payment);
-                
-                log.info("Created wallet transaction for booking {}", booking.getId());
-            } catch (Exception e) {
-                log.error("Error processing wallet payment for booking {}: {}", booking.getId(), e.getMessage(), e);
-                throw e;
-            }
-        }
-
-        // 10. Create BookingSlot records
+        // 9. Create BookingSlot records
         log.info("Creating {} BookingSlot records for booking {}", slots.size(), booking.getId());
         for (Slot slot : slots) {
             // Check for existing booking slot to prevent duplicates
@@ -184,7 +154,7 @@ public class BookingService {
                 log.warn("BookingSlot already exists for bookingId={}, slotId={}", booking.getId(), slot.getId());
                 continue;
             }
-            
+
             BookingSlot bookingSlot = new BookingSlot();
             bookingSlot.setBooking(booking);
             bookingSlot.setSlot(slot);
@@ -195,43 +165,43 @@ public class BookingService {
             bookingSlot.setStatus(statusValue);
             bookingSlotRepository.save(bookingSlot);
             log.info("Created BookingSlot: bookingId={}, slotId={}", booking.getId(), slot.getId());
-            // 11. Update slot availability
+            // 10. Update slot availability
             slot.setAvailable(false);
             slotRepository.save(slot);
         }
 
-        // 12. Generate receipt
+        // 11. Generate receipt
         emailService.sendBookingConfirmation(account.getUser().getEmail(), booking, court, slots.get(0));
 
-        // 13. Add points reward (1 point per RM1 spent)
+        // 11.5. Add points reward (1 point per RM1 spent)
         int pointsEarned = (int) Math.round(amount);
-        
+
         // Store old tier for comparison
         String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
-        
+
         member.setPointBalance(member.getPointBalance() + pointsEarned);
         memberRepository.save(member);
         log.info("Added {} points to member {} for booking {}", pointsEarned, member.getId(), booking.getId());
 
         // Automatic tier upgrade check after booking
         tierService.recalculateMemberTier(member);
-        
+
         // Refresh member data to get updated tier
         member = memberRepository.findByUserId(member.getUser().getId());
         String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
-        
+
         // Log tier upgrade if it occurred
         if (!oldTierName.equals(newTierName)) {
-            log.info("🎉 Automatic tier upgrade after booking: {} -> {} (Points: {} -> {})", 
+            log.info("🎉 Automatic tier upgrade after booking: {} -> {} (Points: {} -> {})",
                     oldTierName, newTierName, member.getPointBalance() - pointsEarned, member.getPointBalance());
         }
 
-        // 14. Create response with updated balance
+        // 12. Create response with updated balance
         BookingResponseDto response = mapToBookingResponse(booking, court, slots.get(0));
         response.setDurationHours(totalDuration);
         response.setWalletBalance(wallet.getBalance());
 
-        // 15. 更新用户统计数据
+        // 13. 更新用户统计数据
         User user = member.getUser();
         if (user != null) {
             List<Booking> userBookings = bookingRepository.findByMemberId(member.getId());
@@ -317,12 +287,12 @@ public class BookingService {
             response.setPaymentMethod("N/A");
             response.setPaymentStatus("N/A");
         }
-        
+
         // Add points information
         int pointsEarned = (int) Math.round(booking.getTotalAmount());
         response.setPointsEarned(pointsEarned);
         response.setCurrentPointBalance(booking.getMember().getPointBalance());
-        
+
         return response;
     }
 
@@ -365,6 +335,9 @@ public class BookingService {
             booking.setStatus(bookingStatus);
             bookingRepository.save(booking);
 
+            // 新增：同步取消 FriendlyMatch
+            friendlyMatchService.cancelReservationAndMatch(bookingId);
+
             // 3. Update booking slot status
             BookingSlot bookingSlot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0) : null;
             if (bookingSlot != null) {
@@ -392,15 +365,9 @@ public class BookingService {
             double refund = booking.getTotalAmount() * 0.5;
             Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
-            
-            double oldBalance = wallet.getBalance();
-            double newBalance = oldBalance + refund;
-            
-            wallet.setBalance(newBalance);
+            wallet.setBalance(wallet.getBalance() + refund);
             walletRepository.save(wallet);
-            
-            // 创建退款交易记录
-            walletService.createWalletTransactionForRefund(wallet, refund, oldBalance, newBalance, booking);
+            // 可选：记录退款流水
 
             // 6. 更新支付状态
             Payment payment = booking.getPayment();
@@ -470,6 +437,17 @@ public class BookingService {
 
     public List<SlotResponseDto> getAvailableSlots(LocalDate date) {
         return slotRepository.findByDateAndIsAvailableTrue(date).stream()
+                .filter(slot -> {
+                    // 檢查是否有課程預約佔用這個時段
+                    LocalDateTime startDateTime = LocalDateTime.of(date, slot.getStartTime());
+                    LocalDateTime endDateTime = LocalDateTime.of(date, slot.getEndTime());
+
+                    // 檢查是否有 type="class" 的 Booking 在這個時段
+                    long classBookings = bookingRepository.countClassBookingsInTimeRange(
+                        slot.getCourtId(), startDateTime, endDateTime);
+
+                    return classBookings == 0; // 只有沒有課程預約的時段才可用
+                })
                 .map(slot -> {
                     SlotResponseDto dto = new SlotResponseDto();
                     dto.setId(slot.getId());
@@ -545,6 +523,9 @@ public class BookingService {
             booking.setStatus(bookingStatus);
             bookingRepository.save(booking);
 
+            // 新增：同步取消 FriendlyMatch
+            friendlyMatchService.cancelReservationAndMatch(booking.getId());
+
             // 3. Update booking slot status
             String slotStatus = "CANCELLED";
             if (slotStatus.length() > 50) {
@@ -553,28 +534,7 @@ public class BookingService {
             bookingSlot.setStatus(slotStatus);
             bookingSlotRepository.save(bookingSlot);
 
-            // 4. Process refund if payment was made via wallet
-            Payment payment = booking.getPayment();
-            if (payment != null && "WALLET".equals(payment.getPaymentMethod()) && "COMPLETED".equals(payment.getStatus())) {
-                double refund = booking.getTotalAmount() * 0.5; // 50% refund
-                Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
-                
-                double oldBalance = wallet.getBalance();
-                double newBalance = oldBalance + refund;
-                
-                wallet.setBalance(newBalance);
-                walletRepository.save(wallet);
-                
-                // Create refund transaction record
-                walletService.createWalletTransactionForRefund(wallet, refund, oldBalance, newBalance, booking);
-                
-                // Update payment status
-                payment.setStatus("REFUNDED");
-                paymentRepository.save(payment);
-            }
-
-            // 5. Update request
+            // 4. Update request
             request.setStatus("APPROVED");
 
             // Get current admin ID

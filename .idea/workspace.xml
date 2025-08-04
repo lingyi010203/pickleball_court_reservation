@@ -4,25 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c3ded6e-9290-4208-bf86-f2c4e1aa2374" name="Changes" comment="CourtAvailabilityPage.jsx ament">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/App.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminDashboard.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/WalletTopUpPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/WalletTopUpPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/WalletTransactionHistory.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/WalletTransactionHistory.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminModerationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminModerationController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminUserController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminUserController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/CourtController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/CourtController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/ReportController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/ReportController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/dto/ProfileDto.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/dto/ProfileDto.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/BookingRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/BookingRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/CourtRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/CourtRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/FeedbackRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/FeedbackRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminUserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminUserService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminUserServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminUserServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/CourtServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/CourtServiceImpl.java" afterDir="false" />
+    <list default="true" id="0c3ded6e-9290-4208-bf86-f2c4e1aa2374" name="Changes" comment="profile">
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtAvailabilityPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtAvailabilityPage.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/RecentBookings.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/RecentBookings.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/RecentInvoices.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/RecentInvoices.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -324,33 +309,10 @@
       <option name="project" value="LOCAL" />
       <updated>1753781450293</updated>
     </task>
-    <task id="LOCAL-00029" summary="CourtAvailabilityPage.jsx ament">
-      <option name="closed" value="true" />
-      <created>1753782491187</created>
-      <option name="number" value="00029" />
-      <option name="presentableId" value="LOCAL-00029" />
-      <option name="project" value="LOCAL" />
-      <updated>1753782491187</updated>
-    </task>
-    <option name="localTasksCounter" value="30" />
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
-    <option name="RECENT_FILTERS">
-      <map>
-        <entry key="Branch">
-          <value>
-            <list>
-              <RecentGroup>
-                <option name="FILTER_VALUES">
-                  <option value="origin/master" />
-                </option>
-              </RecentGroup>
-            </list>
-          </value>
-        </entry>
-      </map>
-    </option>
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
@@ -361,7 +323,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/master" />
+                        <option value="fix-court" />
                       </list>
                     </value>
                   </entry>
@@ -390,8 +352,7 @@
     <MESSAGE value="admin setting, dark mode done" />
     <MESSAGE value="report generation done" />
     <MESSAGE value="profile" />
-    <MESSAGE value="CourtAvailabilityPage.jsx ament" />
-    <option name="LAST_COMMIT_MESSAGE" value="CourtAvailabilityPage.jsx ament" />
+    <option name="LAST_COMMIT_MESSAGE" value="profile" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

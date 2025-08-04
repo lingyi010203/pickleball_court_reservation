@@ -1,5 +1,7 @@
 package com.pickleball_backend.pickleball.security;
 
+import com.pickleball_backend.pickleball.entity.User;
+import com.pickleball_backend.pickleball.repository.UserRepository;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -21,6 +24,8 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
+
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -78,5 +83,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public User getCurrentUser(String username) {
+        return userRepository.findByUserAccount_Username(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 }

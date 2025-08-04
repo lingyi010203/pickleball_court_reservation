@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 import java.util.Map;
@@ -38,15 +39,22 @@ public class MessageService {
     @Autowired
     private EmailService emailService; // Add this if not present
 
+    @Autowired
+    private CoachRepository coachRepository;
+
     @Transactional
     public MessageDto sendMessage(String senderUsername, String recipientUsername, String content, String imageUrl) {
-        User sender = userRepository.findByUsernameCaseInsensitive(senderUsername)
+        User sender = findUserByUsernameOrEmail(senderUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderUsername));
-        User recipient = userRepository.findByUsernameCaseInsensitive(recipientUsername)
+        User recipient = findUserByUsernameOrEmail(recipientUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Receiver not found: " + recipientUsername));
 
-        // Ensure friendship
-        if (!friendshipService.areFriends(sender.getId(), recipient.getId())) {
+        // Check if sender or recipient is a coach - if so, allow messaging without friendship
+        boolean isSenderCoach = coachRepository.findById(sender.getId()).isPresent();
+        boolean isRecipientCoach = coachRepository.findById(recipient.getId()).isPresent();
+        
+        // Allow messaging if either sender or recipient is a coach, or if they are friends
+        if (!isSenderCoach && !isRecipientCoach && !friendshipService.areFriends(sender.getId(), recipient.getId())) {
             throw new SecurityException("You can only message friends");
         }
 
@@ -73,9 +81,9 @@ public class MessageService {
     }
 
     public List<MessageResponseDto> getConversation(String username1, String username2) {
-        User user1 = userRepository.findByUsernameCaseInsensitive(username1)
+        User user1 = findUserByUsernameOrEmail(username1)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + username1));
-        User user2 = userRepository.findByUsernameCaseInsensitive(username2)
+        User user2 = findUserByUsernameOrEmail(username2)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + username2));
 
         int minId = Math.min(user1.getId(), user2.getId());
@@ -133,6 +141,18 @@ public class MessageService {
         } else {
             dto.setReceiverUsername(getSafeUsername(user));
         }
+    }
+
+    // 通過 username 或 email 查找用戶
+    private Optional<User> findUserByUsernameOrEmail(String usernameOrEmail) {
+        // 首先嘗試通過 username 查找
+        Optional<User> userByUsername = userRepository.findByUsernameCaseInsensitive(usernameOrEmail);
+        if (userByUsername.isPresent()) {
+            return userByUsername;
+        }
+        
+        // 如果找不到，嘗試通過 email 查找
+        return userRepository.findByEmail(usernameOrEmail);
     }
 
     // 安全获取用户名的方法
@@ -223,6 +243,9 @@ public class MessageService {
                             .filter(msg -> msg.getReceiver().equals(currentUser) && !msg.isRead())
                             .count();
                     
+                    // Check if other user is a coach
+                    boolean isCoach = coachRepository.findById(otherUser.getId()).isPresent();
+                    
                     return Map.of(
                             "id", conversationId,
                             "lastMessage", Map.of(
@@ -233,7 +256,9 @@ public class MessageService {
                                     "id", otherUser.getId(),
                                     "username", getSafeUsername(otherUser),
                                     "name", otherUser.getName(),
-                                    "profileImage", getSafeProfileImage(otherUser)
+                                    "profileImage", getSafeProfileImage(otherUser),
+                                    "userType", isCoach ? "COACH" : "USER",
+                                    "email", otherUser.getEmail()
                             ),
                             "unreadCount", unreadCount
                     );

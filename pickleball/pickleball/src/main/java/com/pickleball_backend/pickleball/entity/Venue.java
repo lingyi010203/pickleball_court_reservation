@@ -1,6 +1,6 @@
 package com.pickleball_backend.pickleball.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -20,11 +20,14 @@ public class Venue {
 
     private String location;
 
+    @Column(name = "state", length = 100)
+    private String state;
+
     private String description;
 
     private Boolean isArchived = false;
 
     @OneToMany(mappedBy = "venue", cascade = CascadeType.ALL)
-    @JsonIgnoreProperties("venue")
+    @JsonIgnore
     private List<Court> courts = new ArrayList<>();}
 

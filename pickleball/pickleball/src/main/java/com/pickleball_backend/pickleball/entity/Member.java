@@ -1,5 +1,6 @@
 package com.pickleball_backend.pickleball.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,6 +33,7 @@ public class Member {
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"member", "userAccount", "sentMessages", "receivedMessages", "coachSessions"})
     private User user;
 
     @ManyToOne

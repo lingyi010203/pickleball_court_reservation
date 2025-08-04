@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.List;
+import com.pickleball_backend.pickleball.entity.ClassSession;
 
 @Entity
 @Data
@@ -50,6 +53,10 @@ public class Court {
 
     @ManyToOne
     @JoinColumn(name = "venue_id")
-    @JsonIgnoreProperties("courts")  // 防止 venue 再序列化它的 courts
+    @JsonIgnoreProperties("courts")  // 只忽略 courts，讓 venue 的基本信息能傳遞
     private Venue venue;
+
+    @OneToMany(mappedBy = "court", cascade = CascadeType.ALL)
+    @JsonIgnore
+    private List<ClassSession> sessions;
 }

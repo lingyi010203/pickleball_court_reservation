@@ -103,8 +103,8 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
                 "Dear %s,\n\nYou have successfully registered for the event \"%s\".\n\nDate: %s\nLocation: %s\n\nThank you for registering!\n\nPickleball Team",
                 user.getName(),
                 event.getTitle(),
-                event.getStartTime(),
-                event.getLocation()
+                event.getStartTime() != null ? event.getStartTime().toString() : "N/A",
+                event.getVenue() != null ? event.getVenue().getName() : "N/A"
             );
             emailService.sendEmail(userEmail, subject, content);
         }

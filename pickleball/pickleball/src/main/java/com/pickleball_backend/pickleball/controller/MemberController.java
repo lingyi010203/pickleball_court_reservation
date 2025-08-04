@@ -167,7 +167,7 @@ public class MemberController {
     }
 
     @GetMapping("/courts")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'COACH')")
     public ResponseEntity<?> getAllCourtsForMember() {
         try {
             List<Court> courts = courtService.getAllCourts();
@@ -179,7 +179,7 @@ public class MemberController {
     }
 
     @GetMapping("/courts/{id}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'COACH')")
     public ResponseEntity<?> getCourtById(@PathVariable Integer id) {
         try {
             Court court = courtService.getCourtByIdForMember(id);
@@ -193,7 +193,7 @@ public class MemberController {
     }
 
     @GetMapping("/courts/available")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'COACH')")
     public ResponseEntity<?> getAvailableCourts(
             @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam("startTime") String startTime,

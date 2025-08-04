@@ -2,16 +2,23 @@ package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.dto.EventDetailDto;
 import com.pickleball_backend.pickleball.dto.EventFilterDto;
+import com.pickleball_backend.pickleball.dto.EventCreateDto;
+import com.pickleball_backend.pickleball.dto.EventUpdateDto;
 import com.pickleball_backend.pickleball.entity.Event;
 import com.pickleball_backend.pickleball.entity.EventOrganizer;
 import com.pickleball_backend.pickleball.entity.User;
 import com.pickleball_backend.pickleball.entity.UserAccount;
+import com.pickleball_backend.pickleball.entity.Court;
+import com.pickleball_backend.pickleball.entity.Venue;
 import com.pickleball_backend.pickleball.repository.EventOrganizerRepository;
 import com.pickleball_backend.pickleball.repository.EventRepository;
 import com.pickleball_backend.pickleball.repository.EventRegistrationRepository;
 import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.repository.UserRepository;
+import com.pickleball_backend.pickleball.repository.CourtRepository;
+import com.pickleball_backend.pickleball.repository.VenueRepository;
 import com.pickleball_backend.pickleball.service.EmailService;
+import com.pickleball_backend.pickleball.service.VenueService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +33,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Service
 public class EventServiceImpl implements EventService {
@@ -50,8 +60,15 @@ public class EventServiceImpl implements EventService {
     @Autowired
     private EventRegistrationRepository eventRegistrationRepository;
 
+    @Autowired
+    private CourtRepository courtRepository;
+    @Autowired
+    private VenueRepository venueRepository;
+    @Autowired
+    private VenueService venueService;
+
     @Override
-    public Event createEvent(Event event, String organizerUsername) {
+    public Event createEvent(EventCreateDto eventDto, String organizerUsername) {
         UserAccount organizer = userAccountRepository.findByUsername(organizerUsername)
                 .orElseThrow(() -> new RuntimeException("Organizer not found"));
 
@@ -62,84 +79,90 @@ public class EventServiceImpl implements EventService {
         }
 
         // Validate event times
-        if (event.getStartTime() != null && event.getEndTime() != null) {
-            if (event.getStartTime().isAfter(event.getEndTime())) {
+        if (eventDto.getStartTime() != null && eventDto.getEndTime() != null) {
+            if (eventDto.getStartTime().isAfter(eventDto.getEndTime())) {
                 throw new RuntimeException("Start time must be before end time");
             }
-            if (event.getStartTime().isBefore(LocalDateTime.now())) {
+            if (eventDto.getStartTime().isBefore(LocalDateTime.now())) {
                 throw new RuntimeException("Start time cannot be in the past");
             }
         }
 
+        Event event = new Event();
+        event.setTitle(eventDto.getTitle());
+        event.setStartTime(eventDto.getStartTime());
+        event.setEndTime(eventDto.getEndTime());
+        event.setEventType(eventDto.getEventType());
+        event.setStatus(eventDto.getStatus());
+        event.setSchedule(eventDto.getSchedule());
+        event.setFeeAmount(eventDto.getFeeAmount());
         event.setOrganizerId(organizer.getUser().getId());
+        // [全場地自動分配]：當自動分配時，會直接分配所有可用場地給活動，不再根據人數裁剪，也不檢查總容量是否足夠。
+        Set<Court> courts;
+        if ((eventDto.getCourtIds() == null || eventDto.getCourtIds().isEmpty()) && eventDto.getVenueId() != null && eventDto.getCapacity() != null) {
+            // 自動分配 court
+            LocalDate date = eventDto.getStartTime().toLocalDate();
+            LocalTime startTime = eventDto.getStartTime().toLocalTime();
+            LocalTime endTime = eventDto.getEndTime().toLocalTime();
+            int peopleCount = eventDto.getCapacity();
+            List<Court> availableCourts = venueService.getAvailableCourts(eventDto.getVenueId(), date, startTime, endTime, peopleCount);
+            // 直接分配所有可用場地，不再根據人數裁剪，也不再丟出『此場地容量不足』
+            courts = new java.util.HashSet<>(availableCourts);
+        } else if (eventDto.getCourtIds() != null && !eventDto.getCourtIds().isEmpty()) {
+            courts = new java.util.HashSet<>(courtRepository.findAllById(eventDto.getCourtIds()));
+        } else {
+            courts = new java.util.HashSet<>();
+        }
+        event.setCourts(courts);
+        // capacity = courts.size() * 8 (每場8人)
+        if (eventDto.getCapacity() != null) {
+            event.setCapacity(eventDto.getCapacity());
+        } else {
+            event.setCapacity(courts.size() * 8);
+        }
+        // venue
+        if (eventDto.getVenueId() != null) {
+            Venue venue = venueRepository.findById(eventDto.getVenueId()).orElse(null);
+            event.setVenue(venue);
+        }
+        else {
+            event.setVenue(null);
+        }
+        event.setRegisteredCount(0);
         event.setStatus("PUBLISHED");
         Event savedEvent = eventRepository.save(event);
 
         // Notification logic
-        String[] eligibleTiers = event.getEligibility().split(",");
-        log.info("Event eligibility tiers: {}", Arrays.toString(eligibleTiers));
-        
-        // Clean up tier names (remove whitespace and convert to uppercase)
-        List<String> cleanTierNames = Arrays.stream(eligibleTiers)
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .filter(tier -> !tier.isEmpty())
-                .toList();
-        
-        log.info("Cleaned tier names: {}", cleanTierNames);
-        
-        // Find eligible users by membership tier
-        List<User> eligibleUsers = userRepository.findByMembershipTierNameIn(cleanTierNames);
-        log.info("Total eligible users found: {}", eligibleUsers.size());
-        
-        // Fallback: if no users found by membership tier, try userType
-        if (eligibleUsers.isEmpty()) {
-            log.info("No users found by membership tier, trying userType fallback...");
-            eligibleUsers = userRepository.findByUserTypeIn(cleanTierNames);
-            log.info("Fallback: {} users found by userType", eligibleUsers.size());
-        }
-        
+        List<User> allUsers = userRepository.findAll();
         int emailsSent = 0;
         int emailsSkipped = 0;
-        
-        for (User user : eligibleUsers) {
+        for (User user : allUsers) {
             String userEmail = user.getEmail();
-            String userTier = user.getMember() != null && user.getMember().getTier() != null ? 
-                    user.getMember().getTier().getTierName().toString() : "NO_TIER";
-            String userType = user.getUserType();
-            
-            log.info("Processing user: {} | Email: {} | Tier: {} | UserType: {}", 
-                    user.getName(), userEmail, userTier, userType);
-            
             if (userEmail == null || userEmail.trim().isEmpty()) {
-                log.warn("Skipping user {} - no valid email address", user.getName());
                 emailsSkipped++;
                 continue;
             }
-            
             try {
                 emailService.sendEventNotification(userEmail, savedEvent);
                 emailsSent++;
-                log.info("Event notification sent successfully to: {}", userEmail);
             } catch (Exception e) {
-                log.error("Failed to send event notification to {}: {}", userEmail, e.getMessage());
                 emailsSkipped++;
             }
         }
         
         log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                emailsSent, emailsSkipped, eligibleUsers.size());
+                emailsSent, emailsSkipped, allUsers.size());
 
         return savedEvent;
     }
 
     @Override
-    public Event updateEvent(Integer id, Event event, String organizerUsername, boolean notifyParticipants) {
+    public Event updateEvent(Integer id, EventUpdateDto eventDto, String organizerUsername, boolean notifyParticipants) {
         Optional<Event> existingOpt = eventRepository.findById(id);
         if (existingOpt.isEmpty()) {
             throw new RuntimeException("Event not found");
         }
-        Event existing = existingOpt.get();
+        Event event = existingOpt.get();
 
         // Get the organizer's user id
         UserAccount organizerAccount = userAccountRepository.findByUsername(organizerUsername)
@@ -147,30 +170,41 @@ public class EventServiceImpl implements EventService {
         Integer organizerId = organizerAccount.getUser().getId();
 
         // Check if the current user is the organizer of this event
-        if (!existing.getOrganizerId().equals(organizerId)) {
+        if (!event.getOrganizerId().equals(organizerId)) {
             throw new RuntimeException("You are not authorized to edit this event.");
         }
 
         // Validate event times
-        if (event.getStartTime() != null && event.getEndTime() != null) {
-            if (event.getStartTime().isAfter(event.getEndTime())) {
+        if (eventDto.getStartTime() != null && eventDto.getEndTime() != null) {
+            if (eventDto.getStartTime().isAfter(eventDto.getEndTime())) {
                 throw new RuntimeException("Start time must be before end time");
             }
         }
         
         // Update fields as needed
-        existing.setTitle(event.getTitle());
-        existing.setStartTime(event.getStartTime());
-        existing.setEndTime(event.getEndTime());
-        existing.setEventType(event.getEventType());
-        existing.setCapacity(event.getCapacity());
-        existing.setLocation(event.getLocation());
-        existing.setStatus(event.getStatus());
-        existing.setEligibility(event.getEligibility());
-        existing.setSchedule(event.getSchedule());
-        // OrganizerId should not change
+        event.setTitle(eventDto.getTitle());
+        event.setStartTime(eventDto.getStartTime());
+        event.setEndTime(eventDto.getEndTime());
+        event.setEventType(eventDto.getEventType());
+        event.setStatus(eventDto.getStatus());
+        event.setSchedule(eventDto.getSchedule());
+        event.setFeeAmount(eventDto.getFeeAmount());
+        // courts
+        if (eventDto.getCourtIds() != null && !eventDto.getCourtIds().isEmpty()) {
+            Set<Court> courts = new java.util.HashSet<>(courtRepository.findAllById(eventDto.getCourtIds()));
+            event.setCourts(courts);
+            int totalCapacity = courts.size() * 8;
+            event.setCapacity(totalCapacity);
+        }
+        // venue
+        if (eventDto.getVenueId() != null) {
+            Venue venue = venueRepository.findById(eventDto.getVenueId()).orElse(null);
+            event.setVenue(venue);
+        } else {
+            event.setVenue(null);
+        }
         
-        Event updatedEvent = eventRepository.save(existing);
+        Event updatedEvent = eventRepository.save(event);
         
         // Send notifications if requested
         if (notifyParticipants) {
@@ -216,60 +250,24 @@ public class EventServiceImpl implements EventService {
         event.setStatus("PUBLISHED");
         eventRepository.save(event);
 
-        // Notification logic
-        String[] eligibleTiers = event.getEligibility().split(",");
-        log.info("Event eligibility tiers: {}", Arrays.toString(eligibleTiers));
-        
-        // Clean up tier names (remove whitespace and convert to uppercase)
-        List<String> cleanTierNames = Arrays.stream(eligibleTiers)
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .filter(tier -> !tier.isEmpty())
-                .toList();
-        
-        log.info("Cleaned tier names: {}", cleanTierNames);
-        
-        // Find eligible users by membership tier
-        List<User> eligibleUsers = userRepository.findByMembershipTierNameIn(cleanTierNames);
-        log.info("Total eligible users found: {}", eligibleUsers.size());
-        
-        // Fallback: if no users found by membership tier, try userType
-        if (eligibleUsers.isEmpty()) {
-            log.info("No users found by membership tier, trying userType fallback...");
-            eligibleUsers = userRepository.findByUserTypeIn(cleanTierNames);
-            log.info("Fallback: {} users found by userType", eligibleUsers.size());
-        }
-        
+        // 通知所有 user
+        List<User> allUsers = userRepository.findAll();
         int emailsSent = 0;
         int emailsSkipped = 0;
-        
-        for (User user : eligibleUsers) {
+        for (User user : allUsers) {
             String userEmail = user.getEmail();
-            String userTier = user.getMember() != null && user.getMember().getTier() != null ? 
-                    user.getMember().getTier().getTierName().toString() : "NO_TIER";
-            String userType = user.getUserType();
-            
-            log.info("Processing user: {} | Email: {} | Tier: {} | UserType: {}", 
-                    user.getName(), userEmail, userTier, userType);
-            
             if (userEmail == null || userEmail.trim().isEmpty()) {
-                log.warn("Skipping user {} - no valid email address", user.getName());
                 emailsSkipped++;
                 continue;
             }
-            
             try {
                 emailService.sendEventNotification(userEmail, event);
                 emailsSent++;
-                log.info("Event notification sent successfully to: {}", userEmail);
             } catch (Exception e) {
-                log.error("Failed to send event notification to {}: {}", userEmail, e.getMessage());
                 emailsSkipped++;
             }
         }
-        
-        log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                emailsSent, emailsSkipped, eligibleUsers.size());
+        log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", emailsSent, emailsSkipped, allUsers.size());
         return event;
     }
     
@@ -308,59 +306,23 @@ public class EventServiceImpl implements EventService {
      */
     private void sendEventCancellationNotifications(Event event) {
         // Notification logic
-        String[] eligibleTiers = event.getEligibility().split(",");
-        log.info("Event cancellation - eligibility tiers: {}", Arrays.toString(eligibleTiers));
-        
-        // Clean up tier names (remove whitespace and convert to uppercase)
-        List<String> cleanTierNames = Arrays.stream(eligibleTiers)
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .filter(tier -> !tier.isEmpty())
-                .toList();
-        
-        log.info("Event cancellation - cleaned tier names: {}", cleanTierNames);
-        
-        // Find eligible users by membership tier
-        List<User> eligibleUsers = userRepository.findByMembershipTierNameIn(cleanTierNames);
-        log.info("Event cancellation - total eligible users found: {}", eligibleUsers.size());
-        
-        // Fallback: if no users found by membership tier, try userType
-        if (eligibleUsers.isEmpty()) {
-            log.info("Event cancellation - no users found by membership tier, trying userType fallback...");
-            eligibleUsers = userRepository.findByUserTypeIn(cleanTierNames);
-            log.info("Event cancellation - fallback: {} users found by userType", eligibleUsers.size());
-        }
-        
+        List<User> allUsers = userRepository.findAll();
         int emailsSent = 0;
         int emailsSkipped = 0;
-        
-        for (User user : eligibleUsers) {
+        for (User user : allUsers) {
             String userEmail = user.getEmail();
-            String userTier = user.getMember() != null && user.getMember().getTier() != null ? 
-                    user.getMember().getTier().getTierName().toString() : "NO_TIER";
-            String userType = user.getUserType();
-            
-            log.info("Event cancellation - processing user: {} | Email: {} | Tier: {} | UserType: {}", 
-                    user.getName(), userEmail, userTier, userType);
-            
             if (userEmail == null || userEmail.trim().isEmpty()) {
-                log.warn("Event cancellation - skipping user {} - no valid email address", user.getName());
                 emailsSkipped++;
                 continue;
             }
-            
             try {
                 emailService.sendEventCancellationNotification(userEmail, event);
                 emailsSent++;
-                log.info("Event cancellation notification sent successfully to: {}", userEmail);
             } catch (Exception e) {
-                log.error("Failed to send event cancellation notification to {}: {}", userEmail, e.getMessage());
                 emailsSkipped++;
             }
         }
-        
-        log.info("Event cancellation notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                emailsSent, emailsSkipped, eligibleUsers.size());
+        log.info("Event cancellation notification summary - Sent: {}, Skipped: {}, Total processed: {}", emailsSent, emailsSkipped, allUsers.size());
     }
     
     // New methods for browsing events
@@ -378,17 +340,14 @@ public class EventServiceImpl implements EventService {
         // Set default status to PUBLISHED if not specified
         String status = filterDto.getStatus() != null ? filterDto.getStatus() : "PUBLISHED";
         
-        log.info("Browsing events with filters: eventType={}, skillLevel={}, location={}, status={}", 
-                filterDto.getEventType(), filterDto.getSkillLevel(), filterDto.getLocation(), status);
+        log.info("Browsing events with filters: eventType={}, location={}, status={}", 
+                filterDto.getEventType(), filterDto.getLocation(), status);
         
         return eventRepository.findEventsWithFilters(
             filterDto.getEventType(),
-            filterDto.getSkillLevel(),
-            filterDto.getLocation(),
             filterDto.getStartDate(),
             filterDto.getEndDate(),
             status,
-            filterDto.getEligibility(),
             filterDto.getSearchKeyword(),
             pageable
         );
@@ -406,10 +365,11 @@ public class EventServiceImpl implements EventService {
         detailDto.setEndTime(event.getEndTime());
         detailDto.setEventType(event.getEventType());
         detailDto.setCapacity(event.getCapacity());
-        detailDto.setLocation(event.getLocation());
+        detailDto.setVenueId(event.getVenue() != null ? event.getVenue().getId() : null);
+        detailDto.setVenueName(event.getVenue() != null ? event.getVenue().getName() : "N/A");
+        detailDto.setVenueState(event.getVenue() != null ? event.getVenue().getState() : "N/A");
+        detailDto.setVenueLocation(event.getVenue() != null ? event.getVenue().getLocation() : "N/A");
         detailDto.setStatus(event.getStatus());
-        detailDto.setSkillLevel(event.getSkillLevel());
-        detailDto.setEligibility(event.getEligibility());
         detailDto.setSchedule(event.getSchedule());
         detailDto.setFeeAmount(event.getFeeAmount());
         detailDto.setOrganizerId(event.getOrganizerId());
@@ -451,40 +411,19 @@ public class EventServiceImpl implements EventService {
             detailDto.setTimeUntilEvent("Event has passed");
         }
         
-        // Check if user is eligible (based on membership tier)
-        try {
-            UserAccount userAccount = userAccountRepository.findByUsername(username)
-                    .orElse(null);
-            if (userAccount != null) {
-                User user = userAccount.getUser();
-                String userTier = user.getMember() != null && user.getMember().getTier() != null ? 
-                        user.getMember().getTier().getTierName().toString() : "NO_TIER";
-                
-                detailDto.setEligible(event.getEligibility().toUpperCase().contains(userTier));
-            }
-        } catch (Exception e) {
-            log.warn("Could not check eligibility for user {}: {}", username, e.getMessage());
-            detailDto.setEligible(false);
-        }
-        
         return detailDto;
     }
     
     @Override
-    public Page<Event> getUpcomingEvents(String username) {
-        Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "startTime"));
+    public Page<Event> getUpcomingEvents(String username, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startTime"));
         LocalDateTime now = LocalDateTime.now();
-        
-        log.info("Getting upcoming events for user: {}", username);
-        
+        log.info("Getting upcoming events for user: {} page: {} size: {}", username, page, size);
         return eventRepository.findEventsWithFilters(
             null, // eventType
-            null, // skillLevel
-            null, // location
-            now,  // startDate (from now)
+            null, // startDate
             null, // endDate
             "PUBLISHED", // status
-            null, // eligibility
             null, // searchKeyword
             pageable
         );
@@ -498,31 +437,9 @@ public class EventServiceImpl implements EventService {
         
         return eventRepository.findEventsWithFilters(
             eventType, // eventType
-            null, // skillLevel
-            null, // location
             null, // startDate
             null, // endDate
             "PUBLISHED", // status
-            null, // eligibility
-            null, // searchKeyword
-            pageable
-        );
-    }
-    
-    @Override
-    public Page<Event> getEventsBySkillLevel(String skillLevel, String username) {
-        Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "startTime"));
-        
-        log.info("Getting events by skill level: {} for user: {}", skillLevel, username);
-        
-        return eventRepository.findEventsWithFilters(
-            null, // eventType
-            skillLevel, // skillLevel
-            null, // location
-            null, // startDate
-            null, // endDate
-            "PUBLISHED", // status
-            null, // eligibility
             null, // searchKeyword
             pageable
         );

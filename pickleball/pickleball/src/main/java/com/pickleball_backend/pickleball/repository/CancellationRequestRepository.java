@@ -18,4 +18,6 @@ public interface CancellationRequestRepository extends JpaRepository<Cancellatio
     List<CancellationRequest> findByStatusWithRelations(@Param("status") String status);
 
     List<CancellationRequest> findTop3ByOrderByRequestDateDesc();
+
+    List<CancellationRequest> findByBookingId(Integer bookingId);
 }
