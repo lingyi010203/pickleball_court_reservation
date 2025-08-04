@@ -160,38 +160,66 @@ public class CourtController {
             @PathVariable Integer courtId,
             @RequestParam("file") MultipartFile file) {
         try {
+            System.out.println("=== Uploading image for court ID: " + courtId + " ===");
+            System.out.println("File name: " + file.getOriginalFilename());
+            System.out.println("File size: " + file.getSize());
+            
             if (file.isEmpty()) {
+                System.out.println("File is empty!");
                 return ResponseEntity.badRequest().body("File is empty");
             }
+            
             // 保存文件到 uploads 目录
             String uploadsDir = "uploads/";
             Path uploadPath = Paths.get(uploadsDir).toAbsolutePath().normalize();
+            System.out.println("Upload path: " + uploadPath);
+            
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
+                System.out.println("Created uploads directory");
             }
+            
             String originalFilename = file.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String filename = UUID.randomUUID().toString() + extension;
             Path filePath = uploadPath.resolve(filename);
+            System.out.println("File path: " + filePath);
+            
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("File saved to disk successfully");
 
             // 保存到 court_image 表
             CourtImage courtImage = new CourtImage();
             courtImage.setCourtId(courtId);
             courtImage.setImagePath("/uploads/" + filename);
             courtImage.setUploadedAt(LocalDateTime.now());
-            courtImageRepository.save(courtImage);
+            
+            System.out.println("CourtImage object created:");
+            System.out.println("  - Court ID: " + courtImage.getCourtId());
+            System.out.println("  - Image Path: " + courtImage.getImagePath());
+            System.out.println("  - Uploaded At: " + courtImage.getUploadedAt());
+            
+            CourtImage savedImage = courtImageRepository.save(courtImage);
+            System.out.println("Image saved to database with ID: " + savedImage.getId());
 
-            return ResponseEntity.ok().body(courtImage);
+            return ResponseEntity.ok().body(savedImage);
         } catch (Exception e) {
+            System.err.println("Error uploading image: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to upload image: " + e.getMessage());
         }
     }
 
     @GetMapping("/{courtId}/images")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> getCourtImages(@PathVariable Integer courtId) {
+        System.out.println("=== Getting images for court ID: " + courtId + " ===");
         List<CourtImage> images = courtImageRepository.findByCourtId(courtId);
+        System.out.println("Found " + images.size() + " images in database");
+        for (CourtImage image : images) {
+            System.out.println("  - Image ID: " + image.getId() + ", Path: " + image.getImagePath());
+        }
         return ResponseEntity.ok(images);
     }
 

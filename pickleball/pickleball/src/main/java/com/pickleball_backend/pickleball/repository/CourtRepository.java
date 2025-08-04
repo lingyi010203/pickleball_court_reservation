@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface CourtRepository extends JpaRepository<Court, Integer> {
     boolean existsByNameAndLocation(String name, String location);
+    boolean existsByNameAndVenueId(String name, Integer venueId);
     List<Court> findByIsArchivedFalseOrIsArchivedIsNull();
     List<Court> findAll();
     @Query("SELECT c FROM Court c WHERE c.isArchived = false OR c.isArchived IS NULL")

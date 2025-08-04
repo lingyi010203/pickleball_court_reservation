@@ -27,7 +27,8 @@ import {
   PictureAsPdf as PictureAsPdfIcon,
   TableChart as TableChartIcon,
   GridOn as GridOnIcon,
-  FileDownload as FileDownloadIcon
+  FileDownload as FileDownloadIcon,
+  RateReview as FeedbackIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import UserService from '../../service/UserService';
@@ -396,6 +397,7 @@ const AdminDashboard = () => {
     if (path.includes('/admin/courts')) return 'courts';
     if (path.includes('/admin/tiers')) return 'tiers';
     if (path.includes('/admin/bookings')) return 'bookings';
+    if (path.includes('/admin/feedback')) return 'feedback';
     if (path.includes('/admin/settings')) return 'settings';
     return 'dashboard';
   };
@@ -588,6 +590,26 @@ const AdminDashboard = () => {
               <BookingsIcon />
             </ListItemIcon>
             <ListItemText primary="Booking Management" />
+          </ListItem>
+          <ListItem
+            onClick={() => navigate('/admin/feedback')}
+            sx={{
+              borderRadius: 1,
+              mb: 0.5,
+              bgcolor: getCurrentTab() === 'feedback' ? theme.palette.action.hover : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: theme.palette.action.selected
+              }
+            }}
+          >
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab() === 'feedback' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
+              <FeedbackIcon />
+            </ListItemIcon>
+            <ListItemText primary="Feedback Management" />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/settings')}

@@ -182,7 +182,7 @@ const WalletTransactionHistory = () => {
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
           View all your wallet transactions and payment history
-        </Typography>
+      </Typography>
       </Box>
 
       {/* Wallet Summary Cards */}
@@ -332,8 +332,8 @@ const WalletTransactionHistory = () => {
               <HistoryIcon sx={{ fontSize: 24, color: theme.palette.info.main }} />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Recent Transactions ({totalElements} total)
-            </Typography>
+            Recent Transactions ({totalElements} total)
+          </Typography>
           </Box>
 
           {transactions.length === 0 ? (

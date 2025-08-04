@@ -3,6 +3,7 @@ package com.pickleball_backend.pickleball.controller;
 import com.pickleball_backend.pickleball.dto.FeedbackResponseDto;
 import com.pickleball_backend.pickleball.service.AdminModerationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/moderation")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminModerationController {
 
     private final AdminModerationService moderationService;

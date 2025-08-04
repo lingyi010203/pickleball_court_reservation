@@ -41,6 +41,7 @@ import AdminSettings from './components/admin/AdminSettings';
 import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
 import ProfileOverview from './components/profile/ProfileOverview';
 import EditProfileForm from './components/profile/EditProfileForm';
+import AdminModerationDashboard from './components/admin/AdminModerationDashboard';
 
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
@@ -110,6 +111,7 @@ function App() {
           <Route path="tiers" element={<AdminManageTiers />} />
           <Route path="courts" element={<AdminManageCourts />} />
           <Route path="bookings" element={<AdminManageBookings />} />
+          <Route path="feedback" element={<AdminModerationDashboard />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 

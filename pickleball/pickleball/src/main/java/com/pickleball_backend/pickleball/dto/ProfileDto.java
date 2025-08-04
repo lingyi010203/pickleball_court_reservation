@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -31,6 +32,15 @@ public class ProfileDto {
     private boolean pushNotifications;
     private String verificationDocuments;
     private String verificationStatus;
+    
+    // 用户统计数据
+    private Integer totalBookings;
+    private Integer totalFeedback;
+    private Double avgRating;
+    private Integer points;
+    
+    // 用户创建时间
+    private LocalDateTime createdAt;
 
     public ProfileDto(Integer id, String name, String email, String phone) {
         this.id = id;

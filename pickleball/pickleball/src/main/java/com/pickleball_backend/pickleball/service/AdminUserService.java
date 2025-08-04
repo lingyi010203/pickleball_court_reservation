@@ -14,4 +14,9 @@ public interface AdminUserService {
     void deleteUser(Integer userId);
     void updateUserStatusBatch(List<Integer> userIds, String status);
     void updateUserRole(Integer userId, String newRole);
+    
+    // 新增的用户管理方法
+    void warnUser(Integer userId, String message, String reason);
+    void updateUserStatus(Integer userId, String status, String reason);
+    java.util.List<java.util.Map<String, Object>> getUserHistory(String username);
 }

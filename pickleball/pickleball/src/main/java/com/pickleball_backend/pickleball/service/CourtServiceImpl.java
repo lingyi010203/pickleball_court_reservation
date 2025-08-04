@@ -50,8 +50,9 @@ public class CourtServiceImpl implements CourtService {
             Venue venue = venueRepository.findById(courtDto.getVenueId())
                     .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
 
-            if (courtRepository.existsByNameAndLocation(courtDto.getName(), courtDto.getLocation())) {
-                throw new IllegalArgumentException("Court with the same name and location already exists");
+            // 检查在同一场馆内是否有相同名称的场地
+            if (courtRepository.existsByNameAndVenueId(courtDto.getName(), courtDto.getVenueId())) {
+                throw new IllegalArgumentException("Court with the same name already exists in this venue");
             }
 
             Court court = new Court();
@@ -138,12 +139,10 @@ public class CourtServiceImpl implements CourtService {
         Court existingCourt = courtRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Court not found with id: " + id));
 
-        // Check for duplicate name/location only if they're being changed
-        if (!existingCourt.getName().equals(courtDto.getName()) ||
-                !existingCourt.getLocation().equals(courtDto.getLocation())) {
-
-            if (courtRepository.existsByNameAndLocation(courtDto.getName(), courtDto.getLocation())) {
-                throw new IllegalArgumentException("Another court with the same name and location already exists");
+        // Check for duplicate name in the same venue only if name is being changed
+        if (!existingCourt.getName().equals(courtDto.getName())) {
+            if (courtRepository.existsByNameAndVenueId(courtDto.getName(), courtDto.getVenueId())) {
+                throw new IllegalArgumentException("Another court with the same name already exists in this venue");
             }
         }
 
@@ -155,6 +154,13 @@ public class CourtServiceImpl implements CourtService {
             System.out.println("==> saveOrUpdateCourt called, dto=" + courtDto);
             court.setName(courtDto.getName());
             court.setLocation(courtDto.getLocation());
+            
+            // 如果是新建场地，设置场馆
+            if (court.getVenue() == null && courtDto.getVenueId() != null) {
+                Venue venue = venueRepository.findById(courtDto.getVenueId())
+                    .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
+                court.setVenue(venue);
+            }
             court.setStatus(courtDto.getStatus().toUpperCase());
             court.setOpeningTime(courtDto.getOpeningTime());
             court.setClosingTime(courtDto.getClosingTime());

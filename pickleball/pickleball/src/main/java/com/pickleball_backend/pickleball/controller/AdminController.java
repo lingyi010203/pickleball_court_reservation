@@ -3,6 +3,8 @@ package com.pickleball_backend.pickleball.controller;
 import com.pickleball_backend.pickleball.dto.*;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.*;
+import com.pickleball_backend.pickleball.repository.BookingRepository;
+import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import com.pickleball_backend.pickleball.service.AdminService;
 import com.pickleball_backend.pickleball.service.BookingService;
 import com.pickleball_backend.pickleball.service.EmailService;
@@ -20,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
@@ -43,6 +46,8 @@ public class AdminController {
     private final MemberRepository memberRepository;
     private final TierAutoUpgradeService tierAutoUpgradeService;
     private final FileStorageService fileStorageService;
+    private final BookingRepository bookingRepository;
+    private final FeedbackRepository feedbackRepository;
 
     // User Type Change Management
     @GetMapping("/pending-type-changes")
@@ -256,10 +261,22 @@ public class AdminController {
     }
 
     @GetMapping("/user-profile/{username}")
-    public ProfileDto getUserProfile(@PathVariable String username) {
-        User user = userRepository.findByUserAccount_Username(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return convertToProfileDto(user);
+    public ResponseEntity<?> getUserProfile(@PathVariable String username) {
+        try {
+            // 首先尝试通过用户名查找
+            Optional<User> userOpt = userRepository.findByUserAccount_Username(username);
+            
+            // 如果没找到，尝试通过邮箱查找
+            if (userOpt.isEmpty()) {
+                userOpt = userRepository.findByEmail(username);
+            }
+            
+            User user = userOpt.orElseThrow(() -> new RuntimeException("User not found with username/email: " + username));
+            return ResponseEntity.ok(convertToProfileDtoWithStats(user));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "User not found", "message", e.getMessage()));
+        }
     }
 
     @GetMapping("/profile")
@@ -367,7 +384,29 @@ public class AdminController {
         dto.setDob(user.getDob());
         dto.setUserType(user.getUserType());
         dto.setProfileImage(user.getProfileImage()); // Use correct field name
+        dto.setCreatedAt(user.getCreatedAt()); // Set creation date
         // Add more fields as needed
+        return dto;
+    }
+    
+    private ProfileDto convertToProfileDtoWithStats(User user) {
+        ProfileDto dto = convertToProfileDto(user);
+        
+        // 获取用户统计数据
+        Long totalBookings = bookingRepository.countByUserId(user.getId());
+        Long totalFeedback = feedbackRepository.countByUserId(user.getId());
+        Double avgRating = feedbackRepository.findAverageRatingByUserId(user.getId());
+        
+        // 获取用户积分（从Member表）
+        Member member = memberRepository.findByUserId(user.getId());
+        Integer points = member != null ? member.getPointBalance() : 0;
+        
+        // 设置统计数据
+        dto.setTotalBookings(totalBookings != null ? totalBookings.intValue() : 0);
+        dto.setTotalFeedback(totalFeedback != null ? totalFeedback.intValue() : 0);
+        dto.setAvgRating(avgRating != null ? avgRating : 0.0);
+        dto.setPoints(points);
+        
         return dto;
     }
 

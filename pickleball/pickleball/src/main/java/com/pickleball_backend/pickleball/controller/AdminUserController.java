@@ -102,6 +102,42 @@ public class AdminUserController {
         return ResponseEntity.ok().build();
     }
 
+    // 发送警告给用户
+    @PostMapping("/{userId}/warn")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> warnUser(
+            @PathVariable Integer userId,
+            @RequestBody java.util.Map<String, String> request) {
+        
+        String message = request.get("message");
+        String reason = request.get("reason");
+        adminUserService.warnUser(userId, message, reason);
+        return ResponseEntity.ok().build();
+    }
+
+    // 更新用户状态（启用/禁用）
+    @PutMapping("/{userId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> updateUserStatus(
+            @PathVariable Integer userId,
+            @RequestBody java.util.Map<String, String> request) {
+        
+        String status = request.get("status");
+        String reason = request.get("reason");
+        adminUserService.updateUserStatus(userId, status, reason);
+        return ResponseEntity.ok().build();
+    }
+
+    // 获取用户历史记录
+    @GetMapping("/{username}/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getUserHistory(
+            @PathVariable String username) {
+        
+        java.util.List<java.util.Map<String, Object>> history = adminUserService.getUserHistory(username);
+        return ResponseEntity.ok(history);
+    }
+
     // 更新用户角色
     @PutMapping("/{userId}/role")
     @PreAuthorize("hasRole('ADMIN')")

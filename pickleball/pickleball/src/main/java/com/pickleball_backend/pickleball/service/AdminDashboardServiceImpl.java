@@ -1222,11 +1222,27 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                 .collect(Collectors.toList()));
                     }
                 }
-            } catch (Exception e) {
-                System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
-            }
-            
-        return dto;
+                                    } catch (Exception e) {
+                            System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
+                        }
+                        
+                        // 设置取消请求信息
+                        try {
+                            if (booking.getCancellationRequest() != null) {
+                                com.pickleball_backend.pickleball.dto.CancellationRequestDto cancellationDto = 
+                                    new com.pickleball_backend.pickleball.dto.CancellationRequestDto();
+                                cancellationDto.setId(booking.getCancellationRequest().getId());
+                                cancellationDto.setReason(booking.getCancellationRequest().getReason());
+                                cancellationDto.setStatus(booking.getCancellationRequest().getStatus());
+                                cancellationDto.setRequestDate(booking.getCancellationRequest().getRequestDate());
+                                cancellationDto.setAdminRemark(booking.getCancellationRequest().getAdminRemark());
+                                dto.setCancellationRequest(cancellationDto);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Error processing cancellation request for booking " + booking.getId() + ": " + e.getMessage());
+                        }
+                        
+                    return dto;
         } catch (Exception e) {
             System.err.println("Error converting booking to DTO: " + e.getMessage());
             return null;

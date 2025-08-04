@@ -130,12 +130,12 @@ const WalletTopUpPage = () => {
                 mb: 2
               }}
             >
-              Top Up Wallet
-            </Typography>
-            
+            Top Up Wallet
+          </Typography>
+          
             <Typography variant="body1" sx={{ fontSize: '1.1rem', color: theme.palette.text.secondary }}>
-              Add money to your wallet for easy payments
-            </Typography>
+            Add money to your wallet for easy payments
+          </Typography>
           </Box>
 
           {/* Current Balance */}

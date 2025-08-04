@@ -39,4 +39,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Integer> {
     
     // 通过bookingId查找feedback
     List<Feedback> findByBookingIdOrderByCreatedAtDesc(Integer bookingId);
+    
+    // 统计用户的总评价数
+    @Query("SELECT COUNT(f) FROM Feedback f WHERE f.user.id = :userId")
+    Long countByUserId(@Param("userId") Integer userId);
+    
+    // 计算用户的平均评分
+    @Query("SELECT AVG(f.rating) FROM Feedback f WHERE f.user.id = :userId")
+    Double findAverageRatingByUserId(@Param("userId") Integer userId);
 }
