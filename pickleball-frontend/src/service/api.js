@@ -2,11 +2,16 @@ import axios from 'axios';
 import UserService from './UserService';
 
 const api = axios.create({
-  baseURL: '/api'
+  baseURL: 'http://localhost:8081/api'
 });
 
 api.interceptors.request.use(config => {
-  const token = UserService.getToken();
+  // Check if this is an admin route
+  const isAdminRoute = config.url?.startsWith('/admin/');
+  
+  // Use admin token for admin routes, regular token for other routes
+  const token = isAdminRoute ? UserService.getAdminToken() : UserService.getToken();
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -17,8 +22,15 @@ api.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      UserService.logout();
-      window.location.href = '/login';
+      // Check if it's an admin route to determine which logout to call
+      const isAdminRoute = error.config?.url?.startsWith('/admin/');
+      if (isAdminRoute) {
+        UserService.adminLogout();
+        window.location.href = '/admin/login';
+      } else {
+        UserService.logout();
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

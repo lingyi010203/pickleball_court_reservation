@@ -1,5 +1,4 @@
-import axios from 'axios'; // Add this import
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+import api from './api';
 const TOKEN_KEY = 'authToken';
 const USER_ROLE_KEY = 'userRole';
 const USERNAME_KEY = 'username';
@@ -88,27 +87,18 @@ const UserService = {
 
   // Add this new method for fetching redemption history
   getRedeemHistory: async () => {
-    const token = UserService.getToken();
-    const response = await axios.get('http://localhost:8081/api/member/redeem-history', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get('/member/redeem-history');
     return response.data;
   },
 
   getMessages: async (username) => {
-    const token = UserService.getToken();
-    const response = await axios.get(`${API_URL}/api/messages/${username}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get(`/messages/${username}`);
     return response.data;
   },
 
   getConversations: async () => {
-    const token = UserService.getToken();
     // This endpoint needs to be implemented in the backend
-    const response = await axios.get(`${API_URL}/api/chat/conversations`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get('/chat/conversations');
     return response.data;
   },
 
@@ -121,11 +111,9 @@ const UserService = {
 
   // UserService.js
   searchUsers: async (query) => {
-    const token = UserService.getToken();
     try {
-      const response = await axios.get(`${API_URL}/api/users/search`, {
-        params: { query },
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.get('/users/search', {
+        params: { query }
       });
       return response.data;
     } catch (error) {
@@ -137,18 +125,8 @@ const UserService = {
   },
 
   addFriend: async (username) => {
-    const token = UserService.getToken();
     try {
-      const response = await axios.post(
-        `${API_URL}/api/friends/add`,
-        { username },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await api.post('/friends/add', { username });
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message ||
@@ -159,25 +137,16 @@ const UserService = {
   },
 
   getCurrentUser: async () => {
-    const token = UserService.getToken();
-    const response = await axios.get(`${API_URL}/api/profile`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get('/profile');
     return response.data;
   },
 
 sendFriendRequest: async (receiverUsername) => {
-  const token = UserService.getToken();
   const senderUsername = UserService.getUsername();
   try {
-    const response = await axios.post(
-      `${API_URL}/api/users/friend-request`,
-      null,
-      {
-        params: { senderUsername, receiverUsername },
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    );
+    const response = await api.post('/users/friend-request', null, {
+      params: { senderUsername, receiverUsername }
+    });
     return response.data;
   } catch (error) {
     let errorMessage = "Failed to send friend request";
@@ -193,27 +162,17 @@ sendFriendRequest: async (receiverUsername) => {
   }
 },
   acceptFriendRequest: async (senderUsername) => {
-    const token = UserService.getToken();
-    const response = await axios.post(
-      `${API_URL}/api/users/accept-friend`,
-      null,
-      {
-        params: {
-          receiverUsername: UserService.getUsername(),
-          senderUsername
-        },
-        headers: { Authorization: `Bearer ${token}` }
+    const response = await api.post('/users/accept-friend', null, {
+      params: {
+        receiverUsername: UserService.getUsername(),
+        senderUsername
       }
-    );
+    });
     return response.data;
   },
 
     getFriendRequests: async () => {
-      const token = UserService.getToken();
-      const currentUser = await axios.get(
-        `${API_URL}/api/users/me`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const currentUser = await api.get('/users/me');
 
       // Return users who added current user but not accepted yet
       return currentUser.data.friends.filter(friend =>

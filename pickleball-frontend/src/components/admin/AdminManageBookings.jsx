@@ -209,7 +209,20 @@ const AdminManageBookings = () => {
 
   // 处理取消请求（批准或拒绝）
   const handleProcessRequest = async () => {
-    if (!selectedBooking || !selectedBooking.cancellationRequest?.id) return;
+    console.log('Selected booking:', selectedBooking);
+    console.log('Cancellation request:', selectedBooking?.cancellationRequest);
+    console.log('Process action:', processAction);
+    console.log('Admin remark:', adminRemark);
+    
+    if (!selectedBooking || !selectedBooking.cancellationRequest?.id) {
+      console.error('Missing booking or cancellation request ID');
+      setSnackbar({
+        open: true,
+        message: 'Missing cancellation request information',
+        severity: 'error'
+      });
+      return;
+    }
 
     try {
       setLoading(true);

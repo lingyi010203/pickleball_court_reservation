@@ -1,36 +1,4 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:8081/api';
-
-const getAuthToken = () => {
-  return localStorage.getItem('authToken');
-};
-
-// Create a reusable axios instance
-const api = axios.create({
-  baseURL: API_URL,
-  timeout: 10000,
-});
-
-// Add interceptors
-api.interceptors.request.use(config => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login?session_expired=true';
-    }
-    return Promise.reject(error);
-  }
-);
+import api from './api';
 
 export const getAvailableSlots = async (courtId, date) => {
   try {

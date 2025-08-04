@@ -8,39 +8,8 @@
 import axios from 'axios';
 
 
-// Base URL for backend API
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
-
-// Create a reusable Axios instance
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000
-});
-
-// Add request interceptor to include Bearer token automatically
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Add response interceptor to handle global auth errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.warn('401 Unauthorized - clearing token and redirecting to login');
-      localStorage.removeItem('authToken');
-      window.location.href = '/login?session_expired=true';
-    }
-    return Promise.reject(error);
-  }
-);
+// Import the centralized api instance
+import api from './api';
 
 // -----------------------------
 // CourtService Methods
@@ -54,7 +23,7 @@ const CourtService = {
    */
   getAllCourts: async () => {
     try {
-      const response = await api.get('/api/member/courts');
+      const response = await api.get('/member/courts');
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getAllCourts:', error);
@@ -69,7 +38,7 @@ const CourtService = {
    */
   getCourtById: async (id) => {
     try {
-      const response = await api.get(`/api/member/courts/${id}`);
+      const response = await api.get(`/member/courts/${id}`);
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getCourtById:', error);
@@ -83,7 +52,7 @@ const CourtService = {
    */
   getBookedCourts: async () => {
     try {
-      const response = await api.get('/api/member/courts/booked');
+      const response = await api.get('/member/courts/booked');
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getBookedCourts:', error);
@@ -100,7 +69,7 @@ const CourtService = {
    */
   getAvailableCourts: async (date, startTime, endTime) => {
     try {
-      const response = await api.get('/api/member/courts/available', {
+      const response = await api.get('/member/courts/available', {
         params: { date, startTime, endTime }
       });
       return response.data;
@@ -120,9 +89,9 @@ const CourtService = {
 export const uploadCourtImage = async (courtId, file) => {
   const formData = new FormData();
   formData.append('file', file);
-  const token = localStorage.getItem('adminToken');
-  const response = await api.post(`/api/admin/courts/${courtId}/images`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
+  
+  const response = await api.post(`/admin/courts/${courtId}/images`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
   });
   return response.data;
 };
@@ -133,15 +102,12 @@ export const uploadCourtImage = async (courtId, file) => {
  * @returns {Promise<Array>}
  */
 export const getCourtImages = async (courtId) => {
-  const token = localStorage.getItem('adminToken');
-  const response = await api.get(`/api/admin/courts/${courtId}/images`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const response = await api.get(`/admin/courts/${courtId}/images`);
   return response.data;
 };
 
 export const getCourtImagesPublic = async (courtId) => {
-  const response = await api.get(`/api/admin/courts/public/${courtId}/images`);
+  const response = await api.get(`/admin/courts/public/${courtId}/images`);
   return response.data;
 };
 

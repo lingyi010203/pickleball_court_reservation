@@ -15,10 +15,10 @@ import {
   FilterList as FilterIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
-import axios from 'axios';
 import UserService from '../../service/UserService';
 import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
 import { getStatusChip } from './statusConfig';
+import api from '../../service/api';
 
 
 const AdminManageCourts = () => {
@@ -83,18 +83,12 @@ const AdminManageCourts = () => {
 
   // 2. 获取场馆列表
   useEffect(() => {
-    const token = UserService.getAdminToken();
-    axios.get('/api/admin/venues', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(res => setVenues(res.data));
+    api.get('/admin/venues').then(res => setVenues(res.data));
   }, []);
 
   // 3. 新建场馆提交
   const handleAddVenue = async () => {
-    const token = UserService.getAdminToken();
-    const res = await axios.post('/api/admin/venues', newVenue, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await api.post('/admin/venues', newVenue);
     const newVenueObj = { id: res.data, ...newVenue };
     setVenues([...venues, newVenueObj]);
     setSelectedVenueId(res.data);
@@ -153,7 +147,6 @@ const AdminManageCourts = () => {
     
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
       const uniqueDays = Array.from(new Set(daysOfWeek));
       const payload = {
         ...formData,
@@ -167,22 +160,14 @@ const AdminManageCourts = () => {
       if (payload.operatingDays === '') payload.operatingDays = null;
 
       if (currentCourt) {
-        await axios.put(
-          `http://localhost:8081/api/admin/courts/${currentCourt.id}`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.put(`/admin/courts/${currentCourt.id}`, payload);
         setSnackbar({
           open: true,
           message: 'Court updated successfully!',
           severity: 'success'
         });
       } else {
-        await axios.post(
-          'http://localhost:8081/api/admin/courts',
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await api.post('/admin/courts', payload);
         setSnackbar({
           open: true,
           message: 'Court created successfully!',
@@ -213,11 +198,7 @@ const AdminManageCourts = () => {
   const handleDelete = async (courtId) => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
-      await axios.delete(
-        `http://localhost:8081/api/admin/courts/${courtId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.delete(`/admin/courts/${courtId}`);
       setSnackbar({
         open: true,
         message: 'Court deleted successfully!',
@@ -283,12 +264,7 @@ const AdminManageCourts = () => {
   const handleBatchDelete = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
-      await axios.post(
-        'http://localhost:8081/api/admin/courts/batch-delete',
-        { courtIds: selectedCourts },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post('/admin/courts/batch-delete', { courtIds: selectedCourts });
       
       setSnackbar({
         open: true,
@@ -315,11 +291,7 @@ const AdminManageCourts = () => {
   const fetchCourts = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
-      const response = await axios.get(
-        'http://localhost:8081/api/admin/courts',
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.get('/admin/courts');
       setCourts(response.data);
       setTotalCourts(response.data.length);
     } catch (err) {
@@ -440,24 +412,41 @@ const AdminManageCourts = () => {
 
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
+    console.log('Selected files:', files);
+    console.log('Current court:', currentCourt);
+    
     if (!currentCourt || !currentCourt.id) {
       alert('请先保存球场基本信息，再上传图片');
       return;
     }
+    
+    console.log('Uploading images for court ID:', currentCourt.id);
+    
     for (let file of files) {
       try {
-        await uploadCourtImage(currentCourt.id, file);
+        console.log('Uploading file:', file.name, 'Size:', file.size);
+        const result = await uploadCourtImage(currentCourt.id, file);
+        console.log('Upload result:', result);
       } catch (err) {
+        console.error('Upload error:', err);
         alert('图片上传失败: ' + err.message);
       }
     }
+    
     // 上传后刷新图片
+    console.log('Refreshing images for court ID:', currentCourt.id);
     fetchCourtImages(currentCourt.id);
   };
 
   const fetchCourtImages = async (courtId) => {
-    const images = await getCourtImages(courtId);
-    setCourtImages(images);
+    try {
+      console.log('Fetching images for court ID:', courtId);
+      const images = await getCourtImages(courtId);
+      console.log('Fetched images:', images);
+      setCourtImages(images);
+    } catch (err) {
+      console.error('Error fetching images:', err);
+    }
   };
 
   if (loading && !courts.length) {

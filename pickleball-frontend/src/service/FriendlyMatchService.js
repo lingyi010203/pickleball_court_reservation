@@ -2,7 +2,7 @@ import api from './api';
 
 // Get all open matches
 export async function getOpenMatches() {
-  const res = await api.get('/api/friendly-matches/open');
+  const res = await api.get('/friendly-matches/open');
   return res.data;
 }
 

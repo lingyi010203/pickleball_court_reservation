@@ -1,23 +1,11 @@
-import axios from 'axios';
 import UserService from './UserService';
-
-const API_BASE_URL = 'http://localhost:8081/api/member';
-const ADMIN_API_BASE_URL = 'http://localhost:8081/api/admin/dashboard';
+import api from './api';
 
 const BookingService = {
   bookCourt: async (bookingRequest) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await axios.post(`${API_BASE_URL}/bookings`, bookingRequest, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      // Return the actual data from the response
+      const response = await api.post('/member/bookings', bookingRequest);
       return response.data;
-      
     } catch (error) {
       let errorMessage = 'Network error. Please try again.';
       
@@ -40,13 +28,7 @@ const BookingService = {
 
   getAllAdminBookings: async (params = {}) => {
     try {
-      const token = UserService.getAdminToken ? UserService.getAdminToken() : localStorage.getItem('adminToken');
-      const response = await axios.get(`${ADMIN_API_BASE_URL}/bookings`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        params // 关键：把排序、分页等参数传递给后端
-      });
+      const response = await api.get('/admin/dashboard/bookings', { params });
       return response.data;
     } catch (error) {
       let errorMessage = 'Failed to fetch admin bookings.';
@@ -59,17 +41,11 @@ const BookingService = {
 
   cancelBooking: async (bookingId, adminRemark) => {
     try {
-      const token = UserService.getAdminToken ? UserService.getAdminToken() : localStorage.getItem('adminToken');
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      };
       let response;
       if (adminRemark !== undefined) {
-        response = await axios.put(`${ADMIN_API_BASE_URL}/bookings/${bookingId}/cancel`, { adminRemark }, config);
+        response = await api.put(`/admin/dashboard/bookings/${bookingId}/cancel`, { adminRemark });
       } else {
-        response = await axios.put(`${ADMIN_API_BASE_URL}/bookings/${bookingId}/cancel`, null, config);
+        response = await api.put(`/admin/dashboard/bookings/${bookingId}/cancel`, null);
       }
       return response.data;
     } catch (error) {
@@ -83,16 +59,13 @@ const BookingService = {
 
   processCancelRequest: async (cancellationRequestId, action, adminRemark) => {
     try {
-      const token = UserService.getAdminToken ? UserService.getAdminToken() : localStorage.getItem('adminToken');
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      };
-      const url = `/api/admin/cancellation-requests/${cancellationRequestId}/${action}`; // 修正为实际后端路由
-      const response = await axios.put(url, { adminRemark }, config);
+      const url = `/admin/cancellation-requests/${cancellationRequestId}/${action}`;
+      console.log('Processing cancellation request:', { cancellationRequestId, action, adminRemark, url });
+      const response = await api.put(url, { adminRemark });
+      console.log('Cancellation request response:', response.data);
       return response.data;
     } catch (error) {
+      console.error('Cancellation request error:', error);
       let errorMessage = 'Failed to process cancellation request.';
       if (error.response) {
         errorMessage = error.response.data.message || errorMessage;
