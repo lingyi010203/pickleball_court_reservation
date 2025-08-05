@@ -45,7 +45,7 @@ public class TierAutoUpgradeService {
                     if (!oldTierName.equals(newTierName)) {
                         upgradedCount++;
                         log.info("🎉 Auto-upgraded member {}: {} -> {} (Points: {})", 
-                                member.getUser().getEmail(), oldTierName, newTierName, member.getPointBalance());
+                                member.getUser().getEmail(), oldTierName, newTierName, member.getTierPointBalance());
                     }
                 } catch (Exception e) {
                     log.error("Error upgrading tier for member {}: {}", 
@@ -88,11 +88,11 @@ public class TierAutoUpgradeService {
             
             if (!oldTierName.equals(newTierName)) {
                 log.info("🎉 Manually upgraded member {}: {} -> {} (Points: {})", 
-                        member.getUser().getEmail(), oldTierName, newTierName, member.getPointBalance());
+                        member.getUser().getEmail(), oldTierName, newTierName, member.getTierPointBalance());
                 return true;
             } else {
                 log.info("ℹ️ No upgrade needed for member {}: {} (Points: {})", 
-                        member.getUser().getEmail(), newTierName, member.getPointBalance());
+                        member.getUser().getEmail(), newTierName, member.getTierPointBalance());
                 return false;
             }
             

@@ -6,6 +6,7 @@ import {
 import { ConfirmationNumber as VoucherIcon } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
+import { formatVoucherExpiryDate } from '../../utils/dateUtils';
 
 const RedeemVoucherPage = ({ onSuccess, onError }) => {
   const theme = useTheme();
@@ -37,6 +38,11 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
       name: 'Platinum',
       gradient: 'linear-gradient(135deg, #f0f0f0, #e5e4e2)',
       light: '#fafafa'
+    },
+    VIP: {
+      name: 'VIP',
+      gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+      light: '#fff6f0'
     }
   };
 
@@ -47,14 +53,44 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
         const token = UserService.getToken();
         if (!token) return;
 
-        const dashboardResponse = await axios.get('http://localhost:8081/api/member/dashboard', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // Fetch dashboard data and user's redemption history in parallel
+        const [dashboardResponse, redemptionHistoryResponse] = await Promise.all([
+          axios.get('http://localhost:8081/api/member/dashboard', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
 
         setDashboardData(dashboardResponse.data);
         
+        // Debug: 檢查後端返回的原始數據
+        console.log('=== Frontend Debug: Backend Response ===');
+        console.log('Dashboard data:', dashboardResponse.data);
+        console.log('Redeemable vouchers:', dashboardResponse.data.redeemableVouchers);
+        console.log('User redemption history:', redemptionHistoryResponse.data);
+        
+        // Create a set of voucher codes that user has already redeemed
+        // Only for 0-point vouchers (which can only be redeemed once)
+        const redeemedZeroPointVoucherCodes = new Set(
+          redemptionHistoryResponse.data
+            .filter(redemption => {
+              // Find the corresponding voucher to check its points
+              const voucher = dashboardResponse.data.redeemableVouchers.find(v => v.code === redemption.voucherCode?.split('-')[0]);
+              return voucher && voucher.requestPoints === 0;
+            })
+            .map(redemption => redemption.voucherCode?.split('-')[0])
+        );
+        
+        console.log('Redeemed 0-point voucher codes:', Array.from(redeemedZeroPointVoucherCodes));
+        
         // Map backend vouchers to frontend format
         const backendVouchers = dashboardResponse.data.redeemableVouchers.map(voucher => {
+          // Debug: 檢查每個voucher的原始數據
+          console.log('Processing voucher:', voucher);
+          console.log('Voucher expiry date:', voucher.expiryDate, 'Type:', typeof voucher.expiryDate);
+          
           // Handle different discount types
           let title, discount;
           if (voucher.discountType === 'percentage') {
@@ -65,7 +101,11 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
             discount = `RM${voucher.discountValue} OFF`;
           }
           
-          return {
+          // Check if user has already redeemed this voucher
+          // Only mark as redeemed if it's a 0-point voucher that has been redeemed
+          const isRedeemed = voucher.requestPoints === 0 && redeemedZeroPointVoucherCodes.has(voucher.code);
+          
+          const mappedVoucher = {
             id: voucher.id,
             title: title,
             description: "Special offer for members",
@@ -73,8 +113,17 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
             expiry: voucher.expiryDate,
             points: voucher.requestPoints,
             discountValue: voucher.discountValue,  // Changed from discountAmount
-            discountType: voucher.discountType
+            discountType: voucher.discountType,
+            tierName: voucher.tierName,  // Add tier name
+            isRedeemed: isRedeemed  // Add redemption status
           };
+          
+          // Debug: 檢查映射後的voucher
+          console.log('Mapped voucher:', mappedVoucher);
+          console.log('Mapped expiry:', mappedVoucher.expiry, 'Type:', typeof mappedVoucher.expiry);
+          console.log('Is redeemed:', isRedeemed);
+          
+          return mappedVoucher;
         });
         
         setVouchers(backendVouchers);
@@ -91,6 +140,12 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
   }, []);
 
   const handleRedeemVoucher = async (voucher) => {
+    // Prevent redeeming if it's a 0-point voucher that has already been redeemed
+    if (voucher.points === 0 && voucher.isRedeemed) {
+      setError('This voucher has already been redeemed');
+      return;
+    }
+
     setRedeemingId(voucher.id);
     setError('');
     setSuccess('');
@@ -110,10 +165,27 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
         setSuccess(successMsg);
         if (onSuccess) onSuccess(successMsg);
         
-        // Refresh voucher data
-        const dashboardResponse = await axios.get('http://localhost:8081/api/member/dashboard', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // Refresh voucher data with redemption history
+        const [dashboardResponse, redemptionHistoryResponse] = await Promise.all([
+          axios.get('http://localhost:8081/api/member/dashboard', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+        
+        // Create a set of voucher codes that user has already redeemed
+        // Only for 0-point vouchers (which can only be redeemed once)
+        const redeemedZeroPointVoucherCodes = new Set(
+          redemptionHistoryResponse.data
+            .filter(redemption => {
+              // Find the corresponding voucher to check its points
+              const voucher = dashboardResponse.data.redeemableVouchers.find(v => v.code === redemption.voucherCode?.split('-')[0]);
+              return voucher && voucher.requestPoints === 0;
+            })
+            .map(redemption => redemption.voucherCode?.split('-')[0])
+        );
         
         const updatedVouchers = dashboardResponse.data.redeemableVouchers.map(v => {
           let title, discount;
@@ -124,6 +196,11 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
             title = `RM${v.discountValue} Discount`;
             discount = `RM${v.discountValue} OFF`;
           }
+          
+          // Check if user has already redeemed this voucher
+          // Only mark as redeemed if it's a 0-point voucher that has been redeemed
+          const isRedeemed = v.requestPoints === 0 && redeemedZeroPointVoucherCodes.has(v.code);
+          
           return {
             id: v.id,
             title: title,
@@ -132,7 +209,9 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
             expiry: v.expiryDate,
             points: v.requestPoints,
             discountValue: v.discountValue,
-            discountType: v.discountType
+            discountType: v.discountType,
+            tierName: v.tierName,
+            isRedeemed: isRedeemed
           };
         });
         
@@ -165,7 +244,8 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
   // Use tier from dashboard if available
   const memberTier = dashboardData?.tierName || 'GOLD';
   const currentTier = tierConfig[memberTier.toUpperCase()] || tierConfig.GOLD;
-  const currentPoints = dashboardData?.pointBalance || 0;
+  const tierPoints = dashboardData?.tierPointBalance || 0;
+  const rewardPoints = dashboardData?.rewardPointBalance || 0;
 
   return (
     <Box>
@@ -199,16 +279,21 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
             <Typography variant="body1" sx={{ mb: 2 }}>
               {dashboardData?.benefits || "Premium benefits for loyal members"}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Chip 
-                label={`${currentPoints} Points`} 
-                color="primary"
-                sx={{ fontWeight: 'bold', mr: 2 }}
-              />
-              <Typography variant="body2">
-                Available for redemption
-              </Typography>
-            </Box>
+                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+               <Chip 
+                 label={`${tierPoints} Tier Points`} 
+                 color="primary"
+                 sx={{ fontWeight: 'bold' }}
+               />
+               <Chip 
+                 label={`${rewardPoints} Reward Points`} 
+                 color="secondary"
+                 sx={{ fontWeight: 'bold' }}
+               />
+               <Typography variant="body2">
+                 Tier points for upgrades, Reward points for vouchers
+               </Typography>
+             </Box>
           </Grid>
           <Grid item xs={12} md={4} sx={{ textAlign: 'right' }}>
             <Box sx={{
@@ -236,11 +321,20 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
       ) : (
         <Grid container spacing={3}>
           {vouchers.map((voucher, index) => {
-            const backgroundColor = voucher.discountValue > 30 
-              ? '#e8f5e8' 
-              : voucher.discountValue > 15 
-                ? '#fff3e0' 
-                : '#f3e5f5';
+            let backgroundColor;
+            if (voucher.discountType === 'percentage') {
+              backgroundColor = voucher.discountValue > 30 
+                ? '#e8f5e8' 
+                : voucher.discountValue > 15 
+                  ? '#fff3e0' 
+                  : '#f3e5f5';
+            } else {
+              backgroundColor = voucher.discountValue > 50 
+                ? '#e8f5e8' 
+                : voucher.discountValue > 20 
+                  ? '#fff3e0' 
+                  : '#f3e5f5';
+            }
             
             return (
               <Grid item xs={12} sm={6} md={4} key={voucher.id}>
@@ -282,13 +376,13 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
                         left: 10,
                         lineHeight: 1
                       }}>
-                        {voucher.discountValue}%
+                        {voucher.discountType === 'percentage' ? `${voucher.discountValue}%` : `RM${voucher.discountValue}`}
                       </Typography>
                       <Typography variant="h2" fontWeight="bold" color="primary.main">
-                        {voucher.discountValue}%
+                        {voucher.discountType === 'percentage' ? `${voucher.discountValue}%` : `RM${voucher.discountValue}`}
                       </Typography>
                       <Chip 
-                        label="DISCOUNT"
+                        label={voucher.discountType === 'percentage' ? 'DISCOUNT' : 'VOUCHER'}
                         size="small"
                         sx={{ 
                           position: 'absolute',
@@ -311,9 +405,38 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
                         background: alpha(theme.palette.primary.light, 0.2),
                         zIndex: -1
                       }} />
-                      <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
-                        {voucher.title}
-                      </Typography>
+                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                         <Typography variant="h5" fontWeight="bold">
+                           {voucher.title}
+                         </Typography>
+                         <Box sx={{ display: 'flex', gap: 1 }}>
+                           <Chip 
+                             label={voucher.tierName || 'GENERAL'} 
+                             size="small"
+                             sx={{ 
+                               bgcolor: voucher.tierName && voucher.tierName !== 'GENERAL' 
+                                 ? alpha(theme.palette.primary.light, 0.2)
+                                 : alpha(theme.palette.success.light, 0.2),
+                               color: voucher.tierName && voucher.tierName !== 'GENERAL'
+                                 ? 'primary.dark'
+                                 : 'success.dark',
+                               fontWeight: 'bold',
+                               fontSize: '0.7rem'
+                             }}
+                           />
+                           {voucher.isRedeemed && (
+                             <Chip 
+                               label="REDEEMED" 
+                               size="small"
+                               color="warning"
+                               sx={{ 
+                                 fontWeight: 'bold',
+                                 fontSize: '0.7rem'
+                               }}
+                             />
+                           )}
+                         </Box>
+                       </Box>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {voucher.description}
                       </Typography>
@@ -331,7 +454,7 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
                             Expires
                           </Typography>
                           <Typography variant="body2" fontWeight="medium">
-                            {new Date(voucher.expiry).toLocaleDateString()}
+                            {formatVoucherExpiryDate(voucher.expiry)}
                           </Typography>
                         </Box>
                         <Chip 
@@ -344,31 +467,39 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
                           }}
                         />
                       </Box>
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        startIcon={<VoucherIcon />}
-                        onClick={() => handleRedeemVoucher(voucher)}
-                        disabled={redeemingId === voucher.id}
-                        sx={{ 
-                          borderRadius: 3,
-                          py: 1.5,
-                          fontWeight: 'bold',
-                          background: 'linear-gradient(45deg, #8e44ad, #732d91)',
-                          boxShadow: '0 4px 12px rgba(142, 68, 173, 0.3)',
-                          '&:hover': {
-                            boxShadow: '0 6px 16px rgba(142, 68, 173, 0.4)'
-                          }
-                        }}
-                      >
-                        {redeemingId === voucher.id ? (
-                          <CircularProgress size={24} color="inherit" />
-                        ) : currentPoints >= voucher.points ? (
-                          'Redeem Now'
-                        ) : (
-                          'Not enough points'
-                        )}
-                      </Button>
+                                             <Button
+                         fullWidth
+                         variant="contained"
+                         startIcon={<VoucherIcon />}
+                         onClick={() => handleRedeemVoucher(voucher)}
+                         disabled={redeemingId === voucher.id || voucher.isRedeemed}
+                         sx={{ 
+                           borderRadius: 3,
+                           py: 1.5,
+                           fontWeight: 'bold',
+                           background: voucher.isRedeemed 
+                             ? 'linear-gradient(45deg, #9e9e9e, #757575)'
+                             : 'linear-gradient(45deg, #8e44ad, #732d91)',
+                           boxShadow: voucher.isRedeemed 
+                             ? '0 4px 12px rgba(158, 158, 158, 0.3)'
+                             : '0 4px 12px rgba(142, 68, 173, 0.3)',
+                           '&:hover': {
+                             boxShadow: voucher.isRedeemed 
+                               ? '0 4px 12px rgba(158, 158, 158, 0.3)'
+                               : '0 6px 16px rgba(142, 68, 173, 0.4)'
+                           }
+                         }}
+                       >
+                         {redeemingId === voucher.id ? (
+                           <CircularProgress size={24} color="inherit" />
+                         ) : voucher.isRedeemed ? (
+                           'Already Redeemed'
+                         ) : rewardPoints >= voucher.points ? (
+                           'Redeem Now'
+                         ) : (
+                           'Not enough reward points'
+                         )}
+                       </Button>
                     </CardContent>
                   </Card>
                 </Grow>

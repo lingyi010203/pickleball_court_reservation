@@ -37,10 +37,9 @@ public class EventController {
     public ResponseEntity<Event> updateEvent(
             @PathVariable Integer id,
             @Valid @RequestBody EventUpdateDto eventDto,
-            @RequestParam(defaultValue = "false") boolean notifyParticipants,
             Principal principal) {
         String username = principal.getName();
-        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username, notifyParticipants));
+        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username));
     }
 
     /**
@@ -55,7 +54,7 @@ public class EventController {
             @Valid @RequestBody EventUpdateDto eventDto,
             Principal principal) {
         String username = principal.getName();
-        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username, true));
+        return ResponseEntity.ok(eventService.updateEvent(id, eventDto, username));
     }
 
     @DeleteMapping("/{id}")

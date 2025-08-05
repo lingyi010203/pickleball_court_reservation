@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.dto.AdminBookingDto;
 import com.pickleball_backend.pickleball.dto.AdminUserDto;
+import com.pickleball_backend.pickleball.dto.CancellationRequestDto;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.BookingRepository;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
@@ -1130,7 +1131,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
         Member member = user.getMember();
         if (member != null) {
-            dto.setPointBalance(member.getPointBalance());
+            dto.setPointBalance(member.getTierPointBalance());
             if (member.getTier() != null) {
                 // 修复这里：直接使用 tierName 字符串值，不需要 .name()
                 dto.setTier(member.getTier().getTierName()); // 移除了 .name()
@@ -1218,12 +1219,29 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     }
                                     
                                     return slotDto;
-                                })
-                                .collect(Collectors.toList()));
+                                                        })
+                        .collect(Collectors.toList()));
                     }
                 }
             } catch (Exception e) {
                 System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
+            }
+
+            // 設置取消請求信息
+            try {
+                List<CancellationRequest> cancellationRequests = cancellationRequestRepository.findByBookingId(booking.getId());
+                if (!cancellationRequests.isEmpty()) {
+                    CancellationRequest cancellationRequest = cancellationRequests.get(0); // 取第一個
+                    CancellationRequestDto cancellationRequestDto = new CancellationRequestDto();
+                    cancellationRequestDto.setId(cancellationRequest.getId());
+                    cancellationRequestDto.setStatus(cancellationRequest.getStatus());
+                    cancellationRequestDto.setReason(cancellationRequest.getReason());
+                    cancellationRequestDto.setRequestDate(cancellationRequest.getRequestDate());
+                    cancellationRequestDto.setAdminRemark(cancellationRequest.getAdminRemark());
+                    dto.setCancellationRequest(cancellationRequestDto);
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting cancellation request for booking " + booking.getId() + ": " + e.getMessage());
             }
             
         return dto;

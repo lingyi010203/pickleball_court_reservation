@@ -292,8 +292,8 @@ public class CourtServiceImpl implements CourtService {
     }
 
     private void addCompensationPoints(Member member) {
-        int currentPoints = member.getPointBalance();
-        member.setPointBalance(currentPoints + 200); // 添加200積分作為補償
+        int currentPoints = member.getTierPointBalance();
+        member.setTierPointBalance(currentPoints + 200); // 添加200積分作為補償
         memberRepository.save(member);
         log.info("Added 200 compensation points to member ID: {}", member.getId());
     }

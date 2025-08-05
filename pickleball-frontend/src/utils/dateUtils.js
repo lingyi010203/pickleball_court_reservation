@@ -56,12 +56,96 @@ export const formatDateFromHTMLInput = (dateString) => {
 };
 
 /**
- * 检查日期是否有效
- * @param {string} dateString - 日期字符串
- * @returns {boolean} 是否为有效日期
+ * 檢查日期是否有效
+ * @param {string|Date} date - 日期
+ * @returns {boolean} 是否有效
  */
-export const isValidDate = (dateString) => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+export const isValidDate = (date) => {
+  if (!date) return false;
+  
+  try {
+    const d = new Date(date);
+    return !isNaN(d.getTime());
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * 檢查日期是否過期
+ * @param {string|Date} date - 日期
+ * @returns {boolean} 是否過期
+ */
+export const isExpired = (date) => {
+  if (!date) return false;
+  
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return false;
+    
+    return d < new Date();
+  } catch (error) {
+    return false;
+  }
+};
+
+// 日期處理工具函數
+
+/**
+ * 格式化voucher過期日期
+ * @param {string|Date|null} expiryDate - 過期日期
+ * @returns {string} 格式化後的日期字符串
+ */
+export const formatVoucherExpiryDate = (expiryDate) => {
+  if (!expiryDate) {
+    return 'No expiry';
+  }
+
+  try {
+    // 如果是字符串，嘗試解析
+    let date;
+    if (typeof expiryDate === 'string') {
+      // 處理不同的日期格式
+      if (expiryDate.includes('-')) {
+        // 標準日期格式 yyyy-MM-dd 或 dd-MM-yyyy
+        const parts = expiryDate.split('-');
+        if (parts.length === 3) {
+          if (parts[0].length === 4) {
+            // yyyy-MM-dd 格式
+            date = new Date(expiryDate);
+          } else {
+            // dd-MM-yyyy 格式，轉換為 yyyy-MM-dd
+            date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          }
+        } else {
+          date = new Date(expiryDate);
+        }
+      } else {
+        date = new Date(expiryDate);
+      }
+    } else {
+      date = new Date(expiryDate);
+    }
+
+    // 檢查日期是否有效
+    if (isNaN(date.getTime())) {
+      return 'No expiry';
+    }
+
+    // 檢查是否為1970-01-01（默認日期）
+    if (date.getFullYear() === 1970 && date.getMonth() === 0 && date.getDate() === 1) {
+      return 'No expiry';
+    }
+
+    // 格式化日期
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'No expiry';
+  }
 }; 

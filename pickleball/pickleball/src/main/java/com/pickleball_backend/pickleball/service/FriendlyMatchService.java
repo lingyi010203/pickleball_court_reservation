@@ -431,7 +431,8 @@ public class FriendlyMatchService {
     @Transactional
     public void cleanupExpiredReservationsAndMatches() {
         // 清理過期 booking
-        List<Booking> expiredBookings = bookingRepository.findAllExpired(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        List<Booking> expiredBookings = bookingRepository.findAllExpired(now.toLocalDate(), now.toLocalTime());
         for (Booking b : expiredBookings) {
             // 删除相关的feedback记录
             List<Feedback> relatedFeedbacks = feedbackRepository.findByBookingIdOrderByCreatedAtDesc(b.getId());
@@ -584,11 +585,7 @@ public class FriendlyMatchService {
         for (CancellationRequest req : requests) {
             cancellationRequestRepository.delete(req);
         }
-        // 再删除 booking
-        Booking booking = bookingRepository.findById(bookingId).orElse(null);
-        if (booking != null) {
-            bookingRepository.delete(booking);
-        }
+        // 注意：不删除 booking，因为 booking 的取消由 BookingService 处理
     }
 
     // 查詢所有 invitation 型的 OPEN match

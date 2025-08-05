@@ -9,10 +9,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public interface ClassSessionService {
     ClassSession createClassSession(ClassSessionDto sessionDto, com.pickleball_backend.pickleball.entity.User coach) throws ConflictException, ResourceNotFoundException;
     ClassSession updateClassSession(Integer sessionId, ClassSessionDto sessionDto) throws ResourceNotFoundException, ConflictException;
+    
+    // 新增：部分更新課程（只更新特定字段）
+    ClassSession partialUpdateClassSession(Integer sessionId, Map<String, Object> updates) throws ResourceNotFoundException, ConflictException;
     void cancelClassSession(Integer sessionId, boolean force, String reason) throws ResourceNotFoundException, ConflictException;
     List<ClassSession> getCoachSchedule(Integer coachId, LocalDateTime start, LocalDateTime end);
     boolean registerUserForSession(Integer sessionId, Integer userId) throws ConflictException, ResourceNotFoundException;
@@ -27,7 +31,7 @@ public interface ClassSessionService {
     boolean hasCourtConflict(Integer courtId, java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     // Multi-session registration
-    boolean registerUserForMultipleSessions(Integer userId, List<Integer> sessionIds, String paymentMethod) throws ConflictException, ResourceNotFoundException;
+    Map<String, Object> registerUserForMultipleSessions(Integer userId, List<Integer> sessionIds, String paymentMethod, Integer numPaddles, Boolean buyBallSet) throws ConflictException, ResourceNotFoundException;
 
     // 批量查詢課程詳情
     List<ClassSession> getSessionsByIds(List<Integer> sessionIds);

@@ -107,6 +107,10 @@ public class ClassSession {
     @Column(name = "replacement_for_session_id")
     private Integer replacementForSessionId;
 
+    // 新增：是否允許補課
+    @Column(name = "allow_replacement")
+    private Boolean allowReplacement = false;
+
     @Column(name = "revenue_distributed")
     private Boolean revenueDistributed = false; // 收入是否已分配
 

@@ -1,11 +1,13 @@
 package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+@Getter
+@Setter
 @Table(name = "wallet")
 public class Wallet {
     @Id

@@ -38,6 +38,8 @@ public class UserServiceImpl implements UserService {
     private final FeedbackRepository feedbackRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final FriendRequestRepository friendRequestRepository;
+    private final VoucherRepository voucherRepository;
+
     // 你要注入 CoachRepository
     @Autowired
     private CoachRepository coachRepository;
@@ -97,7 +99,36 @@ public class UserServiceImpl implements UserService {
         // Create membership tier assignment
         assignDefaultMembershipTier(user);
         initializeUserWallet(user);
-        log.info("User registered successfully with Silver tier: {}", dto.getUsername());
+        
+        // Create new user welcome voucher
+        createNewUserVoucher(user);
+        
+        // 2. Create or get default tier
+        log.info("User registered successfully with Bronze tier: {}", dto.getUsername());
+        
+        // Create default tiers if they don't exist
+        createDefaultTiers();
+        
+        MembershipTier bronzeTier = membershipTierRepository.findByTierName("BRONZE");
+        if (bronzeTier == null) {
+            bronzeTier = new MembershipTier();
+            bronzeTier.setTierName("BRONZE"); // 直接使用字符串值
+            bronzeTier.setMinPoints(0);
+            bronzeTier.setMaxPoints(999);
+            bronzeTier.setBenefits("5% discount");
+            bronzeTier.setActive(true);
+            bronzeTier = membershipTierRepository.save(bronzeTier);
+            log.info("Created default BRONZE tier");
+        }
+
+        // 3. Create member with default tier
+        Member member = new Member();
+        member.setUser(user);
+        member.setTier(bronzeTier);
+        member.setTierPointBalance(0);  // Initialize tier points
+        member.setRewardPointBalance(0); // Initialize reward points
+        memberRepository.save(member);
+        log.info("Assigned default Bronze tier to user: {} with 0 tier points and 0 reward points", user.getEmail());
     }
 
     private void assignDefaultMembershipTier(User user) {
@@ -119,11 +150,62 @@ public class UserServiceImpl implements UserService {
         Member member = new Member();
         member.setUser(user);
         member.setTier(silverTier);
-        member.setPointBalance(0);  // Changed from 1000 to 0
+        member.setTierPointBalance(0);  // Initialize tier points
+        member.setRewardPointBalance(0); // Initialize reward points
         memberRepository.save(member);
         user.setMember(member);
         userRepository.save(user);
-        log.info("Assigned default Silver tier to user: {}", user.getEmail());
+        log.info("Assigned default Silver tier to user: {} with 0 tier points and 0 reward points", user.getEmail());
+    }
+
+    private void createDefaultTiers() {
+        // Create BRONZE tier
+        if (membershipTierRepository.findByTierName("BRONZE") == null) {
+            MembershipTier bronzeTier = new MembershipTier();
+            bronzeTier.setTierName("BRONZE");
+            bronzeTier.setMinPoints(0);
+            bronzeTier.setMaxPoints(999);
+            bronzeTier.setBenefits("5% discount");
+            bronzeTier.setActive(true);
+            membershipTierRepository.save(bronzeTier);
+            log.info("Created default BRONZE tier");
+        }
+
+        // Create SILVER tier
+        if (membershipTierRepository.findByTierName("SILVER") == null) {
+            MembershipTier silverTier = new MembershipTier();
+            silverTier.setTierName("SILVER");
+            silverTier.setMinPoints(1000);
+            silverTier.setMaxPoints(2999);
+            silverTier.setBenefits("10% discount");
+            silverTier.setActive(true);
+            membershipTierRepository.save(silverTier);
+            log.info("Created default SILVER tier");
+        }
+
+        // Create GOLD tier
+        if (membershipTierRepository.findByTierName("GOLD") == null) {
+            MembershipTier goldTier = new MembershipTier();
+            goldTier.setTierName("GOLD");
+            goldTier.setMinPoints(3000);
+            goldTier.setMaxPoints(5999);
+            goldTier.setBenefits("15% discount + Priority booking");
+            goldTier.setActive(true);
+            membershipTierRepository.save(goldTier);
+            log.info("Created default GOLD tier");
+        }
+
+        // Create PLATINUM tier
+        if (membershipTierRepository.findByTierName("PLATINUM") == null) {
+            MembershipTier platinumTier = new MembershipTier();
+            platinumTier.setTierName("PLATINUM");
+            platinumTier.setMinPoints(6000);
+            platinumTier.setMaxPoints(Integer.MAX_VALUE);
+            platinumTier.setBenefits("20% discount + Priority booking + Free equipment");
+            platinumTier.setActive(true);
+            membershipTierRepository.save(platinumTier);
+            log.info("Created default PLATINUM tier");
+        }
     }
 
     @Override
@@ -234,6 +316,27 @@ public class UserServiceImpl implements UserService {
             wallet.setBalance(0.00);
             walletRepository.save(wallet);
             log.info("Created wallet for member: {}", member.getId());
+        }
+    }
+
+    private void createNewUserVoucher(User user) {
+        try {
+            // Create a welcome voucher for new users
+            Voucher welcomeVoucher = new Voucher();
+            welcomeVoucher.setCode("WELCOME");
+            welcomeVoucher.setDiscountType("percentage");
+            welcomeVoucher.setDiscountValue(10.0); // 10% discount
+            welcomeVoucher.setRequestPoints(0); // Free voucher
+            welcomeVoucher.setExpiryDate(LocalDate.now().plusMonths(3)); // Valid for 3 months
+            welcomeVoucher.setTierId(null); // Available to all tiers (general voucher)
+            welcomeVoucher.setMember(user.getMember()); // Assign to the new user
+            
+            voucherRepository.save(welcomeVoucher);
+            log.info("Created welcome voucher for new user: {}", user.getEmail());
+            
+        } catch (Exception e) {
+            log.error("Failed to create welcome voucher for user: {}", user.getEmail(), e);
+            // Don't throw exception to avoid breaking registration process
         }
     }
 

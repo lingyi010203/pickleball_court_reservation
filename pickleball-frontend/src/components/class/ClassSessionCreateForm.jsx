@@ -14,11 +14,7 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Box,
-  OutlinedInput,
-  Checkbox,
-  ListItemText,
-  FormHelperText
+  Box
 } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -27,15 +23,7 @@ import ClassSessionService from '../../service/ClassSessionService';
 import CourtService from '../../service/CourtService';
 import axios from 'axios'; // Added axios import
 
-const daysOfWeekOptions = [
-  { label: 'Monday', value: 'MONDAY' },
-  { label: 'Tuesday', value: 'TUESDAY' },
-  { label: 'Wednesday', value: 'WEDNESDAY' },
-  { label: 'Thursday', value: 'THURSDAY' },
-  { label: 'Friday', value: 'FRIDAY' },
-  { label: 'Saturday', value: 'SATURDAY' },
-  { label: 'Sunday', value: 'SUNDAY' },
-];
+
 
 const defaultForm = {
   title: '',
@@ -44,11 +32,11 @@ const defaultForm = {
   courtId: '',
   price: '',
   maxParticipants: '',
-  daysOfWeek: [],
   startTime: '',
   endTime: '',
   startDate: '',
   endDate: '',
+  dayOfWeek: '',
 };
 
 const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
@@ -109,43 +97,59 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
     }
   }, [form.venueId, allCourts]);
 
-  // 自動計算總堂數
+  // 自動計算總堂數（基於日期範圍和星期幾）
   useEffect(() => {
-    if (!form.startDate || !form.endDate || form.daysOfWeek.length === 0) {
+    if (!form.startDate || !form.endDate || !form.dayOfWeek) {
       setTotalSessions(0);
       return;
     }
     const start = new Date(form.startDate);
     const end = new Date(form.endDate);
     let count = 0;
+    
+    // 星期幾對應的數字 (0=Sunday, 1=Monday, ..., 6=Saturday)
+    const dayMap = {
+      'SUN': 0, 'MON': 1, 'TUES': 2, 'WED': 3, 'THURS': 4, 'FRI': 5, 'SAT': 6
+    };
+    
+    const targetDay = dayMap[form.dayOfWeek];
+    if (targetDay === undefined) {
+      setTotalSessions(0);
+      return;
+    }
+    
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-      if (form.daysOfWeek.includes(dayName)) {
+      if (d.getDay() === targetDay) {
         count++;
       }
     }
     setTotalSessions(count);
-  }, [form.startDate, form.endDate, form.daysOfWeek]);
+  }, [form.startDate, form.endDate, form.dayOfWeek]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDaysChange = (event) => {
-    const { value } = event.target;
-    setForm((prev) => ({ ...prev, daysOfWeek: typeof value === 'string' ? value.split(',') : value }));
-  };
-
-  // 根據週期自動產生所有日期時間段
+  // 根據日期範圍和星期幾自動產生所有日期時間段
   const getAllDateTimes = () => {
-    if (!form.startDate || !form.endDate || !form.startTime || !form.endTime || form.daysOfWeek.length === 0) return [];
+    if (!form.startDate || !form.endDate || !form.startTime || !form.endTime || !form.dayOfWeek) return [];
+    
     const start = new Date(form.startDate);
     const end = new Date(form.endDate);
     const result = [];
+    
+    // 星期幾對應的數字 (0=Sunday, 1=Monday, ..., 6=Saturday)
+    const dayMap = {
+      'SUN': 0, 'MON': 1, 'TUES': 2, 'WED': 3, 'THURS': 4, 'FRI': 5, 'SAT': 6
+    };
+    
+    const targetDay = dayMap[form.dayOfWeek];
+    if (targetDay === undefined) return [];
+    
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-      if (form.daysOfWeek.includes(dayName)) {
+      // 只添加符合選擇的星期幾的日期
+      if (d.getDay() === targetDay) {
         const dateStr = d.toISOString().slice(0, 10);
         result.push({
           startTime: `${dateStr}T${form.startTime}`,
@@ -162,8 +166,8 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
     setError('');
     try {
       const dateTimes = getAllDateTimes();
-      if (!form.courtId || dateTimes.length === 0) {
-        setError('Please select venue, court, period, and time');
+      if (!form.courtId || !form.dayOfWeek || dateTimes.length === 0) {
+        setError('Please select venue, court, day of week, and time');
         setChecking(false);
         return;
       }
@@ -183,8 +187,8 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
     setError('');
     setSuccess('');
     const dateTimes = getAllDateTimes();
-    if (!form.title || !form.courtId || !form.venueId || !form.price || !form.maxParticipants || !form.startDate || !form.endDate || !form.startTime || !form.endTime || form.daysOfWeek.length === 0) {
-      setError('Please complete all fields');
+    if (!form.title || !form.courtId || !form.venueId || !form.price || !form.maxParticipants || !form.startDate || !form.endDate || !form.startTime || !form.endTime || !form.dayOfWeek) {
+      setError('Please complete all fields including day of week');
       return;
     }
     if (conflicts.length > 0) {
@@ -194,7 +198,6 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
     try {
       const payload = {
         ...form,
-        daysOfWeek: form.daysOfWeek,
         price: Number(form.price),
         maxParticipants: Number(form.maxParticipants),
       };
@@ -228,25 +231,6 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
           </FormControl>
           <TextField label="Max Participants" name="maxParticipants" type="number" value={form.maxParticipants} onChange={handleChange} required fullWidth inputProps={{ min: 1, max: 20 }} />
           <TextField label="Price (RM/person)" name="price" type="number" value={form.price} onChange={handleChange} required fullWidth inputProps={{ min: 0 }} />
-          <FormControl fullWidth required>
-            <InputLabel>Days of Week</InputLabel>
-            <Select
-              multiple
-              name="daysOfWeek"
-              value={form.daysOfWeek}
-              onChange={handleDaysChange}
-              input={<OutlinedInput label="Days of Week" />}
-              renderValue={(selected) => selected.map(val => daysOfWeekOptions.find(opt => opt.value === val)?.label).join(', ')}
-            >
-              {daysOfWeekOptions.map(opt => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  <Checkbox checked={form.daysOfWeek.indexOf(opt.value) > -1} />
-                  <ListItemText primary={opt.label} />
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>Multiple selection allowed</FormHelperText>
-          </FormControl>
           {/* 新增：顯示總堂數 */}
           <Typography color="primary" sx={{ mb: 1 }}>
             {totalSessions > 0 ? `Total ${totalSessions} sessions` : ''}
@@ -259,7 +243,19 @@ const ClassSessionCreateForm = ({ open, onClose, onSuccess }) => {
             <TextField label="Start Date" name="startDate" type="date" value={form.startDate} onChange={handleChange} required fullWidth />
             <TextField label="End Date" name="endDate" type="date" value={form.endDate} onChange={handleChange} required fullWidth />
           </Box>
-          <Button variant="outlined" onClick={handleCheckConflicts} disabled={checking || !form.courtId || getAllDateTimes().length === 0}>Check Venue Conflicts</Button>
+          <FormControl fullWidth required>
+            <InputLabel>Day of Week</InputLabel>
+            <Select name="dayOfWeek" value={form.dayOfWeek} onChange={handleChange} label="Day of Week">
+              <MenuItem value="MON">Monday</MenuItem>
+              <MenuItem value="TUES">Tuesday</MenuItem>
+              <MenuItem value="WED">Wednesday</MenuItem>
+              <MenuItem value="THURS">Thursday</MenuItem>
+              <MenuItem value="FRI">Friday</MenuItem>
+              <MenuItem value="SAT">Saturday</MenuItem>
+              <MenuItem value="SUN">Sunday</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="outlined" onClick={handleCheckConflicts} disabled={checking || !form.courtId || !form.dayOfWeek || getAllDateTimes().length === 0}>Check Venue Conflicts</Button>
           {conflicts.length > 0 && <Typography color="error">Conflicting time slots: {conflicts.join(', ')}</Typography>}
           {success && <Typography color="success.main">{success.replace('No conflicts, you can create sessions!', 'No conflicts, you can create sessions!').replace('Session created successfully!', 'Session created successfully!')}</Typography>}
           {error && <Typography color="error">{error.replace('Please complete all fields', 'Please complete all fields').replace('There are time conflicts, please reselect', 'There are time conflicts, please reselect').replace('Creation failed', 'Creation failed').replace('Check failed', 'Check failed')}</Typography>}

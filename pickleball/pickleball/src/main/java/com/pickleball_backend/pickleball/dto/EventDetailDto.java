@@ -15,6 +15,7 @@ public class EventDetailDto {
     private String status;
     private String schedule;
     private Double feeAmount;
+    private String location; // 新增：事件地點
     
     // Organizer information
     private Integer organizerId;

@@ -330,12 +330,12 @@ public class WalletService {
 
     private void processInternalCreditPayment(Member member, double amount) {
         int pointsToDeduct = (int) Math.round(amount);
-        if (member.getPointBalance() < pointsToDeduct) {
+        if (member.getRewardPointBalance() < pointsToDeduct) {
             throw new ValidationException(
-                    "Insufficient internal credit. Available: " + member.getPointBalance()
+                    "Insufficient reward points. Available: " + member.getRewardPointBalance()
             );
         }
-        member.setPointBalance(member.getPointBalance() - pointsToDeduct);
+        member.setRewardPointBalance(member.getRewardPointBalance() - pointsToDeduct);
         memberRepository.save(member);
     }
 

@@ -5,9 +5,6 @@
  * Uses a reusable axios instance with interceptors for auth.
  */
 
-import axios from 'axios';
-
-
 // Import the centralized api instance
 import api from './api';
 
@@ -23,7 +20,7 @@ const CourtService = {
    */
   getAllCourts: async () => {
     try {
-      const response = await api.get('/member/courts');
+      const response = await api.get('/courts');
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getAllCourts:', error);
@@ -38,7 +35,7 @@ const CourtService = {
    */
   getCourtById: async (id) => {
     try {
-      const response = await api.get(`/member/courts/${id}`);
+      const response = await api.get(`/courts/${id}`);
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getCourtById:', error);
@@ -52,7 +49,7 @@ const CourtService = {
    */
   getBookedCourts: async () => {
     try {
-      const response = await api.get('/member/courts/booked');
+      const response = await api.get('/courts/booked');
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getBookedCourts:', error);
@@ -69,12 +66,51 @@ const CourtService = {
    */
   getAvailableCourts: async (date, startTime, endTime) => {
     try {
-      const response = await api.get('/member/courts/available', {
+      const response = await api.get('/courts/available', {
         params: { date, startTime, endTime }
       });
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getAvailableCourts:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch booked dates for a venue.
+   * @param {number} venueId - The venue ID
+   * @param {string} startDate - yyyy-MM-dd
+   * @param {string} endDate - yyyy-MM-dd (optional)
+   * @param {string} state - State filter (optional)
+   * @returns {Promise<Array>} List of booked dates
+   */
+  getBookedDates: async (venueId, startDate, endDate, state) => {
+    try {
+      const params = { venueId, startDate };
+      if (endDate) params.endDate = endDate;
+      if (state) params.state = state;
+      
+      const response = await api.get(`/admin/venues/public/${venueId}/booked-dates`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('[CourtService] Error in getBookedDates:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch courts by their IDs.
+   * @param {Array<number>} courtIds - Array of court IDs
+   * @returns {Promise<Array>} List of court objects
+   */
+  getCourtsByIds: async (courtIds) => {
+    try {
+      // 由於後端沒有批量獲取 court 的端點，我們使用現有的 getAllCourts 然後過濾
+      const response = await api.get('/courts');
+      const allCourts = response.data;
+      return allCourts.filter(court => courtIds.includes(court.id));
+    } catch (error) {
+      console.error('[CourtService] Error in getCourtsByIds:', error);
       throw error;
     }
   }

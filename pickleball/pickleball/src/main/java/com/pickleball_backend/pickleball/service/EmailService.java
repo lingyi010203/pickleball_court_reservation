@@ -352,12 +352,39 @@ public class EmailService {
     public void sendEventNotification(String email, Event event) {
         if (email == null || event == null) return;
         log.info("Sending event notification to: {}", email);
-        String subject = "New Event Published: " + event.getTitle();
+        String subject = "🎾 New Event Published: " + event.getTitle();
+        
         String content = String.format(
-            "Dear user,\n\nA new event \"%s\" has been published!\n\nDate: %s\nLocation: %s\n\nCheck it out in the app!",
+            "Dear Picklefy User,\n\n" +
+            "🎉 A new exciting event has been published!\n\n" +
+            "📋 Event Details:\n" +
+            "• Event Name: %s\n" +
+            "• Event Type: %s\n" +
+            "• Date: %s\n" +
+            "• Time: %s - %s\n" +
+            "• Location: %s\n" +
+            "• Capacity: %d players\n" +
+            "• Fee: %s\n" +
+            "• Status: %s\n\n" +
+            "🏟️ Venue Information:\n" +
+            "• Venue: %s\n" +
+            "• Location: %s\n\n" +
+            "📅 Don't miss out on this amazing opportunity to play and connect with other pickleball enthusiasts!\n\n" +
+            "🔗 Check out the event details and register now in the Picklefy app!\n\n" +
+            "Best regards,\nThe Picklefy Team",
             event.getTitle(),
-            event.getStartTime()
+            event.getEventType() != null ? event.getEventType() : "N/A",
+            event.getStartTime() != null ? event.getStartTime().format(dateFormatter) : "TBD",
+            event.getStartTime() != null ? event.getStartTime().format(timeFormatter) : "TBD",
+            event.getEndTime() != null ? event.getEndTime().format(timeFormatter) : "TBD",
+            event.getVenue() != null ? event.getVenue().getName() : "TBD",
+            event.getCapacity() != null ? event.getCapacity() : 0,
+            event.getFeeAmount() != null && event.getFeeAmount() > 0 ? String.format("RM%.2f", event.getFeeAmount()) : "Free",
+            event.getStatus() != null ? event.getStatus() : "PUBLISHED",
+            event.getVenue() != null ? event.getVenue().getName() : "TBD",
+            event.getVenue() != null && event.getVenue().getLocation() != null ? event.getVenue().getLocation() : "TBD"
         );
+        
         sendEmail(email, subject, content);
     }
     

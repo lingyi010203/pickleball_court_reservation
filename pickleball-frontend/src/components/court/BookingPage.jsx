@@ -40,7 +40,7 @@ const BookingPage = () => {
   const [court, setCourt] = useState(null);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(dayjs().date(24));
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [availableDates, setAvailableDates] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlots, setSelectedSlots] = useState([]);

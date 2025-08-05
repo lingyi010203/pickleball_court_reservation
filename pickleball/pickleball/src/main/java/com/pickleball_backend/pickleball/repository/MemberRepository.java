@@ -15,7 +15,7 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE Member m SET m.tier = :tier WHERE m.pointBalance BETWEEN :min AND :max")
+    @Query("UPDATE Member m SET m.tier = :tier WHERE m.tierPointBalance BETWEEN :min AND :max")
     int updateMembersTier(
             @Param("min") int min,
             @Param("max") int max,

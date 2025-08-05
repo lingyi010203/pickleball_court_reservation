@@ -9,7 +9,7 @@ import org.springframework.data.domain.Page;
 
 public interface EventService {
     Event createEvent(EventCreateDto eventDto, String organizerUsername);
-    Event updateEvent(Integer id, EventUpdateDto eventDto, String organizerUsername, boolean notifyParticipants);
+    Event updateEvent(Integer id, EventUpdateDto eventDto, String organizerUsername);
     void deleteEvent(Integer id);
     Event publishEvent(Integer id, String organizerUsername);
     

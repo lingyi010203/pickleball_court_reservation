@@ -9,6 +9,10 @@ import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.EventRepository;
 import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import com.pickleball_backend.pickleball.repository.UserRepository;
+import com.pickleball_backend.pickleball.repository.ClassSessionRepository;
+import com.pickleball_backend.pickleball.repository.ClassRegistrationRepository;
+import com.pickleball_backend.pickleball.entity.ClassSession;
+import com.pickleball_backend.pickleball.entity.ClassRegistration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,6 +31,8 @@ public class FeedbackService {
     private final UserRepository userRepository;
     private final CourtRepository courtRepository;
     private final EventRepository eventRepository;
+    private final ClassSessionRepository classSessionRepository;
+    private final ClassRegistrationRepository classRegistrationRepository;
     @Autowired
     private BookingRepository bookingRepository; // 確保有注入
 
@@ -96,6 +102,7 @@ public class FeedbackService {
         feedback.setReview(dto.getReview());
         feedback.setUser(user);
         feedback.setBooking(booking); // 设置预订关联
+        feedback.setClassSessionId(dto.getClassSessionId()); // 设置课程关联
         feedback.setCreatedAt(LocalDateTime.now());
         feedback.setTags(dto.getTags());
 
@@ -200,6 +207,96 @@ public class FeedbackService {
         } else if (feedback.getTargetType() == Feedback.TargetType.COACH) {
             User coach = userRepository.findById(feedback.getTargetId()).orElse(null);
             dto.setTargetName(coach != null ? coach.getName() : "Unknown Coach");
+            
+            // 為教練評價添加課程詳細信息
+            try {
+                if (feedback.getClassSessionId() != null) {
+                    // 直接使用關聯的課程ID
+                    ClassSession session = classSessionRepository.findById(feedback.getClassSessionId()).orElse(null);
+                    
+                    if (session != null) {
+                        dto.setClassSessionId(session.getId());
+                        dto.setClassSessionTitle(session.getTitle());
+                        dto.setClassSessionDate(session.getStartTime().toLocalDate().toString());
+                        dto.setClassSessionTime(session.getStartTime().toLocalTime().toString() + " - " + session.getEndTime().toLocalTime().toString());
+                        
+                        // 獲取場地信息
+                        if (session.getVenue() != null) {
+                            dto.setVenueName(session.getVenue().getName());
+                        } else if (session.getCourt() != null && session.getCourt().getVenue() != null) {
+                            dto.setVenueName(session.getCourt().getVenue().getName());
+                        }
+                        
+                        // 獲取球場信息
+                        if (session.getCourt() != null) {
+                            dto.setCourtName(session.getCourt().getName());
+                        }
+                        
+                        System.out.println("Found class session for feedback " + feedback.getId() + ": " + 
+                                         session.getTitle() + " on " + session.getStartTime() + 
+                                         " at " + (session.getVenue() != null ? session.getVenue().getName() : "Unknown venue"));
+                    }
+                } else {
+                    // 回退到舊的邏輯（為了向後兼容）
+                    List<ClassRegistration> registrations = classRegistrationRepository.findByMemberUserId(feedback.getUser().getId());
+                    List<ClassRegistration> coachRegistrations = registrations.stream()
+                        .filter(reg -> {
+                            ClassSession session = reg.getClassSession();
+                            return session != null && 
+                                   session.getCoach() != null && 
+                                   session.getCoach().getId().equals(feedback.getTargetId());
+                        })
+                        .sorted((reg1, reg2) -> {
+                            // 按課程開始時間排序，最新的在前
+                            return reg2.getClassSession().getStartTime().compareTo(reg1.getClassSession().getStartTime());
+                        })
+                        .collect(Collectors.toList());
+                    
+                    if (!coachRegistrations.isEmpty()) {
+                        // 嘗試根據評價時間匹配最相關的課程
+                        LocalDateTime feedbackTime = feedback.getCreatedAt();
+                        ClassRegistration bestMatch = null;
+                        
+                        // 找到評價時間之前最近的課程
+                        for (ClassRegistration reg : coachRegistrations) {
+                            ClassSession session = reg.getClassSession();
+                            if (session.getStartTime().isBefore(feedbackTime)) {
+                                bestMatch = reg;
+                                break;
+                            }
+                        }
+                        
+                        // 如果沒有找到，使用最新的課程
+                        if (bestMatch == null) {
+                            bestMatch = coachRegistrations.get(0);
+                        }
+                        
+                        ClassSession session = bestMatch.getClassSession();
+                        dto.setClassSessionId(session.getId());
+                        dto.setClassSessionTitle(session.getTitle());
+                        dto.setClassSessionDate(session.getStartTime().toLocalDate().toString());
+                        dto.setClassSessionTime(session.getStartTime().toLocalTime().toString() + " - " + session.getEndTime().toLocalTime().toString());
+                        
+                        // 獲取場地信息
+                        if (session.getVenue() != null) {
+                            dto.setVenueName(session.getVenue().getName());
+                        } else if (session.getCourt() != null && session.getCourt().getVenue() != null) {
+                            dto.setVenueName(session.getCourt().getVenue().getName());
+                        }
+                        
+                        // 獲取球場信息
+                        if (session.getCourt() != null) {
+                            dto.setCourtName(session.getCourt().getName());
+                        }
+                        
+                        System.out.println("Fallback: Found class session for feedback " + feedback.getId() + ": " + 
+                                         session.getTitle() + " on " + session.getStartTime() + 
+                                         " at " + (session.getVenue() != null ? session.getVenue().getName() : "Unknown venue"));
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Error fetching class session details for coach feedback: " + e.getMessage());
+            }
         } else {
             dto.setTargetName("Unknown Target");
         }

@@ -982,10 +982,22 @@ const VoucherManagementTab = () => {
       } else {
         // Create new voucher
         if (formData.tierName && formData.tierName.trim()) {
-          // Create tier-specific voucher
-          await axios.post(`http://localhost:8081/api/admin/${formData.tierName}/vouchers`, submitData, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          try {
+            // Try to create tier-specific voucher first
+            await axios.post(`http://localhost:8081/api/admin/${formData.tierName}/vouchers`, submitData, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          } catch (err) {
+            // If tier doesn't exist, create general voucher instead
+            if (err.response?.status === 400 && err.response?.data?.message?.includes("Tier not found")) {
+              console.log(`Tier ${formData.tierName} not found, creating general voucher instead`);
+              await axios.post(`http://localhost:8081/api/admin/vouchers`, submitData, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+            } else {
+              throw err; // Re-throw other errors
+            }
+          }
         } else {
           // Create general voucher (no tier association)
           await axios.post(`http://localhost:8081/api/admin/vouchers`, submitData, {

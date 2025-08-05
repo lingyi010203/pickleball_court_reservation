@@ -161,6 +161,31 @@ public class LeaveRequestController {
         }
     }
     
+    // 安排補課
+    @PutMapping("/{requestId}/arrange-makeup")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<LeaveRequestDto> arrangeMakeup(
+            @PathVariable Integer requestId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Integer makeupSessionId = (Integer) request.get("makeupSessionId");
+            Integer studentId = (Integer) request.get("studentId");
+            
+            System.out.println("=== arrangeMakeup called ===");
+            System.out.println("requestId: " + requestId);
+            System.out.println("makeupSessionId: " + makeupSessionId);
+            System.out.println("studentId: " + studentId);
+            
+            // 使用现有的approveRequest方法来安排补课
+            LeaveRequestDto result = leaveRequestService.approveRequest(requestId, makeupSessionId, "Makeup class arranged by coach");
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Error in arrangeMakeup: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+    
     // 獲取教練的待處理請求數量
     @GetMapping("/coach/pending-count")
     @PreAuthorize("hasAuthority('ROLE_COACH')")

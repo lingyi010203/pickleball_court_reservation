@@ -114,4 +114,27 @@ public class VenueController {
 
         return ResponseEntity.ok(new ArrayList<>(allDates));
     }
+
+    // 公共端點，供非管理員用戶使用
+    @GetMapping("/public/{venueId}/booked-dates")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'EVENTORGANIZER', 'COACH')")
+    public ResponseEntity<List<String>> getBookedDatesPublic(@PathVariable Integer venueId,
+                                                  @RequestParam(required = false) String startDate,
+                                                  @RequestParam(required = false) String endDate) {
+        LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now();
+        LocalDate end = endDate != null ? LocalDate.parse(endDate) : start.plusYears(1);
+
+        // 1. 查詢已被 booking 的日期
+        List<LocalDate> bookedDates = bookingSlotRepository.findBookedDatesByVenueIdAndDateRange(venueId, start, end);
+
+        // 2. 查詢該 venue 下所有 event 的日期
+        List<LocalDate> eventDates = eventRepository.findEventDatesByVenueIdAndDateRange(venueId, start, end);
+
+        // 3. 合併去重
+        Set<String> allDates = new HashSet<>();
+        bookedDates.forEach(d -> allDates.add(d.toString()));
+        eventDates.forEach(d -> allDates.add(d.toString()));
+
+        return ResponseEntity.ok(new ArrayList<>(allDates));
+    }
 }

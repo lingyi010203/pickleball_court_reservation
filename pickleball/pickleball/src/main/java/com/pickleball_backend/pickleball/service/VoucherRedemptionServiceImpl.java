@@ -46,20 +46,28 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
         // Validate voucher
-        if (voucher.getTier() == null || voucher.getTier().getId() == null || 
-            member.getTier() == null || member.getTier().getId() == null ||
-            !voucher.getTier().getId().equals(member.getTier().getId())) {
-            throw new ValidationException("Voucher not available for your tier");
+        if (voucher.getTier() != null) {
+            // Tier-specific voucher - check if user's tier matches
+            if (member.getTier() == null || member.getTier().getId() == null ||
+                !voucher.getTier().getId().equals(member.getTier().getId())) {
+                throw new ValidationException("Voucher not available for your tier");
+            }
         }
+        // General voucher (tier == null) is available to all tiers
 
-        if (member.getPointBalance() < voucher.getRequestPoints()) {
-            throw new ValidationException("Insufficient points");
+        if (member.getRewardPointBalance() < voucher.getRequestPoints()) {
+            throw new ValidationException("Insufficient reward points");
         }
 
         // Check if user has already redeemed this voucher
-        if (redemptionRepository.existsByVoucherIdAndUserId(voucherId, user.getId())) {
-            throw new ValidationException("You have already redeemed this voucher");
+        // For 0-point vouchers, only allow one redemption per user
+        // For other vouchers, allow multiple redemptions
+        if (voucher.getRequestPoints() == 0) {
+            if (redemptionRepository.existsByVoucherIdAndUserId(voucherId, user.getId())) {
+                throw new ValidationException("You have already redeemed this voucher");
+            }
         }
+        // For non-zero point vouchers, allow multiple redemptions (no check needed)
 
         // Check expiry date
         if (voucher.getExpiryDate() != null && 
@@ -68,8 +76,8 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
             throw new ValidationException("Voucher has expired");
         }
 
-        // Deduct points
-        member.setPointBalance(member.getPointBalance() - voucher.getRequestPoints());
+        // Deduct reward points
+        member.setRewardPointBalance(member.getRewardPointBalance() - voucher.getRequestPoints());
         memberRepository.save(member);
 
         // Create redemption record
@@ -86,7 +94,7 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
             redemptionExpiry = voucher.getExpiryDate();
         }
         redemption.setExpiryDate(redemptionExpiry);
-        redemption.setStatus("active");  // Use lowercase string
+        redemption.setStatus(VoucherRedemption.STATUS_ACTIVE);
 
         redemption = redemptionRepository.save(redemption);
 
@@ -101,7 +109,7 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
                 "\nDiscount: " + (voucher.getDiscountType().equals("percentage") ? 
                     voucher.getDiscountValue() + "%" : "RM" + voucher.getDiscountValue()) +
                 "\nExpires: " + redemptionExpiry +
-                "\nNew balance: " + member.getPointBalance() + " points"
+                "\nNew reward points balance: " + member.getRewardPointBalance() + " points"
         );
 
         log.info("User {} redeemed voucher {} for {} points", user.getEmail(), voucher.getCode(), voucher.getRequestPoints());
@@ -135,8 +143,10 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
         User user = account.getUser();
 
-        List<VoucherRedemption> redemptions = redemptionRepository.findByUserIdAndStatusOrderByRedemptionDateDesc(
-                user.getId(), "active");  // Use lowercase string
+        // Get both ACTIVE and RESTORED vouchers
+        List<String> activeStatuses = List.of(VoucherRedemption.STATUS_ACTIVE, VoucherRedemption.STATUS_RESTORED);
+        List<VoucherRedemption> redemptions = redemptionRepository.findByUserIdAndStatusInOrderByRedemptionDateDesc(
+                user.getId(), activeStatuses);
         
         return redemptions.stream()
                 .map(redemption -> {
@@ -163,19 +173,19 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
         }
 
         // Check status
-        if (!"active".equals(redemption.getStatus())) {
+        if (!VoucherRedemption.STATUS_ACTIVE.equals(redemption.getStatus())) {
             throw new ValidationException("Voucher is not active");
         }
 
         // Check expiry
         if (redemption.getExpiryDate() != null && redemption.getExpiryDate().isBefore(LocalDate.now())) {
-            redemption.setStatus("expired");
+            redemption.setStatus(VoucherRedemption.STATUS_USED);
             redemptionRepository.save(redemption);
             throw new ValidationException("Voucher has expired");
         }
 
         // Mark as used
-        redemption.setStatus("used");
+        redemption.setStatus(VoucherRedemption.STATUS_USED);
         redemption = redemptionRepository.save(redemption);
 
         Voucher voucher = voucherRepository.findById(redemption.getVoucherId()).orElse(null);
@@ -221,15 +231,23 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
             // Check if already redeemed
-            if (redemptionRepository.existsByVoucherIdAndUserId(voucherId, user.getId())) {
-                return false;
+            if (voucher.getRequestPoints() == 0) {
+                if (redemptionRepository.existsByVoucherIdAndUserId(voucherId, user.getId())) {
+                    return false;
+                }
             }
-
+            // For non-zero point vouchers, allow multiple redemptions (no check needed)
+            
             // Check tier and points
-            return voucher.getTier() != null && voucher.getTier().getId() != null &&
-                   member.getTier() != null && member.getTier().getId() != null &&
-                   voucher.getTier().getId().equals(member.getTier().getId()) &&
-                   member.getPointBalance() >= voucher.getRequestPoints();
+            boolean tierValid = true;
+            if (voucher.getTier() != null) {
+                // Tier-specific voucher - check if user's tier matches
+                tierValid = member.getTier() != null && member.getTier().getId() != null &&
+                           voucher.getTier().getId().equals(member.getTier().getId());
+            }
+            // General voucher (tier == null) is available to all tiers
+            
+            return tierValid && member.getRewardPointBalance() >= voucher.getRequestPoints();
         } catch (Exception e) {
             return false;
         }
@@ -238,10 +256,10 @@ public class VoucherRedemptionServiceImpl implements VoucherRedemptionService {
     @Override
     @Transactional
     public void processExpiredRedemptions() {
-        List<VoucherRedemption> expiredRedemptions = redemptionRepository.findExpiredRedemptions(LocalDate.now());
+        List<VoucherRedemption> expiredRedemptions = redemptionRepository.findExpiredRedemptions(LocalDate.now(), VoucherRedemption.STATUS_ACTIVE);
         
         for (VoucherRedemption redemption : expiredRedemptions) {
-            redemption.setStatus("expired");
+            redemption.setStatus(VoucherRedemption.STATUS_USED);
             redemptionRepository.save(redemption);
             log.info("Marked redemption {} as expired", redemption.getId());
         }

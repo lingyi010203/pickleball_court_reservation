@@ -16,4 +16,8 @@ public class BookingRequestDto {
     private boolean useWallet;
     private String paymentMethod;
     private String paymentStatus;
+    
+    // 新增：優惠券相關字段
+    private Boolean useVoucher;
+    private Integer voucherRedemptionId;
 }

@@ -39,7 +39,8 @@ import {
   CheckCircle as CheckCircleIcon, 
   Schedule as ScheduleIcon, 
   Comment as CommentIcon,
-  RateReview as ReviewIcon
+  RateReview as ReviewIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import LeaveRequestService from '../../service/LeaveRequestService';
@@ -64,11 +65,11 @@ const MyClassSessions = () => {
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [makeupDialog, setMakeupDialog] = useState({ open: false, session: null });
-  const [coachSchedule, setCoachSchedule] = useState([]);
-  const [loadingCoachSchedule, setLoadingCoachSchedule] = useState(false);
-  const [availableSessions, setAvailableSessions] = useState([]);
-  const [loadingAvailableSessions, setLoadingAvailableSessions] = useState(false);
-  const [selectedReplacementSession, setSelectedReplacementSession] = useState(null);
+
+
+
+  const [filter, setFilter] = useState('All'); // 'All', 'Complete', 'Ongoing', 'Upcoming'
+  const [feedbackDialog, setFeedbackDialog] = useState({ open: false, session: null });
 
   useEffect(() => {
     if (currentUser && currentUser.id) {
@@ -112,6 +113,18 @@ const MyClassSessions = () => {
 
       const data = await response.json();
       console.log('Received data:', data);
+      
+      // 调试：检查补课课程
+      const replacementSessions = data.filter(session => session.replacementForSessionId);
+      console.log('User - Replacement sessions found:', replacementSessions.length);
+      replacementSessions.forEach(session => {
+        console.log('User - Replacement session:', {
+          id: session.id,
+          title: session.title,
+          replacementForSessionId: session.replacementForSessionId
+        });
+      });
+      
       setSessions(data);
       
       // Fetch leave requests for the current user
@@ -204,7 +217,7 @@ const MyClassSessions = () => {
         const groupSessions = sessions.filter(s => s.recurringGroupId === reviewDialog.session.recurringGroupId);
         const completedSessions = groupSessions.filter(s => getSessionStatus(s).label === 'Completed');
         
-        // 為每個已完成的課程提交評價
+        // 為每個已完成的課程提交用戶對教練的評價
         const reviewPromises = completedSessions.map(async session => {
           const response = await fetch(`http://localhost:8081/api/class-sessions/${session.id}/review`, {
             method: 'POST',
@@ -214,7 +227,8 @@ const MyClassSessions = () => {
             },
             body: JSON.stringify({
               rating: reviewData.rating,
-              comment: reviewData.comment
+              comment: reviewData.comment,
+              reviewType: 'USER_TO_COACH' // 明確指定這是用戶對教練的評價
             })
           });
           
@@ -228,7 +242,7 @@ const MyClassSessions = () => {
         
         await Promise.all(reviewPromises);
       } else {
-        // 單個課程評價
+        // 單個課程評價 - 用戶對教練的評價
         const response = await fetch(`http://localhost:8081/api/class-sessions/${reviewDialog.session.id}/review`, {
           method: 'POST',
           headers: {
@@ -237,7 +251,8 @@ const MyClassSessions = () => {
           },
           body: JSON.stringify({
             rating: reviewData.rating,
-            comment: reviewData.comment
+            comment: reviewData.comment,
+            reviewType: 'USER_TO_COACH' // 明確指定這是用戶對教練的評價
           })
         });
         
@@ -265,6 +280,23 @@ const MyClassSessions = () => {
   };
 
   const openReviewDialog = (session) => {
+    // 檢查課程狀態，只有已完成的課程才能評價
+    const sessionStatus = getSessionStatus(session);
+    if (sessionStatus.label !== 'Completed') {
+      console.warn('Cannot review session that is not completed:', sessionStatus.label);
+      return;
+    }
+    
+    // 如果是課程組，檢查課程組狀態
+    if (session.recurringGroupId) {
+      const groupSessions = sessions.filter(s => s.recurringGroupId === session.recurringGroupId);
+      const groupStatus = getGroupStatus(groupSessions);
+      if (groupStatus.label !== 'Completed') {
+        console.warn('Cannot review session group that is not completed:', groupStatus.label);
+        return;
+      }
+    }
+    
     setReviewDialog({ open: true, session });
     
     // 如果是課程組，計算平均評分和評論
@@ -273,25 +305,41 @@ const MyClassSessions = () => {
       const completedSessions = groupSessions.filter(s => getSessionStatus(s).label === 'Completed');
       
       if (completedSessions.length > 0) {
-        const totalRating = completedSessions.reduce((sum, s) => sum + (s.rating || 0), 0);
-        const avgRating = Math.round(totalRating / completedSessions.length);
-        const comments = completedSessions.map(s => s.coachComment).filter(Boolean);
-        const combinedComment = comments.length > 0 ? comments.join('\n\n') : '';
+        // 檢查是否有現有的用戶評價
+        const existingUserRatings = completedSessions.map(s => s.userRating).filter(rating => rating != null);
+        const existingUserComments = completedSessions.map(s => s.userComment).filter(comment => comment != null && comment.trim() !== '');
         
-        setReviewData({ 
-          rating: avgRating, 
-          comment: combinedComment 
-        });
+        if (existingUserRatings.length > 0 || existingUserComments.length > 0) {
+          // 有現有評價，使用現有的
+          const avgRating = existingUserRatings.length > 0 ? 
+            Math.round(existingUserRatings.reduce((sum, rating) => sum + rating, 0) / existingUserRatings.length) : 0;
+          const combinedComment = existingUserComments.length > 0 ? existingUserComments.join('\n\n') : '';
+          
+          setReviewData({ 
+            rating: avgRating, 
+            comment: combinedComment 
+          });
+        } else {
+          // 沒有現有評價，設置為空
+          setReviewData({ rating: 0, comment: '' });
+        }
       } else {
         setReviewData({ rating: 0, comment: '' });
       }
     } else {
-      // 單個課程
+      // 單個課程 - 檢查是否有現有的用戶評價
+      const existingRating = session.userRating || 0;
+      const existingComment = session.userComment || '';
+      
       setReviewData({ 
-        rating: session.rating || 0, 
-        comment: session.coachComment || '' 
+        rating: existingRating, 
+        comment: existingComment 
       });
     }
+  };
+
+  const openFeedbackDialog = (session) => {
+    setFeedbackDialog({ open: true, session });
   };
 
   const handleLeaveRequest = async () => {
@@ -351,54 +399,10 @@ const MyClassSessions = () => {
     }
   };
 
-  const fetchCoachSchedule = async (coachId) => {
-    try {
-      setLoadingCoachSchedule(true);
-      const token = localStorage.getItem('authToken');
-      const now = new Date();
-      const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-      
-      console.log('Fetching coach schedule for coachId:', coachId);
-      console.log('Time range:', now.toISOString(), 'to', endDate.toISOString());
-      
-      const response = await fetch(`http://localhost:8081/api/class-sessions/test-coach-sessions/${coachId}?userId=${currentUser.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`API Error: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Coach schedule data:', data);
-      
-      // 從測試端點響應中提取 sessions 數組
-      if (data.sessions && Array.isArray(data.sessions)) {
-        setCoachSchedule(data.sessions);
-      } else {
-        setCoachSchedule([]);
-      }
-    } catch (error) {
-      console.error('Error fetching coach schedule:', error);
-      setError(`Failed to fetch coach schedule: ${error.message}`);
-    } finally {
-      setLoadingCoachSchedule(false);
-    }
-  };
+
 
   const openMakeupDialog = async (session) => {
     setMakeupDialog({ open: true, session });
-    if (session.coachId) {
-      await fetchCoachSchedule(session.coachId);
-      await fetchAvailableSessions(session.coachId);
-    }
   };
 
               const sendMessageToCoach = async (coachId, coachName) => {
@@ -507,83 +511,9 @@ const MyClassSessions = () => {
               }
             };
   
-  // 獲取可用的補課時間
-  const fetchAvailableSessions = async (coachId) => {
-    try {
-      setLoadingAvailableSessions(true);
-      console.log('Fetching available sessions for coachId:', coachId, 'studentId:', currentUser.id);
-      
-      // 先調試檢查教練課程數據
-      try {
-        const debugData = await LeaveRequestService.debugCoachSessions(coachId);
-        console.log('Debug coach sessions data:', debugData);
-      } catch (debugError) {
-        console.error('Debug failed:', debugError);
-      }
-      
-      const sessions = await LeaveRequestService.getAvailableReplacementSessions(coachId, currentUser.id);
-      console.log('Available sessions received:', sessions);
-      setAvailableSessions(Array.isArray(sessions) ? sessions : []);
-    } catch (error) {
-      console.error('Failed to fetch available sessions:', error);
-      // 不要彈出 alert，只記錄錯誤，讓用戶看到 "No available times found"
-      setAvailableSessions([]);
-    } finally {
-      setLoadingAvailableSessions(false);
-    }
-  };
 
-  // 處理學生自己選擇補課時間
-  const handleSelfSelectReplacement = async () => {
-    try {
-      if (!selectedReplacementSession) {
-        alert('請選擇一個補課時間');
-        return;
-      }
 
-      const session = makeupDialog.session;
-      
-      // 先找到現有的請假請求
-      const existingRequest = leaveRequests.find(req => 
-        req.originalSessionId === session.id && req.studentId === currentUser.id
-      );
-      
-      if (!existingRequest) {
-        alert('找不到請假請求，請先提交請假請求。');
-        return;
-      }
-      
-      // 更新請假請求狀態
-      const updateResponse = await fetch(`http://localhost:8081/api/leave-requests/${existingRequest.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'SELF_SELECTED',
-          preferredDate: selectedReplacementSession.startTime ? 
-            new Date(selectedReplacementSession.startTime).toISOString().slice(0, 19).replace('T', ' ') : 
-            '1900-01-01 00:00:00'
-        })
-      });
-      
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        console.error('Failed to update leave request:', errorText);
-        alert('更新請假請求失敗，請稍後再試。');
-        return;
-      }
-      
-      alert('補課請求已提交！');
-      setMakeupDialog({ open: false, session: null });
-      setSelectedReplacementSession(null);
-      fetchUserSessions(); // 刷新課程列表
-    } catch (error) {
-      console.error('Failed to update leave request:', error);
-      alert('提交補課請求失敗，請稍後再試。');
-    }
-  };
+
 
   // 獲取教練的 email
   const getCoachEmail = async (coachId) => {
@@ -617,6 +547,21 @@ const MyClassSessions = () => {
     if (sessionTime < now) return { label: 'Completed', color: 'success' };
     if (sessionTime.getTime() - now.getTime() < 24 * 60 * 60 * 1000) return { label: 'Tomorrow', color: 'warning' };
     return { label: 'Upcoming', color: 'primary' };
+  };
+
+  // 獲取課程組的整體狀態（用於顯示 Ongoing 狀態）
+  const getGroupStatus = (group) => {
+    const now = new Date();
+    const futureSessions = group.filter(s => new Date(s.startTime) > now);
+    const pastSessions = group.filter(s => new Date(s.startTime) <= now);
+    
+    if (futureSessions.length > 0 && pastSessions.length > 0) {
+      return { label: 'Ongoing', color: 'info' };
+    } else if (futureSessions.length > 0) {
+      return { label: 'Upcoming', color: 'primary' };
+    } else {
+      return { label: 'Completed', color: 'success' };
+    }
   };
 
   const getAttendanceStatus = (session) => {
@@ -673,7 +618,29 @@ const MyClassSessions = () => {
   // 按 recurringGroupId 分組課程
   const groupedSessions = () => {
     const grouped = {};
-    sessions.forEach(session => {
+    
+    // Filter sessions based on selected filter
+    const filteredSessions = sessions.filter(session => {
+      const status = getSessionStatus(session);
+      switch (filter) {
+        case 'Complete':
+          return status.label === 'Completed';
+        case 'Ongoing':
+          // Ongoing: 既有未來課程又有過去課程的課程組
+          const groupKey = session.recurringGroupId || session.id;
+          const groupSessions = sessions.filter(s => (s.recurringGroupId || s.id) === groupKey);
+          const now = new Date();
+          const futureSessions = groupSessions.filter(s => new Date(s.startTime) > now);
+          const pastSessions = groupSessions.filter(s => new Date(s.startTime) <= now);
+          return futureSessions.length > 0 && pastSessions.length > 0;
+        case 'Upcoming':
+          return status.label === 'Upcoming';
+        default:
+          return true; // 'All' - show all sessions
+      }
+    });
+    
+    filteredSessions.forEach(session => {
       const key = session.recurringGroupId || session.id;
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(session);
@@ -720,7 +687,7 @@ const MyClassSessions = () => {
 
       {/* Statistics */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -732,7 +699,7 @@ const MyClassSessions = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -744,7 +711,7 @@ const MyClassSessions = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -756,7 +723,32 @@ const MyClassSessions = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Ongoing Sessions
+              </Typography>
+              <Typography variant="h4" color="info.main">
+                {(() => {
+                  const grouped = {};
+                  sessions.forEach(session => {
+                    const key = session.recurringGroupId || session.id;
+                    if (!grouped[key]) grouped[key] = [];
+                    grouped[key].push(session);
+                  });
+                  return Object.values(grouped).filter(group => {
+                    const now = new Date();
+                    const futureSessions = group.filter(s => new Date(s.startTime) > now);
+                    const pastSessions = group.filter(s => new Date(s.startTime) <= now);
+                    return futureSessions.length > 0 && pastSessions.length > 0;
+                  }).length;
+                })()}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={2}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>
@@ -768,23 +760,66 @@ const MyClassSessions = () => {
             </CardContent>
           </Card>
         </Grid>
+        <Grid item xs={12} sm={6} md={2}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Replacement Classes
+              </Typography>
+              <Typography variant="h4" color="secondary">
+                {sessions.filter(s => s.replacementForSessionId).length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
+
+      {/* Filter Summary */}
+      {filter !== 'All' && (
+        <Box sx={{ mb: 2 }}>
+          <Chip 
+            label={`Showing ${filter.toLowerCase()} sessions (${groupedSessions().length} found)`}
+            color="primary"
+            variant="outlined"
+            icon={<FilterIcon />}
+          />
+        </Box>
+      )}
 
       {/* Sessions List */}
       <Box>
-        <Typography variant="h6" gutterBottom>
-          All Sessions
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">
+            {filter === 'All' ? 'All Sessions' : `${filter} Sessions`}
+          </Typography>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Filter Sessions</InputLabel>
+            <Select
+              value={filter}
+              label="Filter Sessions"
+              onChange={(e) => setFilter(e.target.value)}
+              startAdornment={<FilterIcon sx={{ mr: 1, color: 'text.secondary' }} />}
+            >
+              <MenuItem value="All">All Sessions</MenuItem>
+              <MenuItem value="Complete">Complete</MenuItem>
+              <MenuItem value="Ongoing">Ongoing</MenuItem>
+              <MenuItem value="Upcoming">Upcoming</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
         
-        {sessions.length === 0 ? (
+        {groupedSessions().length === 0 ? (
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 4 }}>
               <SchoolIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                No class sessions found
+                {filter === 'All' ? 'No class sessions found' : `No ${filter.toLowerCase()} sessions found`}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                You haven't booked any class sessions yet.
+                {filter === 'All' 
+                  ? "You haven't booked any class sessions yet."
+                  : `You don't have any ${filter.toLowerCase()} sessions.`
+                }
               </Typography>
             </CardContent>
           </Card>
@@ -794,7 +829,7 @@ const MyClassSessions = () => {
               const first = group[0];
               const groupKey = first.recurringGroupId || first.id;
               const expanded = expandedGroups.includes(groupKey);
-              const status = getSessionStatus(first);
+              const status = getGroupStatus(group); // 使用課程組狀態而不是單個課程狀態
               const canCancel = group.some(s => getSessionStatus(s).label === 'Upcoming' && s.status !== 'CANCELLED');
               
               return (
@@ -806,12 +841,25 @@ const MyClassSessions = () => {
                           <Box display="flex" alignItems="center" mb={1}>
                             <Typography variant="h6" sx={{ mr: 2 }}>
                               {first.title}
+                              {first.replacementForSessionId && (
+                                <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1, fontWeight: 'bold' }}>
+                                  (Replacement Class)
+                                </Typography>
+                              )}
                             </Typography>
                             <Chip 
                               label={status.label} 
                               color={status.color} 
                               size="small" 
                             />
+                            {first.replacementForSessionId && (
+                              <Chip 
+                                label="Replacement Class" 
+                                color="secondary" 
+                                size="small" 
+                                sx={{ ml: 1 }}
+                              />
+                            )}
                           </Box>
                           
                           <Grid container spacing={2}>
@@ -831,6 +879,24 @@ const MyClassSessions = () => {
                               <Typography variant="body2" color="primary" mb={1}>
                                 Total {group.length} sessions
                               </Typography>
+                              {first.replacementForSessionId && (() => {
+                                const originalRequest = leaveRequests.find(req => 
+                                  req.replacementSessionId === first.id
+                                );
+                                return originalRequest ? (
+                                  <Typography variant="body2" color="secondary" mb={1} sx={{ fontStyle: 'italic' }}>
+                                    Replacement for session on {new Date(originalRequest.originalSessionStartTime).toLocaleDateString()} at{' '}
+                                    {new Date(originalRequest.originalSessionStartTime).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="body2" color="secondary" mb={1} sx={{ fontStyle: 'italic' }}>
+                                    Replacement class arranged by coach
+                                  </Typography>
+                                );
+                              })()}
                               <Typography variant="body2" color="text.secondary" mb={1}>
                                 {(() => {
                                   // Find earliest and latest date in group
@@ -896,10 +962,11 @@ const MyClassSessions = () => {
                           
                           {/* Review Button for session groups */}
                           {(() => {
+                            const groupStatus = getGroupStatus(group);
                             const completedSessions = group.filter(s => getSessionStatus(s).label === 'Completed');
-                            const upcomingSessions = group.filter(s => getSessionStatus(s).label === 'Upcoming');
-                            const hasReviews = completedSessions.some(s => s.rating);
-                            const canReview = completedSessions.length > 0 || upcomingSessions.length > 0;
+                            const hasUserReviews = completedSessions.some(s => s.userRating || s.userComment);
+                            // 只有當課程組狀態為 "Completed" 時才顯示 Review 按鈕
+                            const canReview = groupStatus.label === 'Completed' && completedSessions.length > 0;
                             
                             return canReview ? (
                               <Button
@@ -908,9 +975,31 @@ const MyClassSessions = () => {
                                 startIcon={<ReviewIcon />}
                                 onClick={() => openReviewDialog(first)}
                                 sx={{ mb: 1, mr: 1 }}
-                                color={hasReviews ? "success" : "primary"}
+                                color={hasUserReviews ? "success" : "primary"}
                               >
-                                {hasReviews ? 'Edit Review' : 'Review'}
+                                {hasUserReviews ? 'Edit Review' : 'Review'}
+                              </Button>
+                            ) : null;
+                          })()}
+                          
+                          {/* View Feedback Button for session groups */}
+                          {(() => {
+                            const groupStatus = getGroupStatus(group);
+                            const completedSessions = group.filter(s => getSessionStatus(s).label === 'Completed');
+                            const hasFeedback = completedSessions.some(s => s.coachComment);
+                            // 只有當課程組狀態為 "Completed" 時才顯示 View Feedback 按鈕
+                            const canViewFeedback = groupStatus.label === 'Completed' && completedSessions.length > 0;
+                            
+                            return canViewFeedback ? (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<CommentIcon />}
+                                onClick={() => openFeedbackDialog(first)}
+                                sx={{ mb: 1, mr: 1 }}
+                                color="info"
+                              >
+                                {hasFeedback ? 'View Feedback' : 'No Feedback'}
                               </Button>
                             ) : null;
                           })()}
@@ -959,7 +1048,30 @@ const MyClassSessions = () => {
                                                 })}
                                               </>
                                             )}
+                                            {session.replacementForSessionId && (
+                                              <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1, fontWeight: 'bold' }}>
+                                                (Replacement Class)
+                                              </Typography>
+                                            )}
                                           </Typography>
+                                          {session.replacementForSessionId && (() => {
+                                            const originalRequest = leaveRequests.find(req => 
+                                              req.replacementSessionId === session.id
+                                            );
+                                            return originalRequest ? (
+                                              <Typography variant="caption" color="secondary" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
+                                                Replacement for: {new Date(originalRequest.originalSessionStartTime).toLocaleDateString()} at{' '}
+                                                {new Date(originalRequest.originalSessionStartTime).toLocaleTimeString([], { 
+                                                  hour: '2-digit', 
+                                                  minute: '2-digit' 
+                                                })}
+                                              </Typography>
+                                            ) : (
+                                              <Typography variant="caption" color="secondary" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
+                                                Replacement class arranged by coach
+                                              </Typography>
+                                            );
+                                          })()}
                                           <Box display="flex" alignItems="center" mt={0.5}>
                                             <Chip 
                                               label={sessionStatus.label} 
@@ -972,40 +1084,23 @@ const MyClassSessions = () => {
                                               label={attendance.label} 
                                               color={attendance.color} 
                                               size="small" 
+                                              sx={{ mr: 1 }}
                                             />
+                                            {session.replacementForSessionId && (
+                                              <Chip 
+                                                label="Replacement" 
+                                                color="secondary" 
+                                                size="small" 
+                                              />
+                                            )}
                                           </Box>
                                         </Box>
                                         
                                         <Box textAlign="right">
-                                          {session.coachComment && (
-                                            <Typography variant="caption" color="text.secondary" display="block">
-                                              {session.coachComment}
-                                            </Typography>
-                                          )}
-                                          {session.rating && (
-                                            <Box display="flex" alignItems="center" justifyContent="flex-end">
-                                              <Rating value={session.rating} readOnly size="small" />
-                                              <Typography variant="caption" sx={{ ml: 0.5 }}>
-                                                ({session.rating}/5)
-                                              </Typography>
-                                            </Box>
-                                          )}
+                                          {/* 移除個別課程的評價顯示 */}
                                           
                                           {/* Action Buttons */}
                                           <Box sx={{ mt: 1 }}>
-                                            {/* Review Button for completed sessions */}
-                                            {sessionStatus.label === 'Completed' && (
-                                              <Button
-                                                variant="outlined"
-                                                size="small"
-                                                startIcon={<ReviewIcon />}
-                                                onClick={() => openReviewDialog(session)}
-                                                sx={{ mr: 1, mb: 1 }}
-                                              >
-                                                {session.rating ? 'Edit Review' : 'Review'}
-                                              </Button>
-                                            )}
-                                            
                                             {/* Leave Request Button for upcoming sessions */}
                                             {sessionStatus.label === 'Upcoming' && (() => {
                                               const leaveRequest = getLeaveRequest(session);
@@ -1156,7 +1251,7 @@ const MyClassSessions = () => {
         fullWidth
       >
         <DialogTitle>
-          {reviewDialog.session ? 'Review Coach & Class Experience' : 'Review'}
+          {reviewDialog.session ? 'Review Coach & Class Experience (User to Coach)' : 'Review'}
         </DialogTitle>
         <DialogContent>
           {reviewDialog.session && (
@@ -1184,7 +1279,7 @@ const MyClassSessions = () => {
                   Coach: {reviewDialog.session.coachName}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Please rate your experience with this coach for this class session
+                  Please rate your experience with this coach for this class session (Your feedback will be visible to the coach)
                 </Typography>
               </Box>
               
@@ -1208,7 +1303,7 @@ const MyClassSessions = () => {
               
               <Box>
                 <Typography variant="subtitle1" gutterBottom>
-                  Additional Comments about Coach & Class (Optional)
+                  Your Comments about Coach & Class (Optional)
                 </Typography>
                 <TextField
                   fullWidth
@@ -1236,7 +1331,7 @@ const MyClassSessions = () => {
             variant="contained"
             disabled={submittingReview || reviewData.rating === 0}
           >
-            {submittingReview ? <CircularProgress size={20} /> : 'Submit Review'}
+            {submittingReview ? <CircularProgress size={20} /> : 'Submit Your Review'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1328,73 +1423,172 @@ const MyClassSessions = () => {
               
               <Divider sx={{ my: 2 }} />
               
-              <Typography variant="subtitle1" gutterBottom>
-                Coach's Available Times (Next 30 Days)
-              </Typography>
-              
-              {loadingCoachSchedule ? (
-                <Box display="flex" justifyContent="center" py={2}>
-                  <CircularProgress />
-                </Box>
-              ) : coachSchedule.length > 0 ? (
-                <Grid container spacing={1}>
-                  {coachSchedule.map((session, index) => (
-                    <Grid item xs={12} sm={6} key={index}>
-                      <Card variant="outlined">
-                        <CardContent sx={{ py: 1 }}>
-                          <Typography variant="body2" fontWeight="bold">
-                            {new Date(session.startTime).toLocaleDateString()}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {new Date(session.startTime).toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })} - {new Date(session.endTime).toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </Typography>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            sx={{ mt: 1 }}
-                            onClick={() => {
-                              // Handle makeup class booking
-                              console.log('Book makeup class:', session);
-                            }}
-                          >
-                            Book This Time
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Box textAlign="center" py={2}>
-                  <Typography color="text.secondary" gutterBottom>
-                    No available times found for the next 30 days.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={async () => {
-                      console.log('Message button clicked');
-                      console.log('Session data:', makeupDialog.session);
-                      console.log('Coach ID:', makeupDialog.session.coachId);
-                      console.log('Coach Name:', makeupDialog.session.coachName);
-                      await sendMessageToCoach(makeupDialog.session.coachId, makeupDialog.session.coachName);
-                    }}
-                  >
-                    Message Coach to Arrange Time
-                  </Button>
-                </Box>
-              )}
+              <Box textAlign="center" py={4}>
+                <Typography variant="body1" color="text.secondary" gutterBottom>
+                  Please contact your coach to arrange a makeup class time.
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  onClick={async () => {
+                    console.log('Message button clicked');
+                    console.log('Session data:', makeupDialog.session);
+                    console.log('Coach ID:', makeupDialog.session.coachId);
+                    console.log('Coach Name:', makeupDialog.session.coachName);
+                    await sendMessageToCoach(makeupDialog.session.coachId, makeupDialog.session.coachName);
+                  }}
+                  sx={{ mt: 2 }}
+                >
+                  Message Coach to Arrange Time
+                </Button>
+              </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMakeupDialog({ open: false, session: null })}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Feedback Dialog */}
+      <Dialog 
+        open={feedbackDialog.open} 
+        onClose={() => setFeedbackDialog({ open: false, session: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Coach Feedback (Coach to User)
+        </DialogTitle>
+        <DialogContent>
+          {feedbackDialog.session && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                {feedbackDialog.session.title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Coach: {feedbackDialog.session.coachName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Date: {new Date(feedbackDialog.session.startTime).toLocaleDateString()} at{' '}
+                {new Date(feedbackDialog.session.startTime).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </Typography>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              {/* 如果是課程組，顯示所有課程的反饋 */}
+              {feedbackDialog.session.recurringGroupId ? (
+                (() => {
+                  const groupSessions = sessions.filter(s => s.recurringGroupId === feedbackDialog.session.recurringGroupId);
+                  const completedSessions = groupSessions.filter(s => getSessionStatus(s).label === 'Completed');
+                  
+                                     if (completedSessions.length === 0) {
+                     return (
+                       <Box textAlign="center" py={4}>
+                         <CommentIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                         <Typography variant="h6" color="text.secondary" gutterBottom>
+                           No Coach Feedback Available
+                         </Typography>
+                         <Typography variant="body2" color="text.secondary">
+                           No coach feedback has been provided for this class session yet.
+                         </Typography>
+                       </Box>
+                     );
+                   }
+                  
+                  return (
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Coach's Feedback for All Sessions (Coach to User):
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {completedSessions.map((session, index) => (
+                          <Grid item xs={12} key={session.id}>
+                            <Card variant="outlined">
+                              <CardContent>
+                                <Typography variant="subtitle2" gutterBottom>
+                                  Session {index + 1}: {new Date(session.startTime).toLocaleDateString()} at{' '}
+                                  {new Date(session.startTime).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </Typography>
+                                
+                                {session.coachComment ? (
+                                  <Box>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                      Coach's Feedback (Coach to User):
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ 
+                                      p: 2, 
+                                      bgcolor: 'grey.50', 
+                                      borderRadius: 1,
+                                      border: '1px solid',
+                                      borderColor: 'grey.300'
+                                    }}>
+                                      {session.coachComment}
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No feedback provided for this session.
+                                  </Typography>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  );
+                })()
+              ) : (
+                /* 單個課程的反饋 */
+                (() => {
+                  if (!feedbackDialog.session.coachComment) {
+                    return (
+                      <Box textAlign="center" py={4}>
+                        <CommentIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                        <Typography variant="h6" color="text.secondary" gutterBottom>
+                          No Coach Feedback Available
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          No coach feedback has been provided for this class session yet.
+                        </Typography>
+                      </Box>
+                    );
+                  }
+                  
+                  return (
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Coach's Feedback (Coach to User):
+                      </Typography>
+                      <Typography variant="body1" sx={{ 
+                        p: 3, 
+                        bgcolor: 'grey.50', 
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'grey.300',
+                        minHeight: '100px'
+                      }}>
+                        {feedbackDialog.session.coachComment}
+                      </Typography>
+                    </Box>
+                  );
+                })()
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFeedbackDialog({ open: false, session: null })}>
             Close
           </Button>
         </DialogActions>

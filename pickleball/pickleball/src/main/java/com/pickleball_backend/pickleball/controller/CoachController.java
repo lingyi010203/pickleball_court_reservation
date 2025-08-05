@@ -6,6 +6,8 @@ import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.*;
 import com.pickleball_backend.pickleball.repository.*;
 import com.pickleball_backend.pickleball.service.CoachCourtService;
+import com.pickleball_backend.pickleball.service.EscrowAccountService;
+import com.pickleball_backend.pickleball.service.ClassSessionServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -47,6 +49,9 @@ public class CoachController {
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final MemberRepository memberRepository;
+    private final MembershipTierRepository membershipTierRepository;
+    private final EscrowAccountService escrowAccountService;
+    private final ClassSessionServiceImpl classSessionService;
 
     // 獲取教練可用的球場
     @GetMapping("/available-courts")
@@ -931,10 +936,109 @@ public class CoachController {
         }
     }
 
-    @GetMapping("/test")
+
+
+
+
+    @PostMapping("/fix-wallet-balance")
     @PreAuthorize("hasAuthority('ROLE_COACH')")
-    public ResponseEntity<?> testEndpoint() {
-        return ResponseEntity.ok(Map.of("message", "Coach controller is working", "timestamp", System.currentTimeMillis()));
+    public ResponseEntity<?> fixWalletBalance() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User coach = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
+
+            // 獲取教練的所有收入記錄
+            List<Payment> coachIncomePayments = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED")
+                    .stream()
+                    .filter(payment -> {
+                        if (payment.getTransactionId() != null && payment.getTransactionId().startsWith("SETTLEMENT_")) {
+                            String sessionIdStr = payment.getTransactionId().replace("SETTLEMENT_", "");
+                            try {
+                                Integer sessionId = Integer.parseInt(sessionIdStr);
+                                ClassSession session = sessionRepository.findById(sessionId).orElse(null);
+                                return session != null && session.getCoach().getId().equals(coach.getId());
+                            } catch (NumberFormatException e) {
+                                return false;
+                            }
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+
+            // 確保教練有Member和Wallet記錄
+            Member coachMember = memberRepository.findByUser(coach);
+            if (coachMember == null) {
+                // 創建默認會員等級
+                MembershipTier defaultTier = membershipTierRepository.findByTierName("SILVER");
+                if (defaultTier == null) {
+                    defaultTier = new MembershipTier();
+                    defaultTier.setTierName("SILVER");
+                    defaultTier.setMinPoints(0);
+                    defaultTier.setMaxPoints(2000);
+                    defaultTier.setBenefits("10% discount");
+                    defaultTier.setActive(true);
+                    defaultTier = membershipTierRepository.save(defaultTier);
+                }
+                
+                coachMember = new Member();
+                coachMember.setUser(coach);
+                coachMember.setTier(defaultTier);
+                coachMember.setTierPointBalance(0);
+                coachMember.setRewardPointBalance(0);
+                coachMember = memberRepository.save(coachMember);
+            }
+
+            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId()).orElse(null);
+            if (coachWallet == null) {
+                coachWallet = new Wallet();
+                coachWallet.setMember(coachMember);
+                coachWallet.setBalance(0.00);
+                coachWallet.setFrozenBalance(0.00);
+                coachWallet.setTotalDeposited(0.00);
+                coachWallet.setTotalSpent(0.00);
+                coachWallet.setStatus("ACTIVE");
+                coachWallet = walletRepository.save(coachWallet);
+            }
+
+            // 計算總收入並更新錢包
+            double totalIncome = coachIncomePayments.stream()
+                    .mapToDouble(Payment::getAmount)
+                    .sum();
+
+            double oldBalance = coachWallet.getBalance();
+            double newBalance = oldBalance + totalIncome; // 累加而不是覆蓋
+            coachWallet.setBalance(newBalance);
+            walletRepository.save(coachWallet);
+
+            // 創建一筆總的交易記錄
+            if (totalIncome > 0) {
+                WalletTransaction totalTransaction = new WalletTransaction();
+                totalTransaction.setWalletId(coachWallet.getId());
+                totalTransaction.setTransactionType("COACH_INCOME");
+                totalTransaction.setAmount(totalIncome);
+                totalTransaction.setBalanceBefore(oldBalance);
+                totalTransaction.setBalanceAfter(newBalance);
+                totalTransaction.setFrozenBefore(coachWallet.getFrozenBalance());
+                totalTransaction.setFrozenAfter(coachWallet.getFrozenBalance());
+                totalTransaction.setReferenceType("SYSTEM_ADJUSTMENT");
+                totalTransaction.setReferenceId(0);
+                totalTransaction.setDescription("System adjustment: Total income from " + coachIncomePayments.size() + " sessions");
+                totalTransaction.setStatus("COMPLETED");
+                walletTransactionRepository.save(totalTransaction);
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Wallet balance fixed successfully");
+            response.put("oldBalance", oldBalance);
+            response.put("newBalance", totalIncome);
+            response.put("totalSessions", coachIncomePayments.size());
+            response.put("totalIncome", totalIncome);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // 新增：獲取教練錢包餘額
@@ -946,15 +1050,42 @@ public class CoachController {
             User coach = userRepository.findByUserAccount_Username(username)
                     .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
 
-            // 獲取教練的Member記錄
+            // 獲取教練的Member記錄，如果不存在則創建
             Member coachMember = memberRepository.findByUser(coach);
             if (coachMember == null) {
-                throw new ResourceNotFoundException("Coach member not found");
+                // 創建默認會員等級
+                MembershipTier defaultTier = membershipTierRepository.findByTierName("SILVER");
+                if (defaultTier == null) {
+                    defaultTier = new MembershipTier();
+                    defaultTier.setTierName("SILVER");
+                    defaultTier.setMinPoints(0);
+                    defaultTier.setMaxPoints(2000);
+                    defaultTier.setBenefits("10% discount");
+                    defaultTier.setActive(true);
+                    defaultTier = membershipTierRepository.save(defaultTier);
+                }
+                
+                // 創建新的Member記錄
+                coachMember = new Member();
+                coachMember.setUser(coach);
+                coachMember.setTier(defaultTier);
+                coachMember.setTierPointBalance(0);
+                coachMember.setRewardPointBalance(0);
+                coachMember = memberRepository.save(coachMember);
             }
 
-            // 獲取教練的錢包
-            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Coach wallet not found"));
+            // 獲取教練的錢包，如果不存在則創建
+            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId()).orElse(null);
+            if (coachWallet == null) {
+                coachWallet = new Wallet();
+                coachWallet.setMember(coachMember);
+                coachWallet.setBalance(0.00);
+                coachWallet.setFrozenBalance(0.00);
+                coachWallet.setTotalDeposited(0.00);
+                coachWallet.setTotalSpent(0.00);
+                coachWallet.setStatus("ACTIVE");
+                coachWallet = walletRepository.save(coachWallet);
+            }
 
             // 獲取最近的交易記錄
             Pageable pageable = PageRequest.of(0, 10);
@@ -998,15 +1129,42 @@ public class CoachController {
             User coach = userRepository.findByUserAccount_Username(username)
                     .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
 
-            // 獲取教練的Member記錄
+            // 獲取教練的Member記錄，如果不存在則創建
             Member coachMember = memberRepository.findByUser(coach);
             if (coachMember == null) {
-                throw new ResourceNotFoundException("Coach member not found");
+                // 創建默認會員等級
+                MembershipTier defaultTier = membershipTierRepository.findByTierName("SILVER");
+                if (defaultTier == null) {
+                    defaultTier = new MembershipTier();
+                    defaultTier.setTierName("SILVER");
+                    defaultTier.setMinPoints(0);
+                    defaultTier.setMaxPoints(2000);
+                    defaultTier.setBenefits("10% discount");
+                    defaultTier.setActive(true);
+                    defaultTier = membershipTierRepository.save(defaultTier);
+                }
+                
+                // 創建新的Member記錄
+                coachMember = new Member();
+                coachMember.setUser(coach);
+                coachMember.setTier(defaultTier);
+                coachMember.setTierPointBalance(0);
+                coachMember.setRewardPointBalance(0);
+                coachMember = memberRepository.save(coachMember);
             }
 
-            // 獲取教練的錢包
-            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Coach wallet not found"));
+            // 獲取教練的錢包，如果不存在則創建
+            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId()).orElse(null);
+            if (coachWallet == null) {
+                coachWallet = new Wallet();
+                coachWallet.setMember(coachMember);
+                coachWallet.setBalance(0.00);
+                coachWallet.setFrozenBalance(0.00);
+                coachWallet.setTotalDeposited(0.00);
+                coachWallet.setTotalSpent(0.00);
+                coachWallet.setStatus("ACTIVE");
+                coachWallet = walletRepository.save(coachWallet);
+            }
 
             // 獲取錢包交易記錄
             List<WalletTransaction> transactions = walletTransactionRepository.findByWalletIdOrderByCreatedAtDesc(coachWallet.getId(), Pageable.unpaged()).getContent();
@@ -1038,7 +1196,8 @@ public class CoachController {
                         
                         // 判斷是收入還是支出
                         boolean isIncome = "DEPOSIT".equals(transaction.getTransactionType()) || 
-                                         "REFUND".equals(transaction.getTransactionType());
+                                         "REFUND".equals(transaction.getTransactionType()) ||
+                                         "COACH_INCOME".equals(transaction.getTransactionType());
                         record.put("isIncome", isIncome);
                         
                         return record;
@@ -1087,9 +1246,19 @@ public class CoachController {
             // 獲取教練的課程收入狀態
             List<ClassSession> sessions = sessionRepository.findByCoachIdOrderByStartTimeDesc(coach.getId());
             
-            List<Map<String, Object>> revenueStatus = sessions.stream()
-                    .filter(session -> session.getRegistrations() != null && !session.getRegistrations().isEmpty())
-                    .map(session -> {
+            List<Map<String, Object>> revenueStatus = new ArrayList<>();
+            
+            for (ClassSession session : sessions) {
+                try {
+                    // 安全地檢查 registrations
+                    List<ClassRegistration> registrations = session.getRegistrations();
+                    if (registrations == null) {
+                        // 如果 registrations 為 null，嘗試從數據庫重新獲取
+                        registrations = registrationRepository.findByClassSessionId(session.getId());
+                    }
+                    
+                    // 只處理有報名的課程
+                    if (registrations != null && !registrations.isEmpty()) {
                         Map<String, Object> status = new HashMap<>();
                         status.put("sessionId", session.getId());
                         status.put("title", session.getTitle());
@@ -1098,13 +1267,11 @@ public class CoachController {
                         status.put("revenueDistributed", session.getRevenueDistributed());
                         
                         // 計算收入
-                        double totalRevenue = 0.0;
-                        if (session.getRegistrations() != null) {
-                            totalRevenue = session.getRegistrations().size() * session.getPrice();
-                        }
+                        double totalRevenue = registrations.size() * session.getPrice();
                         status.put("totalRevenue", totalRevenue);
                         status.put("coachShare", totalRevenue * 0.80);
                         status.put("platformShare", totalRevenue * 0.20);
+                        status.put("participantCount", registrations.size());
                         
                         // 計算距離課程開始的時間
                         if (session.getStartTime() != null) {
@@ -1115,9 +1282,13 @@ public class CoachController {
                             status.put("willDistributeSoon", hoursUntilStart <= 24 && hoursUntilStart > 0);
                         }
                         
-                        return status;
-                    })
-                    .collect(Collectors.toList());
+                        revenueStatus.add(status);
+                    }
+                } catch (Exception e) {
+                    // 記錄錯誤但繼續處理其他課程
+                    System.err.println("Error processing session " + session.getId() + ": " + e.getMessage());
+                }
+            }
 
             Map<String, Object> response = new HashMap<>();
             response.put("coachId", coach.getId());
@@ -1133,6 +1304,180 @@ public class CoachController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error retrieving revenue status: " + e.getMessage());
+        }
+    }
+
+    // 檢查課程狀態和託管支付
+    @GetMapping("/debug/sessions-status")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> debugSessionsStatus() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User coach = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
+
+            List<ClassSession> allSessions = sessionRepository.findAll();
+            List<Map<String, Object>> result = allSessions.stream()
+                    .filter(session -> session.getCoach() != null && session.getCoach().getId().equals(coach.getId()))
+                    .map(session -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("id", session.getId());
+                        map.put("title", session.getTitle());
+                        map.put("status", session.getStatus());
+                        map.put("slotType", session.getSlotType());
+                        map.put("startTime", session.getStartTime());
+                        map.put("endTime", session.getEndTime());
+                        map.put("currentParticipants", session.getCurrentParticipants());
+                        map.put("maxParticipants", session.getMaxParticipants());
+                        map.put("allowReplacement", session.getAllowReplacement());
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error retrieving sessions status");
+        }
+    }
+
+    // 更新時段是否允許補課
+    @PutMapping("/slots/{slotId}/allow-replacement")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> updateSlotAllowReplacement(
+            @PathVariable Integer slotId,
+            @RequestBody Map<String, Boolean> request) {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User coach = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
+
+            Boolean allowReplacement = request.get("allowReplacement");
+            if (allowReplacement == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "allowReplacement field is required"));
+            }
+
+            coachCourtService.updateSlotAllowReplacement(coach.getId(), slotId, allowReplacement);
+            return ResponseEntity.ok(Map.of("message", "Slot allowReplacement updated successfully"));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error updating slot allowReplacement");
+        }
+    }
+
+    // 獲取教練的所有補課課程
+    @GetMapping("/replacement-sessions")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> getReplacementSessions() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User coach = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
+
+            List<ClassSession> replacementSessions = coachCourtService.getReplacementSessionsByCoach(coach.getId());
+            
+            List<Map<String, Object>> result = replacementSessions.stream().map(session -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", session.getId());
+                map.put("title", session.getTitle());
+                map.put("startTime", session.getStartTime());
+                map.put("endTime", session.getEndTime());
+                map.put("status", session.getStatus());
+                map.put("currentParticipants", session.getCurrentParticipants());
+                map.put("maxParticipants", session.getMaxParticipants());
+                map.put("replacementForSessionId", session.getReplacementForSessionId());
+                
+                if (session.getCourt() != null) {
+                    map.put("courtName", session.getCourt().getName());
+                    if (session.getCourt().getVenue() != null) {
+                        map.put("venueName", session.getCourt().getVenue().getName());
+                    }
+                }
+                
+                // 獲取報名學生
+                if (session.getRegistrations() != null) {
+                    List<Map<String, Object>> students = session.getRegistrations().stream().map(reg -> {
+                        Map<String, Object> studentMap = new HashMap<>();
+                        if (reg.getMember() != null && reg.getMember().getUser() != null) {
+                            studentMap.put("studentId", reg.getMember().getUser().getId());
+                            studentMap.put("studentName", reg.getMember().getUser().getName());
+                            studentMap.put("studentEmail", reg.getMember().getUser().getEmail());
+                        }
+                        return studentMap;
+                    }).collect(Collectors.toList());
+                    map.put("students", students);
+                }
+                
+                return map;
+            }).collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error retrieving replacement sessions");
+        }
+    }
+
+    @PostMapping("/trigger-settlement")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> triggerSettlement() {
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User coach = userRepository.findByUserAccount_Username(username)
+                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
+            
+            // 手动触发收入分配
+            List<ClassSession> completedSessions = sessionRepository.findByStatus("COMPLETED");
+            int settledCount = 0;
+            List<String> messages = new ArrayList<>();
+            
+            for (ClassSession session : completedSessions) {
+                if (session.getCoach().getId().equals(coach.getId())) {
+                    try {
+                        // 检查是否已经有收入分配记录
+                        List<Payment> existingSettlements = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED")
+                            .stream()
+                            .filter(payment -> payment.getTransactionId() != null && 
+                                             payment.getTransactionId().equals("SETTLEMENT_" + session.getId()))
+                            .collect(Collectors.toList());
+                        
+                        // 检查是否有托管支付
+                        List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED")
+                            .stream()
+                            .filter(payment -> payment.getTransactionId() != null && 
+                                             payment.getTransactionId().startsWith("SESSION_" + session.getId() + "_"))
+                            .collect(Collectors.toList());
+                        
+                        messages.add(String.format("Session %d: %d existing settlements, %d escrowed payments", 
+                                                  session.getId(), existingSettlements.size(), escrowedPayments.size()));
+                        
+                        // 如果有托管支付但没有结算记录，则进行结算
+                        if (!escrowedPayments.isEmpty() && existingSettlements.isEmpty()) {
+                            escrowAccountService.settleClassSession(session);
+                            settledCount++;
+                            messages.add(String.format("Successfully settled session %d", session.getId()));
+                        } else if (escrowedPayments.isEmpty()) {
+                            messages.add(String.format("No escrowed payments found for session %d", session.getId()));
+                        } else if (!existingSettlements.isEmpty()) {
+                            messages.add(String.format("Session %d already has settlement records", session.getId()));
+                        }
+                    } catch (Exception e) {
+                        messages.add(String.format("Failed to settle session %d: %s", session.getId(), e.getMessage()));
+                    }
+                }
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Settlement triggered successfully",
+                "settledSessions", settledCount,
+                "totalCompletedSessions", completedSessions.size(),
+                "details", messages
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

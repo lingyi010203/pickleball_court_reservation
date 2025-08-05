@@ -35,6 +35,8 @@ public class Event {
     private Integer capacity;
     
     private String status;
+    
+    private String location; // 新增：事件地點
 
     @Column(name = "organizer_id")
     private Integer organizerId;
@@ -56,7 +58,7 @@ public class Event {
     )
     private Set<Court> courts;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "venue_id")
     private Venue venue; // optional, for full venue booking
 

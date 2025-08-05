@@ -33,7 +33,7 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import ClassSessionCreateForm from '../class/ClassSessionCreateForm';
 import EditClassSessionDialog from '../class/EditClassSessionDialog';
-import DeleteIcon from '@mui/icons-material/Delete';
+// 移除删除按钮，不再需要 DeleteIcon
 import ClassSessionService from '../../service/ClassSessionService';
 
 // Query busy slots for a court on a specific day
@@ -607,10 +607,7 @@ const CoachScheduleManagement = () => {
                           <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                             <Typography fontWeight="bold" color={session.status === 'AVAILABLE' ? 'success.dark' : 'warning.dark'}>{session.title || 'Session'}</Typography>
                             <Typography variant="caption" sx={{ bgcolor: session.status === 'AVAILABLE' ? 'success.light' : 'warning.light', color: session.status === 'AVAILABLE' ? 'success.dark' : 'warning.dark', px: 1, borderRadius: 1 }}>{session.status}</Typography>
-                            {/* 新增 Cancel 按鈕 */}
-                            <IconButton color="error" size="small" onClick={e => { e.stopPropagation(); handleCancelSession(session.id); }}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                            {/* 移除删除按钮 - 教练不能删除课程 */}
                           </Box>
                           <Box display="flex" alignItems="center" gap={1} color={session.status === 'AVAILABLE' ? 'success.main' : 'warning.main'}>
                             <AccessTimeIcon fontSize="small" />

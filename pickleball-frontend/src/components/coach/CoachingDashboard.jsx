@@ -36,6 +36,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  FormHelperText,
   Badge,
   Tabs,
   Tab,
@@ -68,7 +69,10 @@ import {
   Receipt,
   AccountBalanceWallet,
   TrendingDown,
-  AccountBalance
+  AccountBalance,
+  CheckCircleOutline,
+  // 移除 ExpandMore 导入
+  // 移除 ExpandLess 导入
 } from '@mui/icons-material';
 import CoachScheduleManagement from './CoachScheduleManagement';
 import MessagingPage from '../messaging/MessagingPage';
@@ -78,10 +82,11 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axiosConfig';
 import { useNavigate } from 'react-router-dom';
 import StudentManagementSystem from './StudentManagementSystem';
-import DeleteIcon from '@mui/icons-material/Delete';
+// 移除删除按钮，不再需要 DeleteIcon
 import ClassSessionService from '../../service/ClassSessionService';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import EditClassSessionDialog from '../class/EditClassSessionDialog';
 
 const drawerWidth = 240;
 
@@ -96,6 +101,7 @@ export default function CoachingDashboard() {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const [expandedGroups, setExpandedGroups] = useState([]); // for expand/collapse
+  // 移除 replacement sessions 相关状态
   const { currentUser, logout, hasRole } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -107,47 +113,38 @@ export default function CoachingDashboard() {
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [unattendedClasses, setUnattendedClasses] = useState([]);
   const [unattendedClassesCount, setUnattendedClassesCount] = useState(0);
+  
+  // 編輯對話框相關狀態
+  const [editSession, setEditSession] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  
+  // 補課安排相關狀態
+  const [makeupDialogOpen, setMakeupDialogOpen] = useState(false);
+  const [selectedMakeupRequest, setSelectedMakeupRequest] = useState(null);
+  const [availableSessionsForMakeup, setAvailableSessionsForMakeup] = useState([]);
+  const [loadingAvailableSessions, setLoadingAvailableSessions] = useState(false);
+  const [selectedCourseForSlots, setSelectedCourseForSlots] = useState(null);
+  const [showSlotsDialog, setShowSlotsDialog] = useState(false);
+  
   // Add these two lines to fix no-undef error
   const coachInitial = currentUser?.username?.charAt(0)?.toUpperCase() || 'C';
   const coachName = currentUser?.username || 'Coach';
 
-  // 新增：獲取教練收入歷史
-  const [incomeHistory, setIncomeHistory] = useState([]);
-  const [incomeLoading, setIncomeLoading] = useState(false);
+  // 錢包相關狀態
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [walletLoading, setWalletLoading] = useState(false);
-  const [showWalletTransactions, setShowWalletTransactions] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
-  const [revenueStatus, setRevenueStatus] = useState([]);
-  const [revenueLoading, setRevenueLoading] = useState(false);
 
-  const fetchIncomeHistory = async () => {
-    try {
-      setIncomeLoading(true);
-      const response = await fetch('http://localhost:8081/api/coach/income-history', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setIncomeHistory(data.incomeHistory || []);
-        console.log('Income history:', data);
-      } else {
-        console.error('Failed to fetch income history');
-      }
-    } catch (error) {
-      console.error('Error fetching income history:', error);
-    } finally {
-      setIncomeLoading(false);
-    }
-  };
 
-  const fetchWalletBalance = async () => {
+
+  const fetchWalletBalance = async (forceRefresh = false) => {
     try {
       console.log('=== Fetching wallet balance ===');
-      const response = await CoachService.getWalletBalance();
+      console.log('Force refresh:', forceRefresh);
+      
+      // 添加時間戳參數來避免緩存
+      const timestamp = forceRefresh ? `?t=${Date.now()}` : '';
+      const response = await CoachService.getWalletBalance(timestamp);
       console.log('Wallet balance response:', response);
       setWalletBalance(response);
     } catch (error) {
@@ -164,10 +161,15 @@ export default function CoachingDashboard() {
     }
   };
 
-  const fetchWalletTransactions = async () => {
+  const fetchWalletTransactions = async (forceRefresh = false) => {
     try {
       setWalletLoading(true);
-      const response = await CoachService.getWalletTransactions();
+      console.log('=== Fetching wallet transactions ===');
+      console.log('Force refresh:', forceRefresh);
+      
+      // 添加時間戳參數來避免緩存
+      const timestamp = forceRefresh ? `?t=${Date.now()}` : '';
+      const response = await CoachService.getWalletTransactions(timestamp);
       setWalletTransactions(response.transactions || []);
     } catch (error) {
       console.error('Failed to fetch wallet transactions:', error);
@@ -176,23 +178,32 @@ export default function CoachingDashboard() {
     }
   };
 
-  const fetchRevenueStatus = async () => {
+
+
+  // 获取球场和场馆数据
+  const fetchCourtsAndVenues = async () => {
     try {
-      setRevenueLoading(true);
-      const response = await api.get('/coach/revenue-status');
-      setRevenueStatus(response.data.revenueStatus || []);
+      const courtsResponse = await fetch('http://localhost:8081/api/coach/all-courts', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        }
+      });
+      
+      if (courtsResponse.ok) {
+        const courtsData = await courtsResponse.json();
+        setCourts(courtsData);
+      }
     } catch (error) {
-      console.error('Failed to fetch revenue status:', error);
-    } finally {
-      setRevenueLoading(false);
+      console.error('Failed to fetch courts:', error);
     }
   };
 
-  // 在組件加載時獲取收入歷史和錢包餘額
+  // 在組件加載時獲取錢包餘額
   useEffect(() => {
     if (currentUser?.id) {
-      fetchIncomeHistory();
       fetchWalletBalance();
+      fetchWalletTransactions();
+      fetchCourtsAndVenues();
     }
   }, [currentUser?.id]);
 
@@ -244,22 +255,32 @@ export default function CoachingDashboard() {
       if (currentUser && currentUser.id) {
         console.log('=== fetchLeaveRequests ===');
         console.log('Current user ID:', currentUser.id);
-        const data = await LeaveRequestService.getPendingRequestsByCoach(currentUser.id);
-        console.log('Fetched leave requests data:', data);
-        console.log('Number of requests:', data.length);
+        
+        // 获取所有请求，包括已批准的补课请求
+        const allData = await LeaveRequestService.getAllRequestsByCoach(currentUser.id);
+        const pendingData = await LeaveRequestService.getPendingRequestsByCoach(currentUser.id);
+        
+        console.log('Fetched all leave requests data:', allData);
+        console.log('Fetched pending leave requests data:', pendingData);
+        console.log('Number of all requests:', allData.length);
+        console.log('Number of pending requests:', pendingData.length);
         
         // 調試每個請求的場地信息
-        data.forEach((request, index) => {
-          console.log(`Request ${index + 1} venue info:`, {
+        allData.forEach((request, index) => {
+          console.log(`Request ${index + 1} info:`, {
+            id: request.id,
+            status: request.status,
             venue: request.venue,
             state: request.state,
             court: request.court,
-            originalSessionTitle: request.originalSessionTitle
+            originalSessionTitle: request.originalSessionTitle,
+            replacementSessionId: request.replacementSessionId,
+            studentId: request.studentId
           });
         });
         
-        setLeaveRequests(data);
-        setPendingRequestCount(data.length);
+        setLeaveRequests(allData); // 使用所有请求数据，包括已批准的补课
+        setPendingRequestCount(pendingData.length); // 只计算待处理请求数量
       }
     } catch (error) {
       console.error('Failed to fetch leave requests:', error);
@@ -285,7 +306,7 @@ export default function CoachingDashboard() {
   const [cancelMessage, setCancelMessage] = useState('');
   const [cancelledSessionObj, setCancelledSessionObj] = useState(null);
   const [busySlots, setBusySlots] = useState([]);
-  const [replacementClasses, setReplacementClasses] = useState([]);
+
 
   // 新增：Dashboard 數據計算
   const [dashboardStats, setDashboardStats] = useState({
@@ -338,46 +359,60 @@ export default function CoachingDashboard() {
     });
   };
 
+  // Fetch coach's class sessions
+  const fetchSessions = async () => {
+    setLoadingSessions(true);
+    setSessionError('');
+    try {
+      // 先調用調試端點
+      const debugData = await CoachService.getDebugSessions();
+      console.log('Debug data:', debugData);
+      
+      // Fetch all sessions: use a very early start and far future end
+      const start = new Date(2000, 0, 1, 0, 0, 0); // Jan 1, 2000
+      const end = new Date(2100, 11, 31, 23, 59, 59); // Dec 31, 2100
+      const data = await CoachService.getScheduleWithRegistrations(start.toISOString(), end.toISOString());
+      console.log('Fetched sessions data:', data); // 調試信息
+      
+      // 调试：检查是否有补课课程
+      const replacementSessions = data.filter(session => session.replacementForSessionId);
+      console.log('Replacement sessions found:', replacementSessions.length);
+      console.log('All sessions data:', data);
+      
+      // 检查所有课程的replacementForSessionId字段
+      data.forEach(session => {
+        if (session.replacementForSessionId) {
+          console.log('Found replacement session:', {
+            id: session.id,
+            title: session.title,
+            replacementForSessionId: session.replacementForSessionId
+          });
+        }
+      });
+      
+      replacementSessions.forEach(session => {
+        console.log('Replacement session:', {
+          id: session.id,
+          title: session.title,
+          replacementForSessionId: session.replacementForSessionId
+        });
+      });
+      
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching sessions:', err); // 調試信息
+      setSessionError('Failed to load sessions.');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
   // Fetch coach's class sessions for the current month on mount
   useEffect(() => {
-    const fetchSessions = async () => {
-      setLoadingSessions(true);
-      setSessionError('');
-      try {
-        // 先調用調試端點
-        const debugData = await CoachService.getDebugSessions();
-        console.log('Debug data:', debugData);
-        
-        // Fetch all sessions: use a very early start and far future end
-        const start = new Date(2000, 0, 1, 0, 0, 0); // Jan 1, 2000
-        const end = new Date(2100, 11, 31, 23, 59, 59); // Dec 31, 2100
-        const data = await CoachService.getScheduleWithRegistrations(start.toISOString(), end.toISOString());
-        console.log('Fetched sessions data:', data); // 調試信息
-        setSessions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Error fetching sessions:', err); // 調試信息
-        setSessionError('Failed to load sessions.');
-      } finally {
-        setLoadingSessions(false);
-      }
-    };
     fetchSessions();
   }, []);
 
-  // Fetch replacement classes
-  useEffect(() => {
-    const fetchReplacements = async () => {
-      try {
-        if (currentUser && currentUser.id) {
-          const data = await ClassSessionService.getReplacementClasses(currentUser.id);
-          setReplacementClasses(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error('Failed to load replacement classes:', err);
-      }
-    };
-    fetchReplacements();
-  }, [currentUser]);
+
 
   // Fetch unread messages count
   useEffect(() => {
@@ -507,6 +542,17 @@ export default function CoachingDashboard() {
       }
     };
     fetchData();
+    
+    // 設置自動刷新 - 每5分鐘刷新一次錢包數據
+    const walletRefreshInterval = setInterval(() => {
+      fetchWalletBalance();
+      fetchWalletTransactions();
+    }, 5 * 60 * 1000); // 5分鐘
+    
+    // 清理定時器
+    return () => {
+      clearInterval(walletRefreshInterval);
+    };
   }, []);
 
   // 計算 Dashboard 統計數據
@@ -784,6 +830,180 @@ export default function CoachingDashboard() {
     );
   };
 
+  // 移除 handleReplacementSessionExpand 函数
+
+
+
+  const handleArrangeMakeupClass = async (request) => {
+    try {
+      setSelectedMakeupRequest(request);
+      setLoadingAvailableSessions(true);
+      
+      // 使用現有的 sessions 資料，過濾出允許補課的課程
+      const availableSessions = sessions.filter(session => {
+        console.log(`Checking session ${session.id}: status=${session.status}, allowReplacement=${session.allowReplacement}, currentParticipants=${session.currentParticipants}, maxParticipants=${session.maxParticipants}`);
+        
+        // 基本條件檢查 - 临时放宽条件进行调试
+        const basicConditions = session.status === 'AVAILABLE' && 
+          new Date(session.startTime) > new Date(); // 只顯示未來的課程，暂时移除其他条件
+        
+        console.log(`Session ${session.id} basic conditions: ${basicConditions}`);
+        
+        if (!basicConditions) return false;
+        
+        // 檢查學生是否已經參加了這個課程
+        const studentAlreadyEnrolled = session.registrations && 
+          session.registrations.some(registration => {
+            const isEnrolled = registration.member?.id === request.studentId;
+            if (isEnrolled) {
+              console.log(`Student ${request.studentId} already enrolled in session ${session.id} (${session.title})`);
+            }
+            return isEnrolled;
+          });
+        
+        console.log(`Session ${session.id} student already enrolled: ${studentAlreadyEnrolled}`);
+        
+        // 如果學生已經參加，則不顯示這個課程
+        return !studentAlreadyEnrolled;
+      });
+      
+      // 按课程分组，相同课程只显示一次
+      const groupedSessions = {};
+      console.log('Available sessions before grouping:', availableSessions.length);
+      availableSessions.forEach(session => {
+        const sessionData = {
+          id: session.id,
+          title: session.title,
+          price: session.price,
+          maxParticipants: session.maxParticipants,
+          currentParticipants: session.currentParticipants,
+          courtName: session.courtName || session.court?.name,
+          venueName: session.venueName || session.venue?.name,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          status: session.status,
+          allowReplacement: session.allowReplacement,
+          recurringGroupId: session.recurringGroupId
+        };
+        
+        // 使用标题作为分组键
+        const groupKey = session.title;
+        if (!groupedSessions[groupKey]) {
+          groupedSessions[groupKey] = {
+            ...sessionData,
+            sessions: []
+          };
+        }
+        groupedSessions[groupKey].sessions.push(sessionData);
+        console.log(`Added session ${session.id} to group "${groupKey}", total sessions in group: ${groupedSessions[groupKey].sessions.length}`);
+      });
+      
+      // 转换为数组并按第一个session的开始时间排序
+      const individualSessions = Object.values(groupedSessions)
+        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+      
+      console.log('Grouped sessions result:');
+      individualSessions.forEach(group => {
+        console.log(`Group "${group.title}": ${group.sessions.length} sessions`);
+      });
+      
+      console.log('Individual sessions for makeup:', individualSessions);
+      console.log('Student ID:', request.studentId);
+      console.log('Total sessions before filtering:', sessions.length);
+      console.log('Sessions after filtering:', availableSessions.length);
+      console.log('Individual sessions available:', individualSessions.length);
+      
+      // 显示所有sessions的基本信息
+      console.log('All sessions info:');
+      sessions.forEach(session => {
+        console.log(`Session ${session.id}: title="${session.title}", status="${session.status}", allowReplacement=${session.allowReplacement}, startTime="${session.startTime}"`);
+      });
+      
+      // 调试：检查recurringGroupId
+      individualSessions.forEach(session => {
+        console.log(`Session ${session.id} (${session.title}): recurringGroupId = ${session.recurringGroupId}`);
+      });
+      setAvailableSessionsForMakeup(individualSessions);
+      
+    } catch (error) {
+      console.error('Error filtering available sessions:', error);
+      alert('Failed to get available sessions');
+    } finally {
+      setLoadingAvailableSessions(false);
+      setMakeupDialogOpen(true);
+    }
+  };
+
+  const handleSendMessageToStudent = (request) => {
+    // 導航到訊息頁面並預填學生資訊
+    setSelectedTab('messages');
+    // 這裡可以添加預填訊息的邏輯
+  };
+
+  const handleConfirmMakeupArrangement = async (selectedSession) => {
+    try {
+      console.log('Arranging makeup class with data:', {
+        requestId: selectedMakeupRequest.id,
+        makeupSessionId: selectedSession.id,
+        studentId: selectedMakeupRequest.studentId,
+        selectedSession: selectedSession
+      });
+
+      const requestBody = {
+        makeupSessionId: selectedSession.id,
+        studentId: selectedMakeupRequest.studentId
+      };
+
+      console.log('Request body:', requestBody);
+
+      const response = await fetch(`http://localhost:8081/api/leave-requests/${selectedMakeupRequest.id}/arrange-makeup`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Success response:', result);
+        alert('Makeup class arranged successfully!');
+        setMakeupDialogOpen(false);
+        setShowSlotsDialog(false);
+        setSelectedMakeupRequest(null);
+        setSelectedCourseForSlots(null);
+        fetchLeaveRequests(); // 重新載入請假申請列表
+        fetchSessions(); // 重新載入課程列表
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        console.error('Response status:', response.status);
+        alert(`Failed to arrange makeup class. Status: ${response.status}. Error: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Error arranging makeup class:', error);
+      alert(`Error arranging makeup class: ${error.message}`);
+    }
+  };
+
+  const handleViewAvailableSlots = (courseGroup) => {
+    console.log('Selected course group for slots:', courseGroup);
+    console.log('Course group sessions:', courseGroup.sessions);
+    
+    setSelectedCourseForSlots(courseGroup);
+    setShowSlotsDialog(true);
+  };
+
+  const handleAddMakeupStudent = (session) => {
+    // 導航到請假申請頁面，並過濾出需要補課的學生
+    setSelectedTab('leave-requests');
+    // 這裡可以添加邏輯來高亮顯示相關的請假申請
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -795,7 +1015,7 @@ export default function CoachingDashboard() {
     { text: 'Session Schedule', icon: <Schedule />, value: 'schedule' },
     { text: 'Messages', icon: <Message />, value: 'messages' },
     { text: 'Leave Requests', icon: <Assessment />, value: 'leave-requests' },
-    { text: 'Income History', icon: <AttachMoney />, value: 'income' },
+    { text: 'Wallet', icon: <AttachMoney />, value: 'income' },
     { text: 'Analytics', icon: <Assessment />, value: 'analytics' },
     { text: 'Settings', icon: <Settings />, value: 'settings' }
   ];
@@ -911,8 +1131,8 @@ export default function CoachingDashboard() {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold' }}>RM {dashboardStats.totalRevenue?.toFixed(2) || '0.00'}</Typography>
-                  <Typography variant="body2">Total Revenue</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold' }}>RM {walletBalance?.balance?.toFixed(2) || '0.00'}</Typography>
+                                      <Typography variant="body2">Total Income</Typography>
                 </Box>
                 <AttachMoney sx={{ fontSize: 40, opacity: 0.8 }} />
               </Box>
@@ -1125,78 +1345,11 @@ export default function CoachingDashboard() {
             </CardContent>
           </Card>
 
-          {/* 收入統計卡片 */}
-          <Card sx={{ mb: 2 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AttachMoney color="primary" />
-                Income Overview
-              </Typography>
-              {incomeHistory.length > 0 ? (
-                <Box>
-                  <Typography variant="h5" color="success.main" fontWeight="bold">
-                    RM {incomeHistory.reduce((sum, record) => sum + (record.amount || 0), 0).toFixed(2)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Total Income ({incomeHistory.length} records)
-                  </Typography>
-                  <Button 
-                    variant="outlined" 
-                    size="small" 
-                    sx={{ mt: 1 }}
-                    onClick={() => handleTabChange('income')}
-                  >
-                    View Details
-                  </Button>
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No income records yet
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
+
         </Grid>
       </Grid>
 
-      {/* Replacement Classes 移到下面 */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom color="primary">Replacement Classes</Typography>
-              {replacementClasses.length === 0 ? (
-                <Typography color="text.secondary">No replacement classes scheduled.</Typography>
-              ) : (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Time</TableCell>
-                        <TableCell>Venue</TableCell>
-                        <TableCell>Court</TableCell>
-                        <TableCell>Title</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {replacementClasses.map(cls => (
-                        <TableRow key={cls.id}>
-                          <TableCell>{cls.startTime ? new Date(cls.startTime).toLocaleDateString() : ''}</TableCell>
-                          <TableCell>{cls.startTime ? new Date(cls.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} - {cls.endTime ? new Date(cls.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</TableCell>
-                          <TableCell>{cls.venue?.name || cls.venueName || '-'}</TableCell>
-                          <TableCell>{cls.court?.name || cls.courtName || '-'}</TableCell>
-                          <TableCell>{cls.title}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+
     </Box>
   );
 
@@ -1295,6 +1448,7 @@ export default function CoachingDashboard() {
                         <TableCell>Court</TableCell>
                         <TableCell>Start Date</TableCell>
                         <TableCell>End Date</TableCell>
+                        <TableCell>Replacement</TableCell>
                         <TableCell>Total Sessions</TableCell>
                         <TableCell align="center">Actions</TableCell>
                       </TableRow>
@@ -1324,7 +1478,26 @@ export default function CoachingDashboard() {
                                     {expanded ? '-' : '+'}
                                   </IconButton>
                                 </TableCell>
-                                <TableCell>{first.title}</TableCell>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Typography variant="body2">
+                                      {first.title}
+                                    </Typography>
+                                    {first.replacementForSessionId && (
+                                      <Chip 
+                                        label="Replacement Class" 
+                                        color="secondary" 
+                                        size="small" 
+                                      />
+                                    )}
+                                    {/* 调试信息 */}
+                                    {first.replacementForSessionId && (
+                                      <Typography variant="caption" color="error">
+                                        Debug: {first.replacementForSessionId}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </TableCell>
                                 <TableCell>{first.slotType || first.type || '-'}</TableCell>
                                 <TableCell>
                                   <Chip label={first.status || 'Scheduled'} color={first.status === 'completed' || first.status === 'COMPLETED' ? 'success' : 'primary'} size="small" />
@@ -1333,60 +1506,233 @@ export default function CoachingDashboard() {
                                 <TableCell>{first.courtName || first.court?.name || '-'}</TableCell>
                                 <TableCell>{start.toLocaleDateString()}</TableCell>
                                 <TableCell>{end.toLocaleDateString()}</TableCell>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Chip 
+                                      label={first.allowReplacement ? 'Enabled' : 'Disabled'} 
+                                      color={first.allowReplacement ? 'success' : 'default'} 
+                                      size="small" 
+                                    />
+                                    {/* 移除快速設定補課按鈕 */}
+                                  </Box>
+                                </TableCell>
                                 <TableCell>{group.length}</TableCell>
                                 <TableCell align="center">
-                                  <IconButton size="small" color="primary">
-                                    <Edit />
-                                  </IconButton>
-                                  <IconButton size="small" color="error">
-                                    <Delete />
-                                  </IconButton>
+                                  {/* 只有 AVAILABLE 狀態的課程才能編輯 */}
+                                  {first.status === 'AVAILABLE' && (
+                                    <IconButton 
+                                      size="small" 
+                                      color="primary"
+                                      onClick={() => handleEditSession(first)}
+                                      title="Edit Session"
+                                    >
+                                      <Edit />
+                                    </IconButton>
+                                  )}
                                 </TableCell>
                               </TableRow>
                               <TableRow>
-                                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={10}>
+                                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={11}>
                                   <Collapse in={expanded} timeout="auto" unmountOnExit>
                                     <Box margin={1}>
+                                      <Typography variant="h6" gutterBottom sx={{ color: theme.palette.primary.main }}>
+                                        Session Details
+                                      </Typography>
+                                      
+                                      {/* 課程基本資訊 */}
+                                      <Card variant="outlined" sx={{ mb: 2 }}>
+                                        <CardContent>
+                                          <Grid container spacing={2}>
+                                            <Grid item xs={12} md={6}>
+                                              <Typography variant="subtitle2" color="text.secondary">Course Information</Typography>
+                                              <Typography variant="body2" sx={{ mt: 1 }}>
+                                                <strong>Title:</strong> {first.title || 'N/A'}
+                                                {first.replacementForSessionId && (
+                                                  <Typography component="span" variant="caption" color="secondary" sx={{ ml: 1, fontWeight: 'bold' }}>
+                                                    (Replacement Class)
+                                                  </Typography>
+                                                )}
+                                              </Typography>
+                                              <Typography variant="body2">
+                                                <strong>Price:</strong> ${first.price || 0}
+                                              </Typography>
+                                              <Typography variant="body2">
+                                                <strong>Max Participants:</strong> {first.maxParticipants || 0}
+                                              </Typography>
+                                              <Typography variant="body2">
+                                                <strong>Current Participants:</strong> {first.currentParticipants || 0}
+                                              </Typography>
+                                              <Typography variant="body2" color="text.secondary">
+                                                <em>Note: Individual session capacities may vary</em>
+                                              </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                              <Typography variant="subtitle2" color="text.secondary">Venue Information</Typography>
+                                              <Typography variant="body2" sx={{ mt: 1 }}>
+                                                <strong>Court:</strong> {first.courtName || first.court?.name || 'N/A'}
+                                              </Typography>
+                                            </Grid>
+                                          </Grid>
+                                        </CardContent>
+                                      </Card>
+
+                                      {/* 詳細時段列表 */}
                                       <Table size="small">
                                         <TableHead>
                                           <TableRow>
                                             <TableCell>Date</TableCell>
-                                            <TableCell>Start Time</TableCell>
-                                            <TableCell>End Time</TableCell>
+                                            <TableCell>Time</TableCell>
                                             <TableCell>Status</TableCell>
+                                            <TableCell>Participants</TableCell>
+                                            <TableCell>Actions</TableCell>
                                           </TableRow>
                                         </TableHead>
                                         <TableBody>
                                           {group.map((sess) => (
                                             <TableRow key={sess.id}>
                                               <TableCell>{new Date(sess.startTime).toLocaleDateString()}</TableCell>
-                                              <TableCell>{new Date(sess.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                                              <TableCell>{new Date(sess.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
                                               <TableCell>
-                                                <Chip label={sess.status || 'Scheduled'} size="small" color={sess.status === 'CANCELLED' ? 'primary' : 'success'} />
+                                                {new Date(sess.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(sess.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Chip 
+                                                  label={sess.status || 'Scheduled'} 
+                                                  size="small" 
+                                                  color={
+                                                    sess.status === 'CANCELLED' ? 'error' : 
+                                                    sess.status === 'FULL' ? 'warning' : 
+                                                    sess.status === 'COMPLETED' ? 'default' : 'success'
+                                                  } 
+                                                />
                                                 {sess.status === 'CANCELLED' && (
                                                   hasReplacement(sess.id) ? (
-                                                    <Chip label="Replacement scheduled" color="success" />
+                                                    <Chip label="Replacement scheduled" color="success" size="small" sx={{ ml: 1 }} />
                                                   ) : (
                                                     <>
-                                                      <Chip label="No replacement scheduled" color="error" />
-                                                      <Button variant="outlined" color="warning" onClick={() => handleBookReplacement(sess)} style={{ marginLeft: 8 }}>
-                                                        BOOK REPLACEMENT
-                                                      </Button>
+                                                      <Chip label="No replacement scheduled" color="error" size="small" sx={{ ml: 1 }} />
+                                                      {/* 移除 BOOK REPLACEMENT 按钮 */}
                                                     </>
                                                   )
                                                 )}
                                               </TableCell>
-                                              {/* 新增 Cancel 按鈕 */}
                                               <TableCell>
-                                                <IconButton color="error" size="small" onClick={() => handleCancelSession(sess.id, sess)}>
-                                                  <DeleteIcon fontSize="small" />
-                                                </IconButton>
+                                                <Typography variant="body2">
+                                                  {sess.currentParticipants || 0} / {sess.maxParticipants || 0}
+                                                </Typography>
+                                                {sess.currentParticipants > 0 && (
+                                                  <Typography variant="caption" color="text.secondary">
+                                                    {Math.round((sess.currentParticipants / sess.maxParticipants) * 100)}% full
+                                                  </Typography>
+                                                )}
+                                                {sess.maxParticipants !== first.maxParticipants && (
+                                                  <Typography variant="caption" color="warning.main">
+                                                    Capacity adjusted
+                                                  </Typography>
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box display="flex" gap={1}>
+                                                                                                     <Button
+                                                     size="small"
+                                                     variant="outlined"
+                                                     color="primary"
+                                                     onClick={() => handleAddMakeupStudent(sess)}
+                                                     startIcon={<Add />}
+                                                   >
+                                                     Add Makeup Student
+                                                   </Button>
+                                                  {/* 移除删除按钮 - 教练不能删除课程 */}
+                                                </Box>
                                               </TableCell>
                                             </TableRow>
                                           ))}
                                         </TableBody>
                                       </Table>
+
+                                      {/* 學生名單（如果有學生報名） */}
+                                      {group.some(sess => sess.registrations && sess.registrations.length > 0) && (
+                                        <Card variant="outlined" sx={{ mt: 2 }}>
+                                          <CardContent>
+                                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                              {(() => {
+                                                const allRegistrations = group.flatMap(sess => sess.registrations || []);
+                                                const uniqueStudents = new Set();
+                                                allRegistrations.forEach(registration => {
+                                                  if (registration.member?.id) {
+                                                    uniqueStudents.add(registration.member.id);
+                                                  }
+                                                });
+                                                return `Enrolled Students (${uniqueStudents.size})`;
+                                              })()}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                              {(() => {
+                                                // 获取所有注册信息并去重（基于学生ID）
+                                                const allRegistrations = group.flatMap(sess => sess.registrations || []);
+                                                const uniqueStudents = new Map();
+                                                
+                                                allRegistrations.forEach(registration => {
+                                                  const studentId = registration.member?.id;
+                                                  if (studentId && !uniqueStudents.has(studentId)) {
+                                                    uniqueStudents.set(studentId, registration);
+                                                  }
+                                                });
+                                                
+                                                return Array.from(uniqueStudents.values()).map((registration, index) => {
+                                                  // 如果是补课学生，查找对应的请假请求
+                                                  let replacementInfo = null;
+                                                  if (registration.attendanceStatus === 'MAKEUP') {
+                                                    console.log('Found makeup student:', registration.member?.user?.name);
+                                                    console.log('Looking for leave request with replacementSessionId:', first.id, 'and studentId:', registration.member?.id);
+                                                    console.log('Available leave requests:', leaveRequests);
+                                                    
+                                                    const leaveRequest = leaveRequests.find(req => 
+                                                      req.replacementSessionId === first.id && 
+                                                      req.studentId === registration.member?.id
+                                                    );
+                                                    
+                                                    if (leaveRequest) {
+                                                      console.log('Found matching leave request:', leaveRequest);
+                                                      replacementInfo = {
+                                                        originalDate: leaveRequest.originalSessionStartTime,
+                                                        originalTitle: leaveRequest.originalSessionTitle
+                                                      };
+                                                    } else {
+                                                      console.log('No matching leave request found');
+                                                    }
+                                                  }
+                                                  
+                                                  return (
+                                                    <Chip
+                                                      key={`${registration.member?.id}-${index}`}
+                                                      label={
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                          {registration.member?.user?.name || `Student ${registration.member?.id || registration.id}`}
+                                                          {registration.attendanceStatus === 'MAKEUP' && (
+                                                            <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold' }}>
+                                                              {replacementInfo ? (
+                                                                `(Replacement for: ${new Date(replacementInfo.originalDate).toLocaleDateString()} ${new Date(replacementInfo.originalDate).toLocaleTimeString([], { 
+                                                                  hour: '2-digit', 
+                                                                  minute: '2-digit' 
+                                                                })})`
+                                                              ) : (
+                                                                '(Makeup)'
+                                                              )}
+                                                            </Typography>
+                                                          )}
+                                                        </Box>
+                                                      }
+                                                      size="small"
+                                                      color={registration.attendanceStatus === 'MAKEUP' ? "secondary" : "primary"}
+                                                      variant="outlined"
+                                                    />
+                                                  );
+                                                });
+                                              })()}
+                                            </Box>
+                                          </CardContent>
+                                        </Card>
+                                      )}
                                     </Box>
                                   </Collapse>
                                 </TableCell>
@@ -1422,7 +1768,7 @@ export default function CoachingDashboard() {
       case 'leave-requests':
         return renderLeaveRequests();
       case 'income':
-        return renderIncomeHistory();
+        return renderWallet();
       case 'analytics':
         return (
           <Box>
@@ -1554,26 +1900,7 @@ export default function CoachingDashboard() {
   };
 
   // 定義 fetchSessions 並設置到 state 供 handleCreateMakeupSession 使用
-  const [fetchSessionsRef, setFetchSessionsRef] = useState(null);
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      setLoadingSessions(true);
-      setSessionError('');
-      try {
-        const start = new Date(2000, 0, 1, 0, 0, 0);
-        const end = new Date(2100, 11, 31, 23, 59, 59);
-        const data = await CoachService.getSchedule(start.toISOString(), end.toISOString());
-        setSessions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setSessionError('Failed to load sessions.');
-      } finally {
-        setLoadingSessions(false);
-      }
-    };
-    setFetchSessionsRef(() => fetchSessions);
-    fetchSessions();
-  }, []);
 
   // 在 handleCreateMakeupSession 時自動帶入 startTime/endTime
   const handleCreateMakeupSession = async () => {
@@ -1601,7 +1928,7 @@ export default function CoachingDashboard() {
       alert('Make-up session created and students will be notified!');
       setShowMakeupDialog(false);
       // 自動刷新 sessions，讓 UI 立即變更
-      if (fetchSessionsRef) fetchSessionsRef(); else window.location.reload();
+      fetchSessions();
     } catch (e) {
       alert('Failed to create make-up session: ' + (e?.response?.data?.error || e.message));
     }
@@ -1633,15 +1960,32 @@ export default function CoachingDashboard() {
   }
   const availableSlotSet = new Set(busySlots ? busySlots.map(s => s.start + '-' + s.end) : []);
 
-  // 新增：BOOK REPLACEMENT 按鈕 handler
-  const handleBookReplacement = (session) => {
-    setMakeupOriginSession(session);
-    setShowMakeupDialog(true);
+  // 新增：編輯課程對話框處理
+  const handleEditSession = (session) => {
+    setEditSession(session);
+    setEditDialogOpen(true);
   };
+
+  const handleEditSuccess = () => {
+    setEditDialogOpen(false);
+    setEditSession(null);
+    fetchSessions(); // 使用組件級別的 fetchSessions 函數
+  };
+
+  // 移除 handleQuickSetReplacement 和 handleBookReplacement 函数
+
+  // 移除 handleUpdateAllowReplacement 函数
+
+  // 新增：獲取補課課程
+  // 移除 replacement sessions 相关状态
+
+  // 移除 fetchReplacementSessions 函数和相关 useEffect
 
   const [commentDialog, setCommentDialog] = useState({ open: false, request: null, action: '' });
   const [coachComment, setCoachComment] = useState('');
   const [bookReplacementDialog, setBookReplacementDialog] = useState({ open: false, request: null });
+  const [bookCourtDialog, setBookCourtDialog] = useState({ open: false, request: null });
+  const [loadingVenueInfo, setLoadingVenueInfo] = useState(false);
   const [selectedRequests, setSelectedRequests] = useState([]);
   const [courts, setCourts] = useState([]);
   const [venues, setVenues] = useState([]);
@@ -1662,6 +2006,120 @@ export default function CoachingDashboard() {
     selectedSlots: [], // 改為數組，支持多選連續時段
     selectedSlot: ''
   });
+
+  const [bookCourtData, setBookCourtData] = useState({
+    title: '',
+    description: '',
+    venueId: '',
+    venueName: '',
+    state: '',
+    courtId: '',
+    startTime: '',
+    endTime: '',
+    maxParticipants: 6,
+    price: '',
+    slotType: 'COACH_SESSION',
+    date: '',
+    availableSlots: [],
+    selectedSlots: [],
+    originalRequest: null,
+    originalDuration: 1 // 原始课程时长（小时）
+  });
+
+  const handleBookCourt = (request) => {
+    setBookCourtDialog({ open: true, request });
+    setLoadingVenueInfo(true);
+    
+    // 通过原始课程ID获取场馆信息
+    const findVenueInfo = async () => {
+      try {
+        const sessionResponse = await fetch(`http://localhost:8081/api/class-sessions/${request.originalSessionId}/details`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          }
+        });
+        
+        if (sessionResponse.ok) {
+          const sessionData = await sessionResponse.json();
+          const venueId = sessionData.venueId;
+          const venueName = sessionData.venueName || request.venue || 'Unknown Venue';
+          
+          // 计算原始课程时长
+          let originalDuration = 1; // 默认1小时
+          if (sessionData.startTime && sessionData.endTime) {
+            const startTime = new Date(sessionData.startTime);
+            const endTime = new Date(sessionData.endTime);
+            const durationMs = endTime.getTime() - startTime.getTime();
+            originalDuration = Math.ceil(durationMs / (1000 * 60 * 60)); // 转换为小时并向上取整
+          }
+          
+          setBookCourtData({
+            title: `[Replacement] ${request.originalSessionTitle || 'Class'}`,
+            description: `Replacement class for ${request.studentName} - ${request.reason || 'No reason provided'}`,
+            venueId: venueId || '',
+            venueName: venueName,
+            state: request.state || '',
+            courtId: '',
+            startTime: '',
+            endTime: '',
+            maxParticipants: 1, // 默认1个学生
+            price: 0, // 固定为0
+            slotType: 'COACH_SESSION',
+            date: '',
+            availableSlots: [],
+            selectedSlots: [],
+            originalRequest: request,
+            originalDuration: originalDuration
+          });
+        } else {
+          // 如果获取失败，使用默认值
+          setBookCourtData({
+            title: `[Replacement] ${request.originalSessionTitle || 'Class'}`,
+            description: `Replacement class for ${request.studentName} - ${request.reason || 'No reason provided'}`,
+            venueId: '',
+            venueName: request.venue || 'Unknown Venue',
+            state: request.state || '',
+            courtId: '',
+            startTime: '',
+            endTime: '',
+            maxParticipants: 1,
+            price: 0,
+            slotType: 'COACH_SESSION',
+            date: '',
+            availableSlots: [],
+            selectedSlots: [],
+            originalRequest: request,
+            originalDuration: 1
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching venue info:', error);
+        // 使用默认值
+        setBookCourtData({
+          title: `[Replacement] ${request.originalSessionTitle || 'Class'}`,
+          description: `Replacement class for ${request.studentName} - ${request.reason || 'No reason provided'}`,
+          venueId: '',
+          venueName: request.venue || 'Unknown Venue',
+          state: request.state || '',
+          courtId: '',
+          startTime: '',
+          endTime: '',
+          maxParticipants: 1,
+          price: 0,
+          slotType: 'COACH_SESSION',
+          date: '',
+          availableSlots: [],
+          selectedSlots: [],
+          originalRequest: request,
+          originalDuration: 1
+        });
+      } finally {
+        setLoadingVenueInfo(false);
+      }
+    };
+    
+    findVenueInfo();
+  };
 
   const handleApproveRequest = async (request) => {
     setCommentDialog({ open: true, request, action: 'approve' });
@@ -1961,36 +2419,39 @@ export default function CoachingDashboard() {
       return;
     }
     
-    // 檢查是否所有請求的原始課程時長相同
-    const durations = selectedRequestObjects.map(r => {
-      if (r.originalSessionStartTime && r.originalSessionEndTime) {
-        const start = new Date(r.originalSessionStartTime + 'Z');
-        const end = new Date(r.originalSessionEndTime + 'Z');
-        return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      }
-      return 1; // 默認1小時
-    });
-    
-    const uniqueDurations = [...new Set(durations)];
-    if (uniqueDurations.length > 1) {
-      alert('All selected requests must have the same original session duration to be processed together');
-      return;
-    }
-    
     // 使用第一個請求作為模板
     const firstRequest = selectedRequestObjects[0];
     setBookReplacementDialog({ open: true, request: firstRequest, batchRequests: selectedRequestObjects });
     
-    // 計算原始課程的時長
-    let originalDuration = 1;
-    if (firstRequest.originalSessionStartTime && firstRequest.originalSessionEndTime) {
-      const originalStart = new Date(firstRequest.originalSessionStartTime + 'Z');
-      const originalEnd = new Date(firstRequest.originalSessionEndTime + 'Z');
-      originalDuration = (originalEnd.getTime() - originalStart.getTime()) / (1000 * 60 * 60);
-    }
+    // 計算所有請求的總時長（相加）
+    let totalOriginalDuration = 0;
+    console.log('=== Duration Calculation Debug ===');
+    console.log('Selected requests:', selectedRequestObjects.length);
     
-    // 生成學生名單
-    const studentNames = selectedRequestObjects.map(r => r.studentName).join(', ');
+    selectedRequestObjects.forEach((r, index) => {
+      let duration = 1; // 默認1小時
+      
+      if (r.originalSessionStartTime && r.originalSessionEndTime) {
+        const start = new Date(r.originalSessionStartTime + 'Z');
+        const end = new Date(r.originalSessionEndTime + 'Z');
+        duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      }
+      
+      totalOriginalDuration += duration;
+      
+      console.log(`Request ${index + 1}: ${r.studentName} - ${r.originalDate} - Duration: ${duration} hours`);
+    });
+    
+    console.log('Total duration:', totalOriginalDuration, 'hours');
+    
+    // 生成學生名單（去重）
+    const uniqueStudents = [...new Set(selectedRequestObjects.map(r => r.studentName))];
+    const studentNames = uniqueStudents.join(', ');
+    
+    console.log('=== Student Deduplication Debug ===');
+    console.log('All students:', selectedRequestObjects.map(r => r.studentName));
+    console.log('Unique students:', uniqueStudents);
+    console.log('Unique student count:', uniqueStudents.length);
     
     // 獲取第一個請求的原始場地信息作為默認值
     let originalVenueId = '';
@@ -2017,25 +2478,169 @@ export default function CoachingDashboard() {
     console.log('Extracted batch venue info:', { originalVenueId, originalVenueName, originalState });
     
     // 預設課程信息
-          setReplacementSessionData({
-        title: `Group Replacement Session`,
-        description: `Replacement session for: ${studentNames}`,
-        venueId: originalVenueId,
-        venueName: originalVenueName,
-        state: originalState,
-        courtId: '',
-        startTime: '',
-        endTime: '',
-        maxParticipants: selectedRequestObjects.length,
-        price: '',
+    setReplacementSessionData({
+      title: `Group Replacement Session`,
+      description: `Replacement session for: ${studentNames}`,
+      venueId: originalVenueId,
+      venueName: originalVenueName,
+      state: originalState,
+      courtId: '',
+      startTime: '',
+      endTime: '',
+      maxParticipants: uniqueStudents.length, // 使用唯一學生數量
+      price: '',
+      slotType: 'COACH_SESSION',
+      originalDuration: totalOriginalDuration, // 使用總時長
+      batchRequests: selectedRequestObjects,
+      date: '',
+      availableSlots: [],
+      selectedSlots: [],
+      selectedSlot: ''
+    });
+  };
+
+  const handleCreateBookCourtSession = async () => {
+    try {
+      if (!bookCourtData.courtId || !bookCourtData.date || bookCourtData.selectedSlots.length === 0) {
+        alert('Please select court, date and time slots');
+        return;
+      }
+
+      const selectedCourt = courts.find(court => court.id === bookCourtData.courtId);
+      if (!selectedCourt) {
+        alert('Selected court not found');
+        return;
+      }
+
+      // 计算开始和结束时间
+      const newSelected = [...bookCourtData.selectedSlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const startTime = `${bookCourtData.date}T${newSelected[0].startTime}:00`;
+      const endTime = `${bookCourtData.date}T${newSelected[newSelected.length - 1].endTime}:00`;
+
+      const sessionData = {
+        title: bookCourtData.title,
+        description: bookCourtData.description,
+        venueId: selectedCourt.venue?.id,
+        courtId: bookCourtData.courtId,
+        startTime: startTime,
+        endTime: endTime,
+        maxParticipants: bookCourtData.maxParticipants,
+        price: 0, // 固定为0
         slotType: 'COACH_SESSION',
-        originalDuration: originalDuration,
-        batchRequests: selectedRequestObjects,
-        date: '',
-        availableSlots: [],
-        selectedSlots: [],
-        selectedSlot: ''
+        allowReplacement: false
+      };
+
+      console.log('Creating new session with data:', sessionData);
+
+      const response = await fetch('http://localhost:8081/api/class-sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(sessionData)
       });
+
+      if (response.ok) {
+        const newSession = await response.json();
+        console.log('New session created:', newSession);
+        
+        // 自动注册学生到新课程中
+        if (bookCourtData.originalRequest && newSession.id) {
+          try {
+            // 注册学生到课程
+            const registrationResponse = await fetch(`http://localhost:8081/api/class-sessions/${newSession.id}/register?userId=${bookCourtData.originalRequest.studentId}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                'Content-Type': 'application/json',
+              }
+            });
+
+            if (registrationResponse.ok) {
+              console.log('Student registered to replacement class successfully');
+              
+              // 获取注册记录并更新为补课状态
+              try {
+                const studentsResponse = await fetch(`http://localhost:8081/api/coach/class-sessions/${newSession.id}/students`, {
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                  }
+                });
+                
+                if (studentsResponse.ok) {
+                  const students = await studentsResponse.json();
+                  const studentRegistration = students.find(s => s.id === bookCourtData.originalRequest.studentId);
+                  
+                  if (studentRegistration) {
+                    // 更新出席状态为 MAKEUP
+                    const updateResponse = await fetch(`http://localhost:8081/api/coach/class-registrations/${studentRegistration.registrationId}/attendance`, {
+                      method: 'PUT',
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        attendanceStatus: 'MAKEUP'
+                      })
+                    });
+                    
+                    if (updateResponse.ok) {
+                      console.log('Attendance status updated to MAKEUP successfully');
+                    } else {
+                      console.error('Failed to update attendance status');
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error updating attendance status:', error);
+              }
+            } else {
+              console.error('Failed to register student to replacement class');
+            }
+
+            // 批准请假请求并关联新课程
+            await LeaveRequestService.approveRequest(
+              bookCourtData.originalRequest.id, 
+              newSession.id, 
+              'Coach booked new court for replacement class - Student automatically registered'
+            );
+          } catch (error) {
+            console.error('Error registering student to replacement class:', error);
+          }
+        }
+
+        alert('Replacement class created and student registered successfully!');
+        setBookCourtDialog({ open: false, request: null });
+        setBookCourtData({
+          title: '',
+          description: '',
+          venueId: '',
+          venueName: '',
+          state: '',
+          courtId: '',
+          startTime: '',
+          endTime: '',
+          maxParticipants: 6,
+          price: 0,
+          slotType: 'COACH_SESSION',
+          date: '',
+          availableSlots: [],
+          selectedSlots: [],
+          originalRequest: null
+        });
+        
+        // 刷新数据
+        fetchSessions();
+        fetchLeaveRequests();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to create session: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating new session:', error);
+      alert('Failed to create new session');
+    }
   };
 
   const handleCreateReplacementSession = async () => {
@@ -2149,40 +2754,17 @@ export default function CoachingDashboard() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-          Makeup Class Requests
+          Leave Requests & Makeup Arrangements
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          {selectedRequests.length > 0 && (
-            <Button 
-              variant="contained" 
-              color="primary"
-              onClick={() => handleBatchBookReplacement()}
-            >
-              BOOK COURT FOR {selectedRequests.length} STUDENT{selectedRequests.length > 1 ? 'S' : ''}
-            </Button>
-          )}
-          <Button 
-            variant="outlined" 
-            onClick={async () => {
-              try {
-                const debugData = await LeaveRequestService.debugAllRequests();
-                console.log('Debug all requests:', debugData);
-                alert(`Total requests: ${debugData.totalRequests}\nCheck console for details`);
-              } catch (error) {
-                console.error('Debug failed:', error);
-                alert('Debug failed: ' + error.message);
-              }
-            }}
-          >
-            Debug All Requests
-          </Button>
-        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Manage student leave requests, directly arrange makeup classes or contact students
+        </Typography>
       </Box>
       
       {leaveRequests.length === 0 ? (
         <Card sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            No pending makeup class requests
+            No pending leave requests
           </Typography>
           <Typography variant="body2" color="text.secondary">
             All requests have been processed.
@@ -2191,48 +2773,19 @@ export default function CoachingDashboard() {
       ) : (
         <TableContainer component={Paper}>
           <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedRequests.length === leaveRequests.filter(r => r.status === 'MESSAGE_SENT').length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedRequests(leaveRequests.filter(r => r.status === 'MESSAGE_SENT').map(r => r.id));
-                      } else {
-                        setSelectedRequests([]);
-                      }
-                    }}
-                  />
-                </TableCell>
-                <TableCell>Student</TableCell>
-                <TableCell>Original Date</TableCell>
-                <TableCell>Preferred Date</TableCell>
-                <TableCell>Request Type</TableCell>
-                <TableCell>Student Reason</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
+                                  <TableHead>
+                        <TableRow>
+                          <TableCell>Student</TableCell>
+                          <TableCell>Original Class</TableCell>
+                          <TableCell>Reason</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Makeup Arrangement</TableCell>
+                          <TableCell>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
             <TableBody>
               {leaveRequests.map((request) => (
                 <TableRow key={request.id}>
-                  <TableCell padding="checkbox">
-                    {request.status === 'MESSAGE_SENT' && (
-                      <input
-                        type="checkbox"
-                        checked={selectedRequests.includes(request.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedRequests([...selectedRequests, request.id]);
-                          } else {
-                            setSelectedRequests(selectedRequests.filter(id => id !== request.id));
-                          }
-                        }}
-                      />
-                    )}
-                  </TableCell>
                   <TableCell>
                     <Box>
                       <Typography variant="subtitle2">{request.studentName}</Typography>
@@ -2242,18 +2795,17 @@ export default function CoachingDashboard() {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    {new Date(request.originalDate).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {request.preferredDate && new Date(request.preferredDate).getFullYear() > 1900 ? 
-                      new Date(request.preferredDate).toLocaleDateString() : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ maxWidth: 200 }}>
-                      {request.status === 'SELF_SELECTED' ? 'Self-Selected Replacement' : 
-                       request.status === 'MESSAGE_SENT' ? 'Message Sent to Coach' : 
-                       'Makeup Class Request'}
-                    </Typography>
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">
+                        {new Date(request.originalDate).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(request.originalDate).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ maxWidth: 200 }}>
@@ -2262,45 +2814,94 @@ export default function CoachingDashboard() {
                   </TableCell>
                   <TableCell>
                     <Chip 
-                      label={request.status.toLowerCase()} 
+                      label={
+                        request.status === 'PENDING' ? 'Pending' :
+                        request.status === 'MESSAGE_SENT' ? 'Coach Contacted' :
+                        request.status === 'MAKEUP_ARRANGED' ? 'Makeup Arranged' :
+                        request.status === 'DECLINED' ? 'Declined' : 
+                        request.status.toLowerCase()
+                      }
                       color={
                         request.status === 'PENDING' ? 'warning' :
-                        request.status === 'SELF_SELECTED' ? 'info' :
                         request.status === 'MESSAGE_SENT' ? 'primary' :
-                        request.status === 'APPROVED' ? 'success' :
+                        request.status === 'MAKEUP_ARRANGED' ? 'success' :
                         request.status === 'DECLINED' ? 'error' : 'default'
                       }
                       size="small"
                     />
                   </TableCell>
                   <TableCell>
-                    <Box display="flex" gap={1}>
-                      {request.status === 'MESSAGE_SENT' && (
-                        <Button 
-                          size="small" 
-                          variant="contained" 
-                          color="primary"
-                          onClick={() => handleBookReplacementForStudent(request)}
-                        >
-                          BOOK COURT
-                        </Button>
-                      )}
+                    {request.status === 'PENDING' || request.status === 'MESSAGE_SENT' ? (
                       <Button 
                         size="small" 
                         variant="contained" 
-                        color="success"
-                        onClick={() => handleApproveRequest(request)}
+                        color="primary"
+                        onClick={() => handleArrangeMakeupClass(request)}
                       >
-                        APPROVE
+                        Arrange Makeup
                       </Button>
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        color="error"
-                        onClick={() => handleDeclineRequest(request)}
-                      >
-                        DECLINE
-                      </Button>
+                    ) : request.status === 'MAKEUP_ARRANGED' ? (
+                      <Chip 
+                        label="Makeup Arranged" 
+                        color="success" 
+                        size="small"
+                      />
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        -
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" gap={1}>
+                      {request.status === 'PENDING' && (
+                        <>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            color="info"
+                            onClick={() => handleSendMessageToStudent(request)}
+                          >
+                            Contact Student
+                          </Button>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            color="error"
+                            onClick={() => handleDeclineRequest(request)}
+                          >
+                            Decline
+                          </Button>
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            color="success"
+                            onClick={() => handleBookCourt(request)}
+                          >
+                            Book Court
+                          </Button>
+                        </>
+                      )}
+                      {request.status === 'MESSAGE_SENT' && (
+                        <>
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            color="info"
+                            onClick={() => handleSendMessageToStudent(request)}
+                          >
+                            Contact Again
+                          </Button>
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            color="success"
+                            onClick={() => handleBookCourt(request)}
+                          >
+                            Book Court
+                          </Button>
+                        </>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -2312,268 +2913,26 @@ export default function CoachingDashboard() {
     </Box>
   );
 
-  const renderIncomeHistory = () => (
+  const renderWallet = () => (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
-          {showWalletTransactions ? 'Wallet Transactions' : 'Income History'}
+          Wallet Transactions
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              setShowWalletTransactions(!showWalletTransactions);
-              if (!showWalletTransactions && walletTransactions.length === 0) {
-                fetchWalletTransactions();
-              }
-            }}
-          >
-            {showWalletTransactions ? 'Show Income History' : 'Show Wallet Transactions'}
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              fetchRevenueStatus();
-            }}
-          >
-            Refresh Revenue Status
-          </Button>
-        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+          <CheckCircleOutline color="success" sx={{ mr: 1 }} />
+          Automated Revenue Distribution System Enabled - Processing COMPLETED sessions every 5 minutes
+        </Typography>
       </Box>
       
-      {/* 收入分配狀態 */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AttachMoney color="primary" />
-            Revenue Distribution Status
-          </Typography>
-          {revenueLoading ? (
-            <Box display="flex" justifyContent="center" p={3}>
-              <CircularProgress />
-            </Box>
-          ) : revenueStatus.length > 0 ? (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Session</TableCell>
-                    <TableCell>Start Time</TableCell>
-                    <TableCell>Total Revenue</TableCell>
-                    <TableCell>Coach Share (80%)</TableCell>
-                    <TableCell>Platform Share (20%)</TableCell>
-                    <TableCell>Hours Until Start</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {revenueStatus.map((status, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="bold">
-                          {status.title}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {status.startTime ? new Date(status.startTime).toLocaleString() : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="success.main" fontWeight="bold">
-                          RM {status.totalRevenue?.toFixed(2) || '0.00'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="primary" fontWeight="bold">
-                          RM {status.coachShare?.toFixed(2) || '0.00'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          RM {status.platformShare?.toFixed(2) || '0.00'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color={status.hoursUntilStart <= 24 ? 'warning.main' : 'text.secondary'}>
-                          {status.hoursUntilStart || 0} hours
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={status.revenueDistributed ? 'Distributed' : 'Pending'}
-                          color={status.revenueDistributed ? 'success' : 'warning'}
-                          size="small"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
-              No revenue data available
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
-      
-      {showWalletTransactions ? (
-        // 錢包交易記錄
-        <>
-          {/* 錢包統計卡片 */}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AccountBalanceWallet color="primary" />
-                    Wallet Balance
-                  </Typography>
-                  {walletBalance ? (
-                    <Typography variant="h4" color="primary" fontWeight="bold">
-                      RM {walletBalance.balance?.toFixed(2) || '0.00'}
-                    </Typography>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      RM 0.00
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingUp color="success" />
-                    Total Income
-                  </Typography>
-                  <Typography variant="h4" color="success.main" fontWeight="bold">
-                    RM {walletTransactions.filter(t => t.isIncome).reduce((sum, t) => sum + (t.amount || 0), 0).toFixed(2)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingDown color="error" />
-                    Total Expense
-                  </Typography>
-                  <Typography variant="h4" color="error.main" fontWeight="bold">
-                    RM {walletTransactions.filter(t => !t.isIncome).reduce((sum, t) => sum + (t.amount || 0), 0).toFixed(2)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AccountBalance color="info" />
-                    Net Income
-                  </Typography>
-                  <Typography variant="h4" color="info.main" fontWeight="bold">
-                    RM {(walletTransactions.filter(t => t.isIncome).reduce((sum, t) => sum + (t.amount || 0), 0) - 
-                         walletTransactions.filter(t => !t.isIncome).reduce((sum, t) => sum + (t.amount || 0), 0)).toFixed(2)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-
-          {/* 錢包交易記錄表格 */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Wallet Transactions</Typography>
-              {walletLoading ? (
-                <Box display="flex" justifyContent="center" p={3}>
-                  <CircularProgress />
-                </Box>
-              ) : walletTransactions.length > 0 ? (
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Description</TableCell>
-                        <TableCell>Amount</TableCell>
-                        <TableCell>Balance After</TableCell>
-                        <TableCell>Reference</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {walletTransactions.map((transaction, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() : 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={transaction.transactionType}
-                              color={transaction.isIncome ? 'success' : 'error'}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {transaction.description || 'N/A'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography 
-                              variant="body2" 
-                              color={transaction.isIncome ? 'success.main' : 'error.main'}
-                              fontWeight="bold"
-                            >
-                              {transaction.isIncome ? '+' : '-'} RM {transaction.amount?.toFixed(2) || '0.00'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              RM {transaction.balanceAfter?.toFixed(2) || '0.00'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="caption" color="text.secondary">
-                              {transaction.referenceType} {transaction.referenceId}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Box display="flex" flexDirection="column" alignItems="center" p={3}>
-                  <AccountBalanceWallet sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No Wallet Transactions
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" textAlign="center">
-                    Your wallet transactions will appear here once you have completed sessions and received payments.
-                  </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        // 收入歷史記錄
-        <>
-      {/* 收入統計卡片 */}
+      {/* 錢包統計卡片 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={12}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <AccountBalanceWallet color="primary" />
-                Wallet Balance
+                Total Income
               </Typography>
               {walletBalance ? (
                 <Typography variant="h4" color="primary" fontWeight="bold">
@@ -2581,93 +2940,59 @@ export default function CoachingDashboard() {
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                      RM 0.00
+                  RM 0.00
                 </Typography>
               )}
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AttachMoney color="success" />
-                Total Income
-              </Typography>
-              <Typography variant="h4" color="success.main" fontWeight="bold">
-                RM {incomeHistory.reduce((sum, record) => sum + (record.amount || 0), 0).toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Receipt color="info" />
-                Total Records
-              </Typography>
-              <Typography variant="h4" color="info.main" fontWeight="bold">
-                {incomeHistory.length}
+              <Typography variant="caption" color="text.secondary">
+                (Actual settled amount)
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* 收入歷史表格 */}
+      {/* 錢包交易記錄表格 */}
       <Card>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Income Records</Typography>
-          {incomeLoading ? (
+          <Typography variant="h6" gutterBottom>Wallet Transactions</Typography>
+          {walletLoading ? (
             <Box display="flex" justifyContent="center" p={3}>
               <CircularProgress />
             </Box>
-          ) : incomeHistory.length > 0 ? (
+          ) : walletTransactions.length > 0 ? (
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date</TableCell>
-                    <TableCell>Session</TableCell>
-                    <TableCell>Students</TableCell>
-                    <TableCell>Session Revenue</TableCell>
-                    <TableCell>Coach Income (80%)</TableCell>
-                    <TableCell>Transaction ID</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Amount</TableCell>
+                    <TableCell>Balance After</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {incomeHistory.map((record, index) => (
+                  {walletTransactions.map((transaction, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        {record.paymentDate ? new Date(record.paymentDate).toLocaleDateString() : 'N/A'}
+                        {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight="bold">
-                          {record.sessionTitle || 'N/A'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {record.sessionDate ? new Date(record.sessionDate).toLocaleDateString() : 'N/A'}
+                        <Typography variant="body2">
+                          {transaction.description || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {record.studentCount || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                            <Typography variant="body2" color="success.main" fontWeight="bold">
-                              RM {record.totalSessionRevenue?.toFixed(2) || '0.00'}
+                        <Typography 
+                          variant="body2" 
+                          color={transaction.isIncome ? 'success.main' : 'error.main'}
+                          fontWeight="bold"
+                        >
+                          {transaction.isIncome ? '+' : '-'} RM {transaction.amount?.toFixed(2) || '0.00'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                            <Typography variant="body2" color="primary" fontWeight="bold">
-                              RM {record.amount?.toFixed(2) || '0.00'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {record.transactionId || 'N/A'}
+                        <Typography variant="body2">
+                          RM {transaction.balanceAfter?.toFixed(2) || '0.00'}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -2677,19 +3002,17 @@ export default function CoachingDashboard() {
             </TableContainer>
           ) : (
             <Box display="flex" flexDirection="column" alignItems="center" p={3}>
-              <Receipt sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <AccountBalanceWallet sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                No Income Records
+                No Wallet Transactions
               </Typography>
               <Typography variant="body2" color="text.secondary" textAlign="center">
-                You haven't received any income yet. Income will appear here after your completed sessions are settled.
+                Your wallet transactions will appear here once you have completed sessions and received payments.
               </Typography>
             </Box>
           )}
         </CardContent>
       </Card>
-        </>
-      )}
     </Box>
   );
 
@@ -3206,15 +3529,24 @@ export default function CoachingDashboard() {
                 // 批量請求顯示
                 <Box>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Number of Students:</strong> {bookReplacementDialog.batchRequests.length}<br/>
-                    <strong>Original Session Duration:</strong> {replacementSessionData.originalDuration || 1} hours
+                    <strong>Number of Students:</strong> {[...new Set(bookReplacementDialog.batchRequests.map(r => r.studentName))].length}<br/>
+                    <strong>Total Original Session Duration:</strong> {replacementSessionData.originalDuration || 1} hours
                   </Typography>
                   <Typography variant="subtitle2" gutterBottom>Student List:</Typography>
-                  {bookReplacementDialog.batchRequests.map((req, index) => (
-                    <Typography key={req.id} variant="body2" sx={{ mb: 1, pl: 2 }}>
-                      {index + 1}. <strong>{req.studentName}</strong> - {req.reason}
-                    </Typography>
-                  ))}
+                  {[...new Set(bookReplacementDialog.batchRequests.map(r => r.studentName))].map((studentName, index) => {
+                    // 獲取該學生的所有原因
+                    const studentReasons = bookReplacementDialog.batchRequests
+                      .filter(r => r.studentName === studentName)
+                      .map(r => r.reason);
+                    const uniqueReasons = [...new Set(studentReasons)];
+                    const reasonsText = uniqueReasons.join(', ');
+                    
+                    return (
+                      <Typography key={studentName} variant="body2" sx={{ mb: 1, pl: 2 }}>
+                        {index + 1}. <strong>{studentName}</strong> - {reasonsText}
+                      </Typography>
+                    );
+                  })}
                 </Box>
               ) : (
                 // 單個請求顯示
@@ -3538,6 +3870,628 @@ export default function CoachingDashboard() {
             disabled={!replacementSessionData.title || !replacementSessionData.startTime}
           >
             Create & Approve
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 編輯課程對話框 */}
+      <EditClassSessionDialog 
+        open={editDialogOpen} 
+        session={editSession} 
+        onClose={() => setEditDialogOpen(false)} 
+        onSuccess={handleEditSuccess} 
+      />
+
+      {/* 補課安排對話框 */}
+      <Dialog 
+        open={makeupDialogOpen} 
+        onClose={() => setMakeupDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Arrange Makeup Class
+          </Typography>
+          {selectedMakeupRequest && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Arrange makeup class for {selectedMakeupRequest.studentName}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {selectedMakeupRequest && (
+            <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Original Class Information
+              </Typography>
+              <Typography variant="body2">
+                <strong>Student:</strong> {selectedMakeupRequest.studentName}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Original Date:</strong> {new Date(selectedMakeupRequest.originalDate).toLocaleDateString()}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Original Time:</strong> {new Date(selectedMakeupRequest.originalDate).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Reason:</strong> {selectedMakeupRequest.reason || 'No reason provided'}
+              </Typography>
+            </Card>
+          )}
+
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+            Select Makeup Time Slot ({availableSessionsForMakeup.length} available)
+          </Typography>
+
+          {loadingAvailableSessions ? (
+            <Box display="flex" justifyContent="center" p={3}>
+              <CircularProgress />
+            </Box>
+          ) : availableSessionsForMakeup.length > 0 ? (
+            <Grid container spacing={2}>
+              {availableSessionsForMakeup.map((courseGroup) => (
+                <Grid item xs={12} sm={6} md={4} key={courseGroup.id}>
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&:hover': { borderColor: 'primary.main', backgroundColor: 'action.hover' },
+                      height: '100%',
+                      borderColor: (courseGroup.currentParticipants / courseGroup.maxParticipants) > 0.8 ? 'warning.main' : 'divider',
+                      borderWidth: (courseGroup.currentParticipants / courseGroup.maxParticipants) > 0.8 ? 2 : 1
+                    }}
+                    onClick={() => handleViewAvailableSlots(courseGroup)}
+                  >
+                    <CardContent>
+                      <Typography variant="h6" fontWeight="bold" gutterBottom>
+                        {courseGroup.title || '課程'}
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Court: {courseGroup.courtName || 'N/A'} | 
+                        Venue: {courseGroup.venueName || 'N/A'}
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Price: ${courseGroup.price || 0}
+                      </Typography>
+                      
+                      <Typography variant="body2" fontWeight="bold" sx={{ mt: 2 }}>
+                        {new Date(courseGroup.startTime).toLocaleDateString()}
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(courseGroup.startTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })} - {new Date(courseGroup.endTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Capacity: {courseGroup.currentParticipants || 0} / {courseGroup.maxParticipants || 0}
+                        {courseGroup.currentParticipants > 0 && (
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            ({Math.round((courseGroup.currentParticipants / courseGroup.maxParticipants) * 100)}% full)
+                          </Typography>
+                        )}
+                      </Typography>
+                      
+                      <Typography variant="caption" color="primary" sx={{ mt: 1, display: 'block' }}>
+                        {courseGroup.sessions.length} time slot(s) available
+                      </Typography>
+                      
+                      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip 
+                          label="View Time Slots" 
+                          color="primary" 
+                          size="small" 
+                          variant="outlined"
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          Click to see available slots
+                        </Typography>
+                        {(courseGroup.currentParticipants / courseGroup.maxParticipants) > 0.8 && (
+                          <Chip 
+                            label="Almost Full" 
+                            color="warning" 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ ml: 'auto' }}
+                          />
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Box textAlign="center" py={3}>
+              <Typography variant="body1" color="text.secondary">
+                No available makeup time slots
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                All available sessions may be full, the student is already enrolled, or no sessions allow makeup classes.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMakeupDialogOpen(false)}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 可用時段選擇對話框 */}
+      <Dialog 
+        open={showSlotsDialog} 
+        onClose={() => {
+          setShowSlotsDialog(false);
+          setSelectedCourseForSlots(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Available Time Slots
+          </Typography>
+          {selectedCourseForSlots && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {selectedCourseForSlots.title} - Select a specific time slot
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {selectedCourseForSlots && (
+            <>
+              {/* 課程基本信息 */}
+              <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Course Information
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Title:</strong> {selectedCourseForSlots.title}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Court:</strong> {selectedCourseForSlots.courtName || 'N/A'}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Venue:</strong> {selectedCourseForSlots.venueName || 'N/A'}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Price:</strong> ${selectedCourseForSlots.price || 0}
+                </Typography>
+              </Card>
+
+              {/* 调试信息 */}
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Debug: Course sessions: {selectedCourseForSlots.sessions.length} | 
+                  Other sessions: {selectedCourseForSlots.sessions.filter(s => s.id !== selectedCourseForSlots.id).length}
+                </Typography>
+              </Box>
+              
+              {/* 补课说明 */}
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                <Typography variant="body2" color="info.contrastText">
+                  <strong>Note:</strong> Makeup students are added separately and do not affect the regular capacity. 
+                  Other students can still register for the remaining {selectedCourseForSlots.maxParticipants || 0} spots.
+                </Typography>
+              </Box>
+
+              {/* 可用時段列表 */}
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                Available Time Slots
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {/* 当前选中的时段 */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&:hover': { borderColor: 'primary.main', backgroundColor: 'action.hover' },
+                      height: '100%',
+                      borderColor: 'primary.main',
+                      borderWidth: 2
+                    }}
+                    onClick={() => handleConfirmMakeupArrangement(selectedCourseForSlots)}
+                  >
+                    <CardContent>
+                      <Typography variant="body2" fontWeight="bold">
+                        {new Date(selectedCourseForSlots.startTime).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(selectedCourseForSlots.startTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })} - {new Date(selectedCourseForSlots.endTime).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Capacity: {selectedCourseForSlots.currentParticipants || 0} / {selectedCourseForSlots.maxParticipants || 0}
+                        <Typography component="span" variant="caption" color="primary" sx={{ ml: 1 }}>
+                          (Makeup students don't count towards capacity)
+                        </Typography>
+                      </Typography>
+                      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip 
+                          label="Select This Slot" 
+                          color="primary" 
+                          size="small" 
+                          variant="filled"
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* 其他相关时段（如果有的话） */}
+                {selectedCourseForSlots.sessions
+                  .filter(session => session.id !== selectedCourseForSlots.id)
+                  .map((session) => (
+                    <Grid item xs={12} sm={6} md={4} key={session.id}>
+                      <Card 
+                        variant="outlined" 
+                        sx={{ 
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: 'primary.main', backgroundColor: 'action.hover' },
+                          height: '100%',
+                          borderColor: (session.currentParticipants / session.maxParticipants) > 0.8 ? 'warning.main' : 'divider',
+                          borderWidth: (session.currentParticipants / session.maxParticipants) > 0.8 ? 2 : 1
+                        }}
+                        onClick={() => handleConfirmMakeupArrangement(session)}
+                      >
+                        <CardContent>
+                          <Typography variant="body2" fontWeight="bold">
+                            {new Date(session.startTime).toLocaleDateString()}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {new Date(session.startTime).toLocaleTimeString([], { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })} - {new Date(session.endTime).toLocaleTimeString([], { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </Typography>
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Capacity: {session.currentParticipants || 0} / {session.maxParticipants || 0}
+                        <Typography component="span" variant="caption" color="primary" sx={{ ml: 1 }}>
+                          (Makeup students don't count towards capacity)
+                        </Typography>
+                      </Typography>
+                          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip 
+                              label="Select This Slot" 
+                              color="primary" 
+                              size="small" 
+                              variant="outlined"
+                            />
+                            {(session.currentParticipants / session.maxParticipants) > 0.8 && (
+                              <Chip 
+                                label="Almost Full" 
+                                color="warning" 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ ml: 'auto' }}
+                              />
+                            )}
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+              </Grid>
+
+              {selectedCourseForSlots.sessions.filter(session => session.id !== selectedCourseForSlots.id).length === 0 && (
+                <Box textAlign="center" py={3}>
+                  <Typography variant="body2" color="text.secondary">
+                    No other time slots available for this course.
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowSlotsDialog(false);
+            setSelectedCourseForSlots(null);
+          }}>
+            Back to Course Selection
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Book Court Dialog */}
+      <Dialog 
+        open={bookCourtDialog.open} 
+        onClose={() => setBookCourtDialog({ open: false, request: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+            Book New Court for Replacement Class
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {bookCourtDialog.request && (
+            <>
+              {/* 原始请假请求信息 */}
+              <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'info.light' }}>
+                <Typography variant="subtitle2" color="info.contrastText" gutterBottom>
+                  Original Leave Request Details
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Student:</strong> {bookCourtDialog.request.studentName}
+                    </Typography>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Original Session:</strong> {bookCourtDialog.request.originalSessionTitle || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Original Date:</strong> {new Date(bookCourtDialog.request.originalDate).toLocaleDateString()}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Original Time:</strong> {bookCourtDialog.request.originalSessionStartTime ?
+                        new Date(bookCourtDialog.request.originalSessionStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} - 
+                      {bookCourtDialog.request.originalSessionEndTime ?
+                        new Date(bookCourtDialog.request.originalSessionEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </Typography>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Duration:</strong> {bookCourtData.originalDuration} hour(s)
+                    </Typography>
+                    <Typography variant="body2" color="info.contrastText">
+                      <strong>Reason:</strong> {bookCourtDialog.request.reason || 'No reason provided'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Card>
+
+              {/* 新课程表单 */}
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
+                New Session Details
+              </Typography>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Session Title"
+                    fullWidth
+                    value={bookCourtData.title}
+                    onChange={(e) => setBookCourtData({...bookCourtData, title: e.target.value})}
+                    helperText="Title for the new replacement session"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    value={bookCourtData.description}
+                    onChange={(e) => setBookCourtData({...bookCourtData, description: e.target.value})}
+                    helperText="Description for the new session"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Original Venue"
+                    fullWidth
+                    value={loadingVenueInfo ? 'Loading...' : (bookCourtData.venueName || 'Not specified')}
+                    InputProps={{ 
+                      readOnly: true,
+                      endAdornment: loadingVenueInfo ? <CircularProgress size={20} /> : null
+                    }}
+                    helperText={loadingVenueInfo ? "Loading venue information..." : "Original venue from leave request (cannot be changed)"}
+                    sx={{ 
+                      '& .MuiInputBase-input': { 
+                        backgroundColor: 'grey.100',
+                        color: 'text.secondary'
+                      }
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Court</InputLabel>
+                    <Select
+                      value={bookCourtData.courtId || ''}
+                      onChange={(e) => {
+                        const selectedCourt = courts.find(c => c.id === e.target.value);
+                        setBookCourtData({
+                          ...bookCourtData,
+                          courtId: e.target.value
+                        });
+                      }}
+                      label="Court"
+                      disabled={!bookCourtData.venueId || loadingVenueInfo}
+                    >
+                      {courts
+                        .filter(court => court.venue?.id === bookCourtData.venueId)
+                        .map((court) => (
+                          <MenuItem key={court.id} value={court.id}>
+                            {court.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                    {loadingVenueInfo ? (
+                      <FormHelperText>Loading venue information...</FormHelperText>
+                    ) : !bookCourtData.venueId ? (
+                      <FormHelperText>Venue information not available</FormHelperText>
+                    ) : courts.filter(court => court.venue?.id === bookCourtData.venueId).length === 0 ? (
+                      <FormHelperText>No courts available for this venue</FormHelperText>
+                    ) : (
+                      <FormHelperText>Select a court from the original venue</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Date"
+                    type="date"
+                    fullWidth
+                    value={bookCourtData.date || ''}
+                    onChange={(e) => {
+                      const dateStr = e.target.value;
+                      setBookCourtData({...bookCourtData, date: dateStr});
+                      if (dateStr && bookCourtData.courtId) {
+                        getAvailableSlotsForDate(dateStr, bookCourtData.courtId).then(availableSlots => {
+                          setBookCourtData(prev => ({ ...prev, availableSlots }));
+                        });
+                      }
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    disabled={!bookCourtData.courtId}
+                    helperText={!bookCourtData.courtId ? "Please select a court first" : ""}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  {bookCourtData.date && bookCourtData.availableSlots && (
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Available Time Slots - {new Date(bookCourtData.date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {bookCourtData.availableSlots.map((slot, index) => {
+                          const isSelected = bookCourtData.selectedSlots.some(s => s.time === slot.time);
+                          const requiredSlots = bookCourtData.originalDuration || 1;
+                          const hasReachedLimit = bookCourtData.selectedSlots.length >= requiredSlots;
+                          
+                          return (
+                            <Chip
+                              key={index}
+                              label={`${slot.startTime} - ${slot.endTime}`}
+                              color={isSelected ? "primary" : "default"}
+                              variant={isSelected ? "filled" : "outlined"}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setBookCourtData({
+                                    ...bookCourtData,
+                                    selectedSlots: bookCourtData.selectedSlots.filter(s => s.time !== slot.time)
+                                  });
+                                } else if (!hasReachedLimit) {
+                                  setBookCourtData({
+                                    ...bookCourtData,
+                                    selectedSlots: [...bookCourtData.selectedSlots, slot]
+                                  });
+                                }
+                              }}
+                              sx={{ 
+                                cursor: hasReachedLimit && !isSelected ? 'not-allowed' : 'pointer',
+                                opacity: hasReachedLimit && !isSelected ? 0.5 : 1
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                      {bookCourtData.selectedSlots.length > 0 && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="body2" color="primary">
+                            Selected: {bookCourtData.selectedSlots.length} hour(s)
+                            {bookCourtData.selectedSlots.length >= bookCourtData.originalDuration &&
+                              <Typography component="span" variant="caption" color="success.main" sx={{ ml: 1 }}>
+                                ✓ Ready to book ({bookCourtData.originalDuration} hours required)
+                              </Typography>
+                            }
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Max Participants"
+                    type="number"
+                    fullWidth
+                    value={bookCourtData.maxParticipants}
+                    onChange={(e) => setBookCourtData({...bookCourtData, maxParticipants: parseInt(e.target.value) || 1})}
+                    inputProps={{ min: 1, max: 20 }}
+                    helperText="Maximum number of students for this session"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Price (RM)"
+                    type="number"
+                    fullWidth
+                    value={0}
+                    InputProps={{ readOnly: true }}
+                    helperText="Free replacement class (price cannot be changed)"
+                    sx={{ 
+                      '& .MuiInputBase-input': { 
+                        backgroundColor: 'grey.100',
+                        color: 'text.secondary'
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setBookCourtDialog({ open: false, request: null });
+            setLoadingVenueInfo(false);
+            setBookCourtData({
+              title: '',
+              description: '',
+              venueId: '',
+              venueName: '',
+              state: '',
+              courtId: '',
+              startTime: '',
+              endTime: '',
+              maxParticipants: 6,
+              price: 0,
+              slotType: 'COACH_SESSION',
+              date: '',
+              availableSlots: [],
+              selectedSlots: [],
+              originalRequest: null,
+              originalDuration: 1
+            });
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleCreateBookCourtSession}
+            disabled={!bookCourtData.courtId || !bookCourtData.date || bookCourtData.selectedSlots.length !== bookCourtData.originalDuration}
+          >
+            Create Session
           </Button>
         </DialogActions>
       </Dialog>

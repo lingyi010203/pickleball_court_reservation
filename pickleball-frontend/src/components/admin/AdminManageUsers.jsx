@@ -114,6 +114,9 @@ const PendingRequestsTab = () => {
     severity: 'success'
   });
   const [filter, setFilter] = useState('all');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectingUserId, setRejectingUserId] = useState(null);
   const theme = useTheme();
 
   useEffect(() => {
@@ -180,17 +183,34 @@ const PendingRequestsTab = () => {
   };
 
   const handleReject = async (userId) => {
+    setRejectingUserId(userId);
+    setRejectDialogOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectReason.trim()) {
+      setSnackbar({
+        open: true,
+        message: 'Please provide a reason for rejection.',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       const token = UserService.getAdminToken();
       await axios.put(
-        `http://localhost:8081/api/admin/reject-user-type/${userId}`,
+        `http://localhost:8081/api/admin/reject-user-type/${rejectingUserId}`,
         null,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          params: { reason: rejectReason }
+        }
       );
 
       // Update local state 
       setPendingRequests(prev =>
-        prev.filter(request => request.userId !== userId)
+        prev.filter(request => request.userId !== rejectingUserId)
       );
 
       setSnackbar({
@@ -198,6 +218,9 @@ const PendingRequestsTab = () => {
         message: 'Request rejected successfully.',
         severity: 'info'
       });
+      setRejectDialogOpen(false);
+      setRejectReason('');
+      setRejectingUserId(null);
     } catch (err) {
       setSnackbar({
         open: true,
@@ -205,6 +228,12 @@ const PendingRequestsTab = () => {
         severity: 'error'
       });
     }
+  };
+
+  const handleCancelReject = () => {
+    setRejectDialogOpen(false);
+    setRejectReason('');
+    setRejectingUserId(null);
   };
 
   const handleFilterChange = (e) => {
@@ -404,6 +433,77 @@ const PendingRequestsTab = () => {
           </Table>
         </TableContainer>
       )}
+
+      {/* Reject Reason Dialog */}
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={handleCancelReject}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+            backgroundColor: theme.palette.background.paper,
+            boxShadow: theme.shadows[10],
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.2rem',
+            pb: 1,
+            mb: 1,
+            color: theme.palette.error.main,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}
+        >
+          <CancelIcon color="error" />
+          Reject User Type Change Request
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Please provide a reason for rejecting this user type change request:
+          </Typography>
+          <TextField
+            label="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            fullWidth
+            required
+            multiline
+            minRows={3}
+            maxRows={5}
+            placeholder="Enter the reason for rejection..."
+            autoFocus
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={handleCancelReject}
+            variant="outlined"
+            sx={{ 
+              color: theme.palette.text.secondary,
+              borderColor: theme.palette.text.secondary
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmReject}
+            variant="contained"
+            color="error"
+            disabled={!rejectReason.trim()}
+            startIcon={<CancelIcon />}
+          >
+            Reject Request
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}

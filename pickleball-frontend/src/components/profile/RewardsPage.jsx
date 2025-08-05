@@ -42,6 +42,13 @@ const RewardsPage = () => {
 
   // Tier configuration with gradient colors
   const tierConfig = {
+    BRONZE: {
+      color: '#CD7F32',
+      name: 'Bronze',
+      gradient: 'linear-gradient(135deg, #f7e8d7, #cd7f32)',
+      light: '#fcf8f3',
+      discountPercentage: 5
+    },
     SILVER: {
       color: '#C0C0C0',
       name: 'Silver',
@@ -99,7 +106,8 @@ const RewardsPage = () => {
           expiry: voucher.expiryDate,
           points: voucher.requestPoints,
           discountValue: voucher.discountValue,
-          discountType: voucher.discountType
+          discountType: voucher.discountType,
+          tierName: voucher.tierName  // Add tier name
         };
       });
       setVouchers(backendVouchers);
@@ -120,33 +128,6 @@ const RewardsPage = () => {
       // ignore
     }
   };
-
-  // Get next tier info
-  const getNextTierInfo = () => {
-    if (!tierInfo?.allTiers) return null;
-    const currentTier = tierInfo.allTiers.find(t => t.id === tierInfo.currentTierId);
-    if (!currentTier) return null;
-    const currentIndex = tierInfo.allTiers.findIndex(t => t.id === tierInfo.currentTierId);
-    const nextTier = tierInfo.allTiers[currentIndex + 1];
-    if (!nextTier) return null;
-    return {
-      name: nextTier.name,
-      minPoints: nextTier.minPoints,
-      pointsNeeded: nextTier.minPoints - tierInfo.pointBalance
-    };
-  };
-
-  // Calculate progress percentage
-  const calculateProgress = () => {
-    if (!tierInfo || !getNextTierInfo()) return 0;
-    const currentTierMinPoints = tierInfo.currentTierMinPoints || 0;
-    const nextTierMinPoints = getNextTierInfo().minPoints;
-    const currentPoints = tierInfo.pointBalance || 0;
-    if (nextTierMinPoints <= currentTierMinPoints) return 100;
-    const progress = ((currentPoints - currentTierMinPoints) / (nextTierMinPoints - currentTierMinPoints)) * 100;
-    return Math.min(Math.max(progress, 0), 100);
-  };
-  const progressToNextTier = calculateProgress();
 
   // Fetch user data and dashboard data
   useEffect(() => {
@@ -172,11 +153,40 @@ const RewardsPage = () => {
   }, []);
 
   // Use dashboard data if available
-  const currentPoints = dashboardData?.pointBalance || 0;
+  const tierPoints = dashboardData?.tierPointBalance || 0;
+  const rewardPoints = dashboardData?.rewardPointBalance || 0;
   const memberTier = tierInfo?.currentTierName || dashboardData?.tierName || 'GOLD';
   const currentTier = tierConfig[memberTier.toUpperCase()] || tierConfig.GOLD;
+
+  // Get next tier info
+  const getNextTierInfo = () => {
+    if (!tierInfo?.allTiers) return null;
+    const currentTier = tierInfo.allTiers.find(t => t.id === tierInfo.currentTierId);
+    if (!currentTier) return null;
+    const currentIndex = tierInfo.allTiers.findIndex(t => t.id === tierInfo.currentTierId);
+    const nextTier = tierInfo.allTiers[currentIndex + 1];
+    if (!nextTier) return null;
+    return {
+      name: nextTier.name,
+      minPoints: nextTier.minPoints,
+      pointsNeeded: nextTier.minPoints - tierPoints
+    };
+  };
+
+  // Calculate progress percentage
+  const calculateProgress = () => {
+    if (!tierInfo || !getNextTierInfo()) return 0;
+    const currentTierMinPoints = tierInfo.currentTierMinPoints || 0;
+    const nextTierMinPoints = getNextTierInfo().minPoints;
+    const currentPoints = tierPoints || 0;
+    if (nextTierMinPoints <= currentTierMinPoints) return 100;
+    const progress = ((currentPoints - currentTierMinPoints) / (nextTierMinPoints - currentTierMinPoints)) * 100;
+    return Math.min(Math.max(progress, 0), 100);
+  };
+
   const nextTier = getNextTierInfo();
   const pointsToNext = nextTier ? nextTier.pointsNeeded : 0;
+  const progressToNextTier = calculateProgress();
 
   const handleTabChange = (event, newValue) => setTab(newValue);
   const handleCloseSnackbar = () => { setError(''); setSuccess(''); };
@@ -273,7 +283,7 @@ const RewardsPage = () => {
                   <Diamond sx={{ color: currentTier.color, fontSize: 44 }} />
                 </Box>
                 <Typography variant="h3" fontWeight="bold" color={theme.palette.text.primary}>
-                  {currentPoints}
+                  {tierPoints}
                 </Typography>
                 <Chip
                   label={`${currentTier.name} Tier`}

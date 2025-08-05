@@ -92,10 +92,7 @@ const UserService = {
   },
 
   getUserProfileByUsername: async (username) => {
-    const token = UserService.getToken();
-    const response = await axios.get(`${API_URL}/api/users/profile/${username}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get(`/users/profile/${username}`);
     return response.data;
   },
 

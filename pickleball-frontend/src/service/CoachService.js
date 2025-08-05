@@ -89,17 +89,16 @@ const CoachService = {
   },
 
   // 获取教练的钱包交易记录
-  getWalletTransactions: async (startDate, endDate) => {
-    const params = {};
-    if (startDate) params.startDate = startDate;
-    if (endDate) params.endDate = endDate;
-    const res = await api.get('/api/coach/wallet-transactions', { params });
+  getWalletTransactions: async (timestamp = '') => {
+    const url = timestamp ? `/api/coach/wallet-transactions${timestamp}` : '/api/coach/wallet-transactions';
+    const res = await api.get(url);
     return res.data;
   },
 
   // 获取教练的钱包余额
-  getWalletBalance: async () => {
-    const res = await api.get('/api/coach/wallet-balance');
+  getWalletBalance: async (timestamp = '') => {
+    const url = timestamp ? `/api/coach/wallet-balance${timestamp}` : '/api/coach/wallet-balance';
+    const res = await api.get(url);
     return res.data;
   }
 };

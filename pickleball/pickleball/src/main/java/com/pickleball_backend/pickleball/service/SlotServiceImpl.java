@@ -10,6 +10,7 @@ import com.pickleball_backend.pickleball.exception.ValidationException;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.SlotRepository;
 import com.pickleball_backend.pickleball.repository.ClassSessionRepository;
+import com.pickleball_backend.pickleball.repository.BookingSlotRepository; // 新增：檢查預訂狀態
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class SlotServiceImpl implements SlotService {
     private final SlotRepository slotRepository;
     private final CourtRepository courtRepository;
     private final ClassSessionRepository classSessionRepository;
+    private final BookingSlotRepository bookingSlotRepository; // 新增：檢查預訂狀態
 
     @Override
     public List<SlotResponseDto> getSlots(List<Integer> courtIds, LocalDate startDate, LocalDate endDate) {
@@ -158,7 +160,11 @@ public class SlotServiceImpl implements SlotService {
             boolean overlap = filteredSessions.stream().anyMatch(s ->
                 slotStart.isBefore(s.getEndTime()) && slotEnd.isAfter(s.getStartTime())
             );
-            return !overlap;
+            
+            // 檢查是否有已預訂的 BookingSlot
+            boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
+            
+            return !overlap && !isBooked; // 只有沒有課程重疊且未預訂的時段才可用
         }).map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
             dto.setId(slot.getId());
@@ -190,7 +196,11 @@ public class SlotServiceImpl implements SlotService {
             dto.setDurationHours(slot.getDurationHours());
             dto.setCourtName(court.getName());
             dto.setCourtLocation(court.getLocation());
-            dto.setStatus(slot.isAvailable() ? "AVAILABLE" : "BOOKED");
+            
+            // 檢查是否有已預訂的 BookingSlot
+            boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
+            dto.setStatus(isBooked ? "BOOKED" : (slot.isAvailable() ? "AVAILABLE" : "UNAVAILABLE"));
+            
             return dto;
         }).collect(Collectors.toList());
     }

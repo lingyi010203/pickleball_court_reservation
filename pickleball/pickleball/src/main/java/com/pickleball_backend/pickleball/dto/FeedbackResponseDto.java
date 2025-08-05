@@ -21,4 +21,12 @@ public class FeedbackResponseDto {
     
     // 新增：预订ID
     private Integer bookingId;
+    
+    // 新增：課程相關信息（用於教練評價）
+    private Integer classSessionId;
+    private String classSessionTitle;
+    private String classSessionDate;
+    private String classSessionTime;
+    private String venueName;
+    private String courtName;
 }

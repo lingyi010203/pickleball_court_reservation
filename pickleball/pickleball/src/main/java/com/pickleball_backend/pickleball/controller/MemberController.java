@@ -88,7 +88,8 @@ public class MemberController {
 
         Map<String, Object> debugInfo = new HashMap<>();
         debugInfo.put("memberId", member.getId());
-        debugInfo.put("pointBalance", member.getPointBalance());
+        debugInfo.put("tierPointBalance", member.getTierPointBalance());
+        debugInfo.put("rewardPointBalance", member.getRewardPointBalance());
         debugInfo.put("currentTierId", member.getTier() != null ? member.getTier().getId() : null);
         debugInfo.put("currentTierName", member.getTier() != null ? member.getTier().getTierName() : null);
         debugInfo.put("currentTierMinPoints", member.getTier() != null ? member.getTier().getMinPoints() : null);

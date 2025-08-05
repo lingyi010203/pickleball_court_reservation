@@ -1,21 +1,13 @@
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+import api from './api';
 
 class HelpdeskService {
   static async askQuestion(question) {
-    const token = localStorage.getItem('authToken');
     try {
-      const response = await axios.post(
-        `${API_URL}/api/helpdesk/ask`,
-        question,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'text/plain'
-          }
+      const response = await api.post('/helpdesk/ask', question, {
+        headers: {
+          'Content-Type': 'text/plain'
         }
-      );
+      });
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message ||
@@ -26,18 +18,8 @@ class HelpdeskService {
   }
 
   static async escalateToHumanSupport(queryId) {
-    const token = localStorage.getItem('authToken');
     try {
-      const response = await axios.post(
-        `${API_URL}/api/helpdesk/escalate/${queryId}`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await api.post(`/helpdesk/escalate/${queryId}`, {});
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message ||

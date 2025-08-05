@@ -17,7 +17,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.UUID;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +40,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     private final WalletRepository walletRepository;
     private final EscrowAccountService escrowAccountService;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final MembershipTierRepository membershipTierRepository;
     private static final Logger logger = LoggerFactory.getLogger(ClassSessionServiceImpl.class);
 
 
@@ -114,11 +117,71 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         session.setDescription(sessionDto.getDescription());
         session.setPrice(sessionDto.getPrice());
         session.setTitle(sessionDto.getTitle());
+        session.setAllowReplacement(sessionDto.getAllowReplacement());
 
         // 如果修改后人数少于最大人数，恢复为可用状态
         if (session.getCurrentParticipants() < sessionDto.getMaxParticipants() &&
                 "FULL".equals(session.getStatus())) {
             session.setStatus("AVAILABLE");
+        }
+
+        return sessionRepository.save(session);
+    }
+
+    @Override
+    @Transactional
+    public ClassSession partialUpdateClassSession(Integer sessionId, Map<String, Object> updates)
+            throws ResourceNotFoundException, ConflictException {
+
+        ClassSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+
+        // 只允许修改未开始的课程
+        if (!"AVAILABLE".equals(session.getStatus()) && !"FULL".equals(session.getStatus())) {
+            throw new ValidationException("Only available or full sessions can be modified");
+        }
+
+        // 调试信息
+        System.out.println("=== Partial Update Debug ===");
+        System.out.println("Session ID: " + sessionId);
+        System.out.println("Updates map: " + updates);
+        for (Map.Entry<String, Object> entry : updates.entrySet()) {
+            System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue() + ", Type: " + entry.getValue().getClass().getSimpleName());
+        }
+
+        // 只更新提供的字段
+        if (updates.containsKey("maxParticipants")) {
+            Object maxParticipantsObj = updates.get("maxParticipants");
+            Integer maxParticipants;
+            if (maxParticipantsObj instanceof Integer) {
+                maxParticipants = (Integer) maxParticipantsObj;
+            } else if (maxParticipantsObj instanceof Double) {
+                maxParticipants = ((Double) maxParticipantsObj).intValue();
+            } else {
+                maxParticipants = Integer.valueOf(maxParticipantsObj.toString());
+            }
+            System.out.println("Setting maxParticipants: " + maxParticipants);
+            session.setMaxParticipants(maxParticipants);
+            
+            // 如果修改后人数少于最大人数，恢复为可用状态
+            if (session.getCurrentParticipants() < maxParticipants &&
+                    "FULL".equals(session.getStatus())) {
+                session.setStatus("AVAILABLE");
+            }
+        }
+        
+        if (updates.containsKey("price")) {
+            Object priceObj = updates.get("price");
+            Double price;
+            if (priceObj instanceof Integer) {
+                price = ((Integer) priceObj).doubleValue();
+            } else if (priceObj instanceof Double) {
+                price = (Double) priceObj;
+            } else {
+                price = Double.valueOf(priceObj.toString());
+            }
+            System.out.println("Setting price: " + price);
+            session.setPrice(price);
         }
 
         return sessionRepository.save(session);
@@ -263,7 +326,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
     @Override
     @Transactional
-    public boolean registerUserForMultipleSessions(Integer userId, List<Integer> sessionIds, String paymentMethod) throws ConflictException, ResourceNotFoundException {
+    public Map<String, Object> registerUserForMultipleSessions(Integer userId, List<Integer> sessionIds, String paymentMethod, Integer numPaddles, Boolean buyBallSet) throws ConflictException, ResourceNotFoundException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Member member = memberRepository.findByUserId(userId);
@@ -283,14 +346,30 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 throw new ConflictException("Already registered for session: " + session.getId());
             }
         }
-        // 計算總金額
-        double total = sessions.stream().mapToDouble(ClassSession::getPrice).sum();
+        // 計算總金額（課程費用 + 設備費用）
+        double sessionTotal = sessions.stream().mapToDouble(ClassSession::getPrice).sum();
+        double equipmentTotal = 0.0;
+        
+        // 計算設備費用
+        if (numPaddles != null && numPaddles > 0) {
+            equipmentTotal += numPaddles * 5.0; // 每個球拍 RM5
+        }
+        if (buyBallSet != null && buyBallSet) {
+            equipmentTotal += 12.0; // 球組 RM12
+        }
+        
+        double total = sessionTotal + equipmentTotal;
         
         // 使用託管帳戶系統處理支付（只扣一次）
         if ("wallet".equalsIgnoreCase(paymentMethod)) {
             // 為每個課程創建託管支付記錄
             for (ClassSession session : sessions) {
                 escrowAccountService.depositToEscrow(user, session.getPrice(), session);
+            }
+            // 如果有設備費用，也創建託管記錄
+            if (equipmentTotal > 0) {
+                // 創建一個虛擬的 session 來處理設備費用
+                escrowAccountService.depositToEscrow(user, equipmentTotal, null);
             }
         } else {
             // 其他付款方式可擴充
@@ -317,7 +396,28 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             );
             sessionRepository.save(session);
         }
-        return true;
+        
+        // 返回詳細的響應數據
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("totalAmount", total);
+        response.put("sessionTotal", sessionTotal);
+        response.put("equipmentTotal", equipmentTotal);
+        response.put("numPaddles", numPaddles != null ? numPaddles : 0);
+        response.put("buyBallSet", buyBallSet != null ? buyBallSet : false);
+        response.put("paymentMethod", paymentMethod);
+        
+        // 計算積分獎勵
+        int pointsEarned = (int) Math.floor(total);
+        response.put("pointsEarned", pointsEarned);
+        
+        // 獲取用戶當前的積分餘額
+        if (member != null) {
+            response.put("currentTierPointBalance", member.getTierPointBalance());
+            response.put("currentRewardPointBalance", member.getRewardPointBalance());
+        }
+        
+        return response;
     }
 
     @Override
@@ -371,8 +471,17 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         LocalDate currentDate = request.getStartDate();
         String recurringGroupId = UUID.randomUUID().toString();
 
+        // 星期幾對應的數字 (1=Monday, 2=Tuesday, ..., 7=Sunday)
+        Map<String, Integer> dayMap = Map.of(
+            "MON", 1, "TUES", 2, "WED", 3, "THURS", 4, "FRI", 5, "SAT", 6, "SUN", 7
+        );
+
         while (!currentDate.isAfter(request.getEndDate())) {
-            if (request.getDaysOfWeek().contains(currentDate.getDayOfWeek())) {
+            // 檢查當前日期是否符合選擇的星期幾
+            int currentDayOfWeek = currentDate.getDayOfWeek().getValue(); // 1=Monday, 2=Tuesday, ..., 7=Sunday
+            Integer targetDay = dayMap.get(request.getDayOfWeek());
+            
+            if (targetDay != null && currentDayOfWeek == targetDay) {
                 LocalDateTime startDateTime = LocalDateTime.of(currentDate, request.getStartTime());
                 LocalDateTime endDateTime = LocalDateTime.of(currentDate, request.getEndTime());
 
@@ -390,9 +499,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     ClassSession session = createClassSession(sessionDto, coach);
                     session.setRecurring(true);
                     session.setRecurrencePattern("WEEKLY");
-                    session.setRecurrenceDays(request.getDaysOfWeek().stream()
-                            .map(DayOfWeek::name)
-                            .collect(Collectors.joining(",")));
+                    session.setRecurrenceDays(request.getDayOfWeek());
                     session.setRecurringGroupId(recurringGroupId);
                     sessions.add(session);
                 } catch (ConflictException e) {
@@ -400,11 +507,12 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     logger.warn("时间冲突跳过日期 {}: {}", currentDate, e.getMessage());
                 }
             }
+            
             currentDate = currentDate.plusDays(1);
         }
 
         if (sessions.isEmpty()) {
-            throw new ConflictException("所有选定日期都存在时间冲突");
+            throw new ConflictException("所有选定日期都存在时间冲突或没有符合选择的星期几的日期");
         }
 
         return sessions;
@@ -440,28 +548,128 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         
         for (ClassSession session : startedSessions) {
             try {
-                // 更新課程狀態為進行中
+                // 只更新課程狀態為進行中，不進行收入分配
                 session.setStatus("IN_PROGRESS");
                 sessionRepository.save(session);
                 
-                // 進行託管分帳
-                escrowAccountService.settleClassSession(session);
-                
-                logger.info("Auto-settled session {} via escrow system", session.getId());
+                logger.info("Updated session {} status to IN_PROGRESS", session.getId());
             } catch (Exception e) {
-                logger.error("Failed to auto-settle session " + session.getId(), e);
+                logger.error("Failed to update session " + session.getId(), e);
+            }
+        }
+    }
+    
+    // 檢查所有已開始但未結算的課程
+    private void autoSettleAllStartedSessions() {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            
+            // 只查找 COMPLETED 狀態的課程
+            List<ClassSession> completedSessions = sessionRepository.findAll().stream()
+                .filter(session -> session.getStartTime() != null && 
+                                 session.getStartTime().isBefore(now) &&
+                                 "COMPLETED".equals(session.getStatus()))
+                .collect(Collectors.toList());
+            
+            for (ClassSession session : completedSessions) {
+                try {
+                    // 檢查是否已經有收入分配記錄
+                    List<Payment> existingSettlements = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED")
+                        .stream()
+                        .filter(payment -> payment.getTransactionId() != null && 
+                                         payment.getTransactionId().equals("SETTLEMENT_" + session.getId()))
+                        .collect(Collectors.toList());
+                    
+                    // 檢查是否有託管支付
+                    List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED")
+                        .stream()
+                        .filter(payment -> payment.getTransactionId() != null && 
+                                         payment.getTransactionId().startsWith("SESSION_" + session.getId() + "_"))
+                        .collect(Collectors.toList());
+                    
+                    // 如果有託管支付但沒有結算記錄，則進行結算
+                    if (!escrowedPayments.isEmpty() && existingSettlements.isEmpty()) {
+                        escrowAccountService.settleClassSession(session);
+                        logger.info("Auto-settled completed session {} via escrow system", session.getId());
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to auto-settle completed session " + session.getId(), e);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error in autoSettleAllStartedSessions: ", e);
+        }
+    }
+
+    @Scheduled(cron = "0 */5 * * * ?") // 每5分鐘檢查一次
+    public void autoUpdateSessionStatus() {
+        LocalDateTime now = LocalDateTime.now();
+        
+        // 更新已結束的課程狀態為 COMPLETED
+        List<ClassSession> inProgressSessions = sessionRepository.findByStatus("IN_PROGRESS");
+        for (ClassSession session : inProgressSessions) {
+            try {
+                if (session.getEndTime() != null && session.getEndTime().isBefore(now)) {
+                    session.setStatus("COMPLETED");
+                    sessionRepository.save(session);
+                    logger.info("Updated session {} status to COMPLETED", session.getId());
+                }
+            } catch (Exception e) {
+                logger.error("Failed to update session " + session.getId() + " status", e);
+            }
+        }
+        
+        // 更新已開始但未更新的課程狀態為 IN_PROGRESS
+        List<ClassSession> confirmedSessions = sessionRepository.findByStatus("CONFIRMED");
+        for (ClassSession session : confirmedSessions) {
+            try {
+                if (session.getStartTime() != null && session.getStartTime().isBefore(now) && 
+                    (session.getEndTime() == null || session.getEndTime().isAfter(now))) {
+                    session.setStatus("IN_PROGRESS");
+                    sessionRepository.save(session);
+                    logger.info("Updated session {} status to IN_PROGRESS", session.getId());
+                }
+            } catch (Exception e) {
+                logger.error("Failed to update session " + session.getId() + " status", e);
             }
         }
     }
 
-    @Scheduled(cron = "0 0 2 * * ?") // 每天凌晨2點跑
+    @Scheduled(cron = "0 */5 * * * ?") // 每5分鐘檢查一次
     public void autoSettleCompletedSessions() {
         List<ClassSession> completed = sessionRepository.findByStatus("COMPLETED");
+        logger.info("Found {} completed sessions to check for settlement", completed.size());
+        
         for (ClassSession session : completed) {
             try {
-                settleClassSession(session.getId());
+                // 檢查是否已經有收入分配記錄
+                List<Payment> existingSettlements = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED")
+                    .stream()
+                    .filter(payment -> payment.getTransactionId() != null && 
+                                     payment.getTransactionId().equals("SETTLEMENT_" + session.getId()))
+                    .collect(Collectors.toList());
+                
+                // 檢查是否有託管支付
+                List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED")
+                    .stream()
+                    .filter(payment -> payment.getTransactionId() != null && 
+                                     payment.getTransactionId().startsWith("SESSION_" + session.getId() + "_"))
+                    .collect(Collectors.toList());
+                
+                logger.info("Session {}: {} existing settlements, {} escrowed payments", 
+                           session.getId(), existingSettlements.size(), escrowedPayments.size());
+                
+                // 如果有託管支付但沒有結算記錄，則進行結算
+                if (!escrowedPayments.isEmpty() && existingSettlements.isEmpty()) {
+                    escrowAccountService.settleClassSession(session);
+                    logger.info("Auto-settled completed session {} via escrow system", session.getId());
+                } else if (escrowedPayments.isEmpty()) {
+                    logger.warn("No escrowed payments found for completed session {}", session.getId());
+                } else if (!existingSettlements.isEmpty()) {
+                    logger.info("Session {} already has settlement records", session.getId());
+                }
             } catch (Exception e) {
-                logger.error("Failed to settle session " + session.getId(), e);
+                logger.error("Failed to auto-settle completed session " + session.getId(), e);
             }
         }
     }
@@ -509,73 +717,30 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     continue;
                 }
                 
-                // 計算總收入
-                double totalRevenue = 0.0;
-                if (session.getRegistrations() != null) {
-                    totalRevenue = session.getRegistrations().stream()
-                        .mapToDouble(registration -> session.getPrice())
-                        .sum();
-                }
+                // 檢查是否有託管支付
+                List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED")
+                    .stream()
+                    .filter(payment -> payment.getTransactionId() != null && 
+                            payment.getTransactionId().startsWith("SESSION_" + session.getId() + "_"))
+                    .collect(java.util.stream.Collectors.toList());
                 
-                if (totalRevenue > 0) {
-                    // 分配收入
-                    distributeSessionRevenue(session, totalRevenue);
+                if (!escrowedPayments.isEmpty()) {
+                    // 使用託管系統進行分帳
+                    escrowAccountService.settleClassSession(session);
                     
                     // 標記為已分配
                     session.setRevenueDistributed(true);
                     sessionRepository.save(session);
                     
                     // 發送通知給教練
+                    double totalRevenue = escrowedPayments.stream().mapToDouble(Payment::getAmount).sum();
                     sendRevenueDistributionNotification(session, totalRevenue);
+                    
+                    logger.info("Auto-distributed revenue for session {} via escrow system", session.getId());
                 }
             }
         } catch (Exception e) {
             logger.error("Error in autoDistributeClassRevenue: ", e);
-        }
-    }
-    
-    private void distributeSessionRevenue(ClassSession session, double totalRevenue) {
-        try {
-            // 計算分配金額
-            double platformShare = totalRevenue * 0.20; // 平台 20%
-            double coachShare = totalRevenue * 0.80;    // 教練 80%
-            
-            // 獲取教練的錢包
-            User coach = session.getCoach();
-            Member coachMember = memberRepository.findByUser(coach);
-            if (coachMember == null) {
-                throw new ResourceNotFoundException("Coach member not found");
-            }
-            
-            Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Coach wallet not found"));
-            
-            // 更新教練錢包餘額
-            double newBalance = coachWallet.getBalance() + coachShare;
-            coachWallet.setBalance(newBalance);
-            walletRepository.save(coachWallet);
-            
-            // 記錄錢包交易
-            WalletTransaction coachTransaction = new WalletTransaction();
-            coachTransaction.setWalletId(coachWallet.getId());
-            coachTransaction.setTransactionType("COACH_INCOME");
-            coachTransaction.setAmount(coachShare);
-            coachTransaction.setBalanceBefore(coachWallet.getBalance() - coachShare);
-            coachTransaction.setBalanceAfter(newBalance);
-            coachTransaction.setFrozenBefore(coachWallet.getFrozenBalance());
-            coachTransaction.setFrozenAfter(coachWallet.getFrozenBalance());
-            coachTransaction.setReferenceType("CLASS_SESSION");
-            coachTransaction.setReferenceId(session.getId());
-            coachTransaction.setDescription("Class session revenue: " + session.getTitle() + " (80% share)");
-            coachTransaction.setStatus("COMPLETED");
-            walletTransactionRepository.save(coachTransaction); 
-            
-            // 記錄平台收入（可以創建一個平台錢包或記錄到系統日誌）
-            logger.info("Platform revenue from session {}: RM {:.2f}", session.getId(), platformShare);
-            
-        } catch (Exception e) {
-            logger.error("Error distributing revenue for session {}: ", session.getId(), e);
-            throw new RuntimeException("Failed to distribute session revenue", e);
         }
     }
     
@@ -590,7 +755,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 "Total Revenue: RM %.2f\n" +
                 "Your Share (80%%): RM %.2f\n" +
                 "Platform Fee (20%%): RM %.2f\n\n" +
-                "The amount has been credited to your wallet.",
+                "The amount has been credited to your wallet via escrow system.",
                 session.getTitle(),
                 session.getStartTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
                 totalRevenue,
@@ -599,8 +764,11 @@ public class ClassSessionServiceImpl implements ClassSessionService {
             );
             
             emailService.sendEmail(coach.getEmail(), subject, message);
+            logger.info("Revenue distribution notification sent to coach {} for session {}", 
+                       coach.getId(), session.getId());
         } catch (Exception e) {
-            logger.error("Error sending revenue distribution notification: ", e);
+            logger.error("Failed to send revenue distribution notification for session {}", 
+                        session.getId(), e);
         }
     }
 }

@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -47,9 +48,9 @@ public class MemberService {
 
         if (member.getTier() == null) {
             // 使用字符串查询默认层
-            MembershipTier defaultTier = tierRepository.findByTierName("SILVER");
+            MembershipTier defaultTier = tierRepository.findByTierName("BRONZE");
             if (defaultTier == null) {
-                throw new ResourceNotFoundException("Default SILVER tier not found");
+                throw new ResourceNotFoundException("Default BRONZE tier not found");
             }
             member.setTier(defaultTier);
             memberRepository.save(member);
@@ -64,24 +65,48 @@ public class MemberService {
         System.out.println("Member ID: " + member.getId());
         System.out.println("Member Tier ID: " + (member.getTier() != null ? member.getTier().getId() : "NULL"));
         System.out.println("Member Tier Name: " + (member.getTier() != null ? member.getTier().getTierName() : "NULL"));
-        System.out.println("Member Point Balance: " + member.getPointBalance());
+        System.out.println("Member Point Balance: " + member.getTierPointBalance());
 
-        List<Voucher> vouchers = voucherRepository.findByTierIdAndMemberIsNull(member.getTier().getId());
+        // Get vouchers for current tier
+        List<Voucher> tierVouchers = voucherRepository.findByTierIdAndMemberIsNull(member.getTier().getId());
         
-        System.out.println("Found " + vouchers.size() + " vouchers for tier " + member.getTier().getId());
-        vouchers.forEach(v -> {
+        // Get vouchers with no tier restriction (available to all users)
+        List<Voucher> noTierVouchers = voucherRepository.findByTierIsNullAndMemberIsNull();
+        
+        // Combine both lists
+        List<Voucher> allVouchers = new ArrayList<>();
+        allVouchers.addAll(tierVouchers);
+        allVouchers.addAll(noTierVouchers);
+        
+        System.out.println("Found " + tierVouchers.size() + " vouchers for tier " + member.getTier().getId());
+        System.out.println("Found " + noTierVouchers.size() + " vouchers with no tier restriction");
+        System.out.println("Total vouchers: " + allVouchers.size());
+        
+        allVouchers.forEach(v -> {
             System.out.println("Voucher ID: " + v.getId() + 
                              ", Code: " + v.getCode() + 
+                             ", Tier: " + (v.getTier() != null ? v.getTier().getTierName() : "NO TIER") +
                              ", Expiry: " + v.getExpiryDate() + 
                              ", Points: " + v.getRequestPoints());
         });
 
-        List<VoucherDto> redeemableVouchers = vouchers.stream()
+        List<VoucherDto> redeemableVouchers = allVouchers.stream()
                 .filter(v -> {
                     // Handle null or default dates as never expiring
-                    if (v.getExpiryDate() == null) return true;
-                    if (v.getExpiryDate().equals(LocalDate.of(1970, 1, 1))) return true;
-                    return v.getExpiryDate().isAfter(LocalDate.now());
+                    if (v.getExpiryDate() == null) {
+                        System.out.println("Voucher " + v.getCode() + " has no expiry date - INCLUDED");
+                        return true;
+                    }
+                    if (v.getExpiryDate().equals(LocalDate.of(1970, 1, 1))) {
+                        System.out.println("Voucher " + v.getCode() + " has default expiry date - INCLUDED");
+                        return true;
+                    }
+                    
+                    boolean isExpired = v.getExpiryDate().isBefore(LocalDate.now());
+                    System.out.println("Voucher " + v.getCode() + " expires on " + v.getExpiryDate() + 
+                                     ", today is " + LocalDate.now() + ", isExpired: " + isExpired + 
+                                     (isExpired ? " - EXCLUDED" : " - INCLUDED"));
+                    return !isExpired;
                 })
                 .map(v -> new VoucherDto(
                         v.getId(),
@@ -98,7 +123,8 @@ public class MemberService {
 
         return new MemberDashboardDto(
                 member.getTier().getTierName(), // 直接返回字符串值
-                member.getPointBalance(),
+                member.getTierPointBalance(),
+                member.getRewardPointBalance(),  // 新增 reward points
                 member.getTier().getBenefits(),
                 redeemableVouchers,
                 member.getTier().getMinPoints(),
@@ -134,12 +160,16 @@ public class MemberService {
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
         // Validate voucher
-        if (voucher.getTier() == null || voucher.getTier().getId() == null || 
-            member.getTier() == null || member.getTier().getId() == null ||
-            !voucher.getTier().getId().equals(member.getTier().getId())) {
-            throw new ValidationException("Voucher not available for your tier");
+        if (voucher.getTier() != null && voucher.getTier().getId() != null) {
+            // Voucher has tier restriction - check if user's tier matches
+            if (member.getTier() == null || member.getTier().getId() == null ||
+                !voucher.getTier().getId().equals(member.getTier().getId())) {
+                throw new ValidationException("Voucher not available for your tier");
+            }
         }
-        if (member.getPointBalance() < voucher.getRequestPoints()) {
+        // If voucher.getTier() is null, it means no tier restriction - all users can redeem
+        
+        if (member.getTierPointBalance() < voucher.getRequestPoints()) {
             throw new ValidationException("Insufficient points");
         }
         if (voucher.getExpiryDate() != null && 
@@ -149,7 +179,7 @@ public class MemberService {
         }
 
         // Deduct points
-        member.setPointBalance(member.getPointBalance() - voucher.getRequestPoints());
+        member.setTierPointBalance(member.getTierPointBalance() - voucher.getRequestPoints());
         memberRepository.save(member);
 
         // Recalculate tier
@@ -173,13 +203,13 @@ public class MemberService {
         emailService.sendVoucherEmail(
                 user.getEmail(),
                 "Voucher Redemption Confirmation",
-                "You redeemed voucher: " + uniqueCode + "\nNew balance: " + member.getPointBalance() + " points"
+                "You redeemed voucher: " + uniqueCode + "\nNew balance: " + member.getTierPointBalance() + " points"
         );
 
         return new VoucherRedemptionResponse(
                 uniqueCode,
                 voucher.getExpiryDate(),
-                member.getPointBalance()
+                member.getTierPointBalance()
         );
     }
 
@@ -194,7 +224,7 @@ public class MemberService {
         // Store old tier for comparison
         String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
         
-        member.setPointBalance(member.getPointBalance() + points);
+        member.setTierPointBalance(member.getTierPointBalance() + points);
         memberRepository.save(member);
 
         // Automatic tier upgrade check

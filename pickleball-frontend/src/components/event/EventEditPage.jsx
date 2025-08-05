@@ -57,6 +57,7 @@ export default function EventEditPage() {
   const [error, setError] = useState("");
   const [notifyParticipants, setNotifyParticipants] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [sendNotification, setSendNotification] = useState(true); // 默認發送通知
 
   const categories = [
     'Tournament',
@@ -74,15 +75,11 @@ export default function EventEditPage() {
     'Beginner Session',
     'Advanced Play'
   ];
-  const skillLevels = [
-    'Beginner', 'Intermediate', 'Advanced', 'All Levels'
-  ];
+
 
   const [form, setForm] = useState({
     title: "",
     eventType: "",
-    skillLevel: "",
-    eligibility: "",
     schedule: [],
     date: '',
     time: '',
@@ -112,8 +109,6 @@ export default function EventEditPage() {
         setForm({
           title: eventData.title || "",
           eventType: eventData.eventType || "",
-          skillLevel: eventData.skillLevel || "",
-          eligibility: eventData.eligibility || "",
           schedule: eventData.schedule ? JSON.parse(eventData.schedule) : [],
           date: start.getFullYear() + '-' +
                 String(start.getMonth() + 1).padStart(2, '0') + '-' +
@@ -121,7 +116,7 @@ export default function EventEditPage() {
           time: String(start.getHours()).padStart(2, '0') + ':' +
                 String(start.getMinutes()).padStart(2, '0'),
           endTime: String(end.getHours()).padStart(2, '0') + ':' + String(end.getMinutes()).padStart(2, '0'),
-          location: eventData.location || "",
+          location: eventData.location || eventData.venueLocation || "",
           capacity: eventData.capacity?.toString() || "",
           price: eventData.feeAmount?.toString() || '',
           feeAmount: eventData.feeAmount?.toString() || '',
@@ -186,15 +181,25 @@ export default function EventEditPage() {
         startTime: `${form.date}T${form.time}`,
         endTime: `${form.date}T${form.endTime}`,
         eventType: form.eventType,
-        skillLevel: form.skillLevel,
         capacity: parseInt(form.capacity, 10),
         location: form.location,
-        eligibility: form.eligibility,
         schedule: JSON.stringify(scheduleArray),
         feeAmount: form.price ? parseFloat(form.price) : 0,
         status: 'PUBLISHED', // Always publish when updating
+        venueId: event?.venueId || null, // 保留現有的 venue 關聯
+        sendNotification: sendNotification // 添加郵件通知選項
        // description: form.description
       };
+      
+      // 調試日誌
+      console.log('Updating event with venueId:', event?.venueId);
+      console.log('Event venue info:', {
+        venueId: event?.venueId,
+        venueName: event?.venueName,
+        venueState: event?.venueState,
+        venueLocation: event?.venueLocation
+      });
+      
       if (notifyParticipants) {
         await EventService.updateEventWithNotification(eventId, eventData);
       } else {
@@ -274,7 +279,22 @@ export default function EventEditPage() {
             {showSuccess && (
               <Zoom in>
                 <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setShowSuccess(false)}>
-                  Event updated successfully! 🎉
+                  <Typography variant="h6" gutterBottom>
+                    Event updated successfully! 🎉
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    Your event has been updated and is now live.
+                  </Typography>
+                  {sendNotification && (
+                    <Typography variant="body2" color="info.main">
+                      📧 Email notifications have been sent to all registered users.
+                    </Typography>
+                  )}
+                  {notifyParticipants && (
+                    <Typography variant="body2" color="info.main">
+                      🔔 Registered participants have been notified about the changes.
+                    </Typography>
+                  )}
                 </Alert>
               </Zoom>
             )}
@@ -335,36 +355,7 @@ export default function EventEditPage() {
                             </Select>
                           </FormControl>
                         </Grid>
-                        <Grid item xs={12} md={6}>
-                          <FormControl fullWidth required disabled>
-                            <InputLabel>Skill Level</InputLabel>
-                            <Select
-                              value={form.skillLevel}
-                              onChange={handleInputChange('skillLevel')}
-                              label="Skill Level"
-                              sx={{ borderRadius: 2 }}
-                            >
-                              {skillLevels.map((level) => (
-                                <MenuItem key={level} value={level}>
-                                  {level}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            label="Eligibility"
-                            value={form.eligibility}
-                            onChange={handleInputChange('eligibility')}
-                            multiline
-                            rows={2}
-                            variant="outlined"
-                            disabled={true}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                          />
-                        </Grid>
+
                         {/* Schedule */}
                         <Grid item xs={12}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Schedule</Typography>
@@ -505,6 +496,40 @@ export default function EventEditPage() {
                             disabled={true}
                           />
                         </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="Venue"
+                            value={event?.venueName || 'N/A'}
+                            variant="outlined"
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <LocationOn color="primary" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            disabled={true}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
+                            label="State"
+                            value={event?.venueState || 'N/A'}
+                            variant="outlined"
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <LocationOn color="primary" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            disabled={true}
+                          />
+                        </Grid>
                         <Grid item xs={12}>
                           <TextField
                             fullWidth
@@ -561,24 +586,55 @@ export default function EventEditPage() {
                 </Grid>
                 
                 {/* Actions */}
-                <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  <Button variant="contained" color="error" onClick={handleDelete} disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
-                    Delete Event
-                  </Button>
-                  <Button variant="contained" type="submit" disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
-                    Update Event
-                  </Button>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notifyParticipants}
-                        onChange={e => setNotifyParticipants(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label="Notify participants about changes"
-                    sx={{ ml: 2 }}
-                  />
+                <Grid item xs={12}>
+                  <Card elevation={8} sx={{ borderRadius: 3, mb: 3 }}>
+                    <CardContent>
+                      <Typography variant="h5" gutterBottom sx={{ color: '#667eea', fontWeight: 'bold' }}>
+                        Notification Settings
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={sendNotification}
+                                onChange={e => setSendNotification(e.target.checked)}
+                                color="primary"
+                              />
+                            }
+                            label="📧 Send email notification to all users about this event update"
+                          />
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: 1 }}>
+                            When enabled, all registered users will receive an email notification about the changes to this event.
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={notifyParticipants}
+                                onChange={e => setNotifyParticipants(e.target.checked)}
+                                color="primary"
+                              />
+                            }
+                            label="🔔 Notify registered participants about changes"
+                          />
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: 1 }}>
+                            When enabled, users who have already registered for this event will receive a notification.
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Button variant="contained" color="error" onClick={handleDelete} disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
+                      Delete Event
+                    </Button>
+                    <Button variant="contained" type="submit" disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
+                      {submitting ? 'Updating Event...' : 'Update Event'}
+                    </Button>
+                  </Box>
                 </Grid>
               </Grid>
             </form>

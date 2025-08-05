@@ -26,4 +26,7 @@ public class FeedbackDto {
     
     // 新增：预订ID
     private Integer bookingId;
+    
+    // 新增：课程ID（用于教练评价）
+    private Integer classSessionId;
 }

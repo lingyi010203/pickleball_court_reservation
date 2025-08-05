@@ -454,6 +454,48 @@ const MyFeedbackPage = () => {
                         <Typography variant="body1" sx={{ lineHeight: 1.6, mb: 2 }}>
                           {item.review}
                         </Typography>
+                        
+                        {/* 為教練評價顯示課程詳細信息 */}
+                        {item.targetType === 'COACH' && (item.classSessionTitle || item.venueName || item.courtName) && (
+                          <Card sx={{ 
+                            mt: 2, 
+                            background: alpha(theme.palette.info.main, 0.05),
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+                          }}>
+                            <CardContent sx={{ p: 2 }}>
+                              <Typography variant="subtitle2" color="info.main" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                📚 Class Session Details
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {item.classSessionTitle && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Class:</strong> {item.classSessionTitle}
+                                  </Typography>
+                                )}
+                                {item.classSessionDate && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Date:</strong> {new Date(item.classSessionDate).toLocaleDateString()}
+                                  </Typography>
+                                )}
+                                {item.classSessionTime && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Time:</strong> {item.classSessionTime}
+                                  </Typography>
+                                )}
+                                {item.venueName && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Venue:</strong> {item.venueName}
+                                  </Typography>
+                                )}
+                                {item.courtName && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Court:</strong> {item.courtName}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        )}
                         {item.tags && item.tags.length > 0 && (
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                             {item.tags.map(tag => (

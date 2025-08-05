@@ -44,14 +44,16 @@ public interface EventRepository extends JpaRepository<Event, Integer> {
            "(:eventType IS NULL OR e.eventType = :eventType) AND " +
            "(:startDate IS NULL OR e.startTime >= :startDate) AND " +
            "(:endDate IS NULL OR e.startTime <= :endDate) AND " +
-           "(:status IS NULL OR e.status = :status) AND " +
-           "(:searchKeyword IS NULL OR LOWER(e.title) LIKE LOWER(CONCAT('%', :searchKeyword, '%')))")
+           "(:status IS NULL OR e.status = :status OR e.status IS NULL) AND " +
+           "(:searchKeyword IS NULL OR LOWER(e.title) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))) AND " +
+           "e.startTime > :currentTime")
     Page<Event> findEventsWithFilters(
             @Param("eventType") String eventType,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("status") String status,
             @Param("searchKeyword") String searchKeyword,
+            @Param("currentTime") LocalDateTime currentTime,
             Pageable pageable);
 
     List<Event> findByCourts_Id(Integer courtId);

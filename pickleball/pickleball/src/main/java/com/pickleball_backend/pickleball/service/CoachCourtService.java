@@ -19,4 +19,6 @@ public interface CoachCourtService {
     void createRecurringClass(Integer coachId, RecurringSessionRequestDto dto);
     List<ClassSession> findScheduleByCoachIdAndPeriodWithVenue(Integer coachId, LocalDateTime from, LocalDateTime to);
     List<Object[]> getAllStudentsForCoach(Integer coachId);
+    void updateSlotAllowReplacement(Integer coachId, Integer sessionId, Boolean allowReplacement);
+    List<ClassSession> getReplacementSessionsByCoach(Integer coachId);
 }

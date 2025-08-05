@@ -35,6 +35,7 @@ const BookingConfirmationPage = () => {
   const navigate = useNavigate();
   const booking = location.state?.booking;
   const matchDetails = location.state?.matchDetails;
+  const eventDetails = location.state?.eventDetails;
   const paymentType = location.state?.type;
   const [sessionDetails, setSessionDetails] = useState(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -53,6 +54,12 @@ const BookingConfirmationPage = () => {
   console.log('Booking object:', booking);
   console.log('Match details:', matchDetails);
   console.log('Payment type:', paymentType);
+  console.log('Voucher information:');
+  console.log('- voucherUsed:', booking?.voucherUsed);
+  console.log('- originalAmount:', booking?.originalAmount);
+  console.log('- discountAmount:', booking?.discountAmount);
+  console.log('- voucherCode:', booking?.voucherCode);
+  console.log('- totalAmount:', booking?.totalAmount);
 
   const formatDate = (dateString) => {
     console.log('formatDate called with:', dateString);
@@ -75,9 +82,10 @@ const BookingConfirmationPage = () => {
       { hour: '2-digit', minute: '2-digit' });
   };
 
-  // 處理 friendly match 或一般 booking 的數據
+  // 處理 friendly match、event registration 或一般 booking 的數據
   const isFriendlyMatch = paymentType === 'friendly-match';
-  const data = isFriendlyMatch ? matchDetails : booking;
+  const isEventRegistration = paymentType === 'event-registration';
+  const data = isFriendlyMatch ? matchDetails : (isEventRegistration ? eventDetails : booking);
   
   // 計算 duration（小時）
   const calculateDuration = () => {
@@ -100,13 +108,17 @@ const BookingConfirmationPage = () => {
   const buyBallSet = isFriendlyMatch ? !!data?.buyBallSet : !!booking?.buyBallSet;
   const total = isFriendlyMatch
     ? (data?.totalPrice || data?.price || 0)
-    : (booking?.price !== undefined
-        ? booking.price
-        : (booking?.totalAmount !== undefined
-            ? booking.totalAmount
-            : (booking?.totalPrice !== undefined
-                ? booking.totalPrice
-                : 0)));
+    : isEventRegistration
+    ? (location.state?.totalAmount || data?.feeAmount || 0)
+    : (booking?.voucherUsed 
+        ? booking.totalAmount  // Use discounted amount when voucher is used
+        : (booking?.price !== undefined
+            ? booking.price
+            : (booking?.totalAmount !== undefined
+                ? booking.totalAmount
+                : (booking?.totalPrice !== undefined
+                    ? booking.totalPrice
+                    : 0))));
 
   useEffect(() => {
     if (booking && booking.type === 'class-session' && booking.sessions && booking.sessions.length > 0) {
@@ -172,6 +184,41 @@ ${data?.numPaddles > 0 ? `🏓 Paddles: ${data.numPaddles} (RM5 each)\n` : ''}${
 Payment Status: ✅ PAID
 
 Join me for a great game! 🏓`;
+    } else if (booking && booking.type === 'class-session' && booking.sessions) {
+      // Class session booking
+      const session = booking.sessions[0]; // 取第一個 session 作為代表
+      const firstSession = session;
+      
+      return `🎓 Class Session Confirmed!
+
+📅 Date: ${formatDate(firstSession?.startTime)}
+⏰ Time: ${formatTime(firstSession?.startTime)} - ${formatTime(firstSession?.endTime)}
+🏟️ Court: ${firstSession?.courtName || firstSession?.court?.name || 'Court'}
+📍 Location: ${firstSession?.venueName || firstSession?.venue?.name || 'Location'}
+👨‍🏫 Coach: ${firstSession?.coachName || firstSession?.coach?.name || 'Coach'}
+💰 Total: RM${total.toFixed(2)}
+
+${booking?.numPaddles > 0 ? `🏓 Paddles: ${booking.numPaddles} (RM5 each)\n` : ''}${booking?.buyBallSet ? '🏐 Ball Set: Yes (RM12)\n' : ''}
+Payment Status: ✅ ${booking?.paymentStatus || 'PAID'}
+
+Let's learn and play! 🏓`;
+    } else if (isEventRegistration) {
+      // Event registration
+      return `🎉 Event Registration Confirmed!
+
+📅 Event: ${data?.title || 'Event'}
+🎯 Type: ${data?.eventType || 'N/A'}
+📅 Date: ${data?.startTime ? new Date(data.startTime).toLocaleDateString() : 'N/A'}
+⏰ Time: ${data?.startTime && data?.endTime ? 
+  `${new Date(data.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(data.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'N/A'}
+📍 Location: ${data?.location || data?.venueLocation || 'Location TBD'}
+👥 Capacity: ${data?.currentParticipants || 0}/${data?.capacity} participants
+💰 Fee: RM${total.toFixed(2)}
+👤 Organizer: ${data?.organizerName || 'N/A'}
+
+Payment Status: ✅ ${location.state?.paymentStatus || 'COMPLETED'}
+
+Looking forward to the event! 🎉`;
     } else {
       return `🏟️ Court Booking Confirmed!
 
@@ -221,7 +268,7 @@ Let's play! 🏓`;
     }
   };
 
-  if (!booking && !matchDetails) {
+  if (!booking && !matchDetails && !eventDetails) {
     return (
       <Container sx={{ py: 4, textAlign: 'center' }}>
         <Typography variant="h5" gutterBottom>
@@ -262,6 +309,8 @@ Let's play! 🏓`;
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
           {isFriendlyMatch 
             ? `Your friendly match payment has been confirmed`
+            : isEventRegistration
+            ? `Your event registration has been confirmed`
             : `Your booking at ${booking?.courtName} has been confirmed`
           }
         </Typography>
@@ -277,7 +326,9 @@ Let's play! 🏓`;
         >
           <Box sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-              {isFriendlyMatch ? 'Match Summary' : 'Booking Summary'}
+              {isFriendlyMatch ? 'Match Summary' : 
+               isEventRegistration ? 'Event Registration Summary' : 
+               'Booking Summary'}
             </Typography>
   
             {booking && booking.type === 'class-session' && booking.sessions ? (
@@ -308,6 +359,25 @@ Let's play! 🏓`;
                     </Typography>
                   );
                 })}
+                
+                {/* Equipment Options for Class Sessions */}
+                {(booking?.numPaddles > 0 || booking?.buyBallSet) && (
+                  <Box mt={2}>
+                    <Typography variant="subtitle2" fontWeight="bold" color="primary" mb={1}>
+                      Equipment Options:
+                    </Typography>
+                    {booking?.numPaddles > 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        🏓 Paddles: {booking.numPaddles} (RM5 each)
+                      </Typography>
+                    )}
+                    {booking?.buyBallSet && (
+                      <Typography variant="body2" color="text.secondary">
+                        🏐 Ball Set: Yes (RM12)
+                      </Typography>
+                    )}
+                  </Box>
+                )}
               </Box>
             ) : (
               <>
@@ -344,6 +414,28 @@ Let's play! 🏓`;
                           value={`${duration} hour${duration !== 1 ? 's' : ''}`}
                           isLast
                         />
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : isEventRegistration ? (
+                  <>
+                    {/* Event Registration Summary */}
+                    <Card variant="outlined" sx={{ mb: 2 }}>
+                      <CardContent>
+                        <SummaryRow label="Event Title" value={data?.title || 'Event'} bold />
+                        <SummaryRow label="Event Type" value={data?.eventType || 'N/A'} />
+                        <SummaryRow label="Capacity" value={`${data?.currentParticipants || 0}/${data?.capacity} participants`} />
+                        <SummaryRow label="Fee" value={`RM${data?.feeAmount || 0}`} isLast />
+                      </CardContent>
+                    </Card>
+
+                    <Card variant="outlined" sx={{ mb: 2 }}>
+                      <CardContent>
+                        <SummaryRow label="Date" value={data?.startTime ? new Date(data.startTime).toLocaleDateString() : 'N/A'} bold />
+                        <SummaryRow label="Time" value={data?.startTime && data?.endTime ? 
+                          `${new Date(data.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(data.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'N/A'} />
+                        <SummaryRow label="Location" value={data?.location || data?.venueLocation || 'Location TBD'} />
+                        <SummaryRow label="Organizer" value={data?.organizerName || 'N/A'} isLast />
                       </CardContent>
                     </Card>
                   </>
@@ -388,20 +480,54 @@ Let's play! 🏓`;
   
             <Card variant="outlined" sx={{ mb: 2 }}>
               <CardContent>
-                <SummaryRow
-                  label="Total Amount"
-                  value={`RM${Number(total).toFixed(2)}`}
-                  bold
-                  color="#2e7d32"
-                />
+                {booking?.voucherUsed ? (
+                  <>
+                    <SummaryRow
+                      label="Original Amount"
+                      value={`RM${Number(booking.originalAmount).toFixed(2)}`}
+                      color="#757575"
+                    />
+                    <SummaryRow
+                      label="Voucher Applied"
+                      value={booking.voucherCode}
+                      color="#ff9800"
+                    />
+                    <SummaryRow
+                      label="Discount Amount"
+                      value={`-RM${Number(booking.discountAmount).toFixed(2)}`}
+                      color="#4caf50"
+                    />
+                    <SummaryRow
+                      label="Final Amount"
+                      value={`RM${Number(total).toFixed(2)}`}
+                      bold
+                      color="#2e7d32"
+                    />
+                  </>
+                ) : (
+                  <SummaryRow
+                    label="Total Amount"
+                    value={`RM${Number(total).toFixed(2)}`}
+                    bold
+                    color="#2e7d32"
+                  />
+                )}
                 <SummaryRow
                   label="Payment Method"
-                  value={isFriendlyMatch ? 'Wallet' : (booking?.paymentMethod === 'WALLET' ? 'Wallet' : 'Credit Card')}
+                  value={isFriendlyMatch ? 'Wallet' : 
+                         isEventRegistration ? (location.state?.paymentMethod === 'WALLET' ? 'Wallet' : 'Credit Card') :
+                         (booking?.paymentMethod === 'WALLET' ? 'Wallet' : 'Credit Card')}
                 />
                 <SummaryRow
                   label="Payment Status"
-                  value={isFriendlyMatch ? 'PAID' : booking?.paymentStatus}
-                  color={(isFriendlyMatch ? 'PAID' : booking?.paymentStatus) === 'COMPLETED' || (isFriendlyMatch ? 'PAID' : booking?.paymentStatus) === 'PAID' ? '#2e7d32' : '#ff9800'}
+                  value={isFriendlyMatch ? 'PAID' : 
+                         isEventRegistration ? (location.state?.paymentStatus || 'COMPLETED') :
+                         booking?.paymentStatus}
+                  color={(isFriendlyMatch ? 'PAID' : 
+                         isEventRegistration ? (location.state?.paymentStatus || 'COMPLETED') :
+                         booking?.paymentStatus) === 'COMPLETED' || (isFriendlyMatch ? 'PAID' : 
+                         isEventRegistration ? (location.state?.paymentStatus || 'COMPLETED') :
+                         booking?.paymentStatus) === 'PAID' ? '#2e7d32' : '#ff9800'}
                   bold
                   isLast
                 />
@@ -436,8 +562,12 @@ Let's play! 🏓`;
                   color="#9c27b0"
                 />
                 <SummaryRow
-                  label="Current Balance"
-                  value={`${booking.currentPointBalance} points`}
+                  label="Tier Points"
+                  value={`${booking.currentTierPointBalance} points`}
+                />
+                <SummaryRow
+                  label="Reward Points"
+                  value={`${booking.currentRewardPointBalance} points`}
                   isLast
                 />
   
@@ -504,6 +634,57 @@ Let's play! 🏓`;
                 }}
               >
                 Create Another Match
+              </Button>
+            </>
+          ) : isEventRegistration ? (
+            // Event Registration 的按鈕
+            <>
+              <Tooltip title="Share confirmation with friends">
+                <IconButton
+                  onClick={handleShare}
+                  sx={{
+                    backgroundColor: '#2196f3',
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: '#1976d2'
+                    },
+                    mb: 2
+                  }}
+                >
+                  <ShareIcon />
+                </IconButton>
+              </Tooltip>
+              
+              <Button 
+                variant="outlined" 
+                onClick={() => navigate('/events')}
+                sx={{ 
+                  px: 4,
+                  py: 1.5,
+                  borderColor: '#4caf50',
+                  color: '#4caf50',
+                  '&:hover': {
+                    backgroundColor: '#e8f5e9',
+                    borderColor: '#2e7d32'
+                  }
+                }}
+              >
+                View My Events
+              </Button>
+              
+              <Button 
+                variant="contained" 
+                onClick={() => navigate('/events')}
+                sx={{ 
+                  px: 4,
+                  py: 1.5,
+                  backgroundColor: '#ff6f00',
+                  '&:hover': {
+                    backgroundColor: '#e65100'
+                  }
+                }}
+              >
+                Browse More Events
               </Button>
             </>
           ) : (booking && booking.type === 'class-session') ? (

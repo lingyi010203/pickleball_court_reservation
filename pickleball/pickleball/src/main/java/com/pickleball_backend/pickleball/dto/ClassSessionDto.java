@@ -25,6 +25,7 @@ public class ClassSessionDto {
     private String recurringGroupId;
     private String venueName;
     private String venueState;
+    private Boolean allowReplacement; // 新增：是否允許補課
     // 新增：報名名單
     private List<ClassRegistrationDto> registrations;
 }
