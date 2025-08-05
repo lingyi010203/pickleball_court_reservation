@@ -44,6 +44,7 @@ import ClassSessionRegisterPage from './components/class/ClassSessionRegisterPag
 import CoachingDashboard from './components/coach/CoachingDashboard';
 import StudentManagementSystem from './components/coach/StudentManagementSystem';
 import MyClassSessionsPage from './components/profile/MyClassSessionsPage';
+import RedeemVoucherPage from './components/profile/RedeemVoucherPage';
 import AdminSettings from './components/admin/AdminSettings';
 import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
 import ProfileOverview from './components/profile/ProfileOverview';
@@ -147,6 +148,11 @@ function App() {
             <Route path="edit-profile" element={
               <ProtectedRoute>
                 <EditProfileForm />
+              </ProtectedRoute>
+            } />
+            <Route path="redeem-voucher" element={
+              <ProtectedRoute>
+                <RedeemVoucherPage />
               </ProtectedRoute>
             } />
             <Route path="notifications" element={null} />

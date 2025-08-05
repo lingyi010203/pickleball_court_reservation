@@ -109,4 +109,59 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     // 查找已退款的预订
     @Query("SELECT b FROM Booking b JOIN b.payment p WHERE p.status = :status")
     List<Booking> findByPaymentStatus(@Param("status") String status);
+
+    // 查找会员的即将到来的预订
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.bookingSlots bs " +
+           "LEFT JOIN FETCH bs.slot s " +
+           "WHERE b.member = :member " +
+           "AND s.date >= :today " +
+           "AND (s.date > :today OR s.startTime > :nowTime) " +
+           "AND b.status IN ('CONFIRMED', 'PENDING') " +
+           "ORDER BY s.date ASC, s.startTime ASC")
+    List<Booking> findUpcomingBookingsByMember(
+            @Param("member") Member member,
+            @Param("today") LocalDate today,
+            @Param("nowTime") java.time.LocalTime nowTime);
+
+    // 统计指定时间段内指定球场的课程预订数量
+    // Note: This method is deprecated. Use ClassSessionRepository instead for class session queries.
+    // The Booking entity doesn't have a 'type' field, so this query was incorrect.
+    // Class sessions are handled by the ClassSession entity, not the Booking entity.
+    @Deprecated
+    default long countClassBookingsInTimeRange(
+            @Param("courtId") Integer courtId,
+            @Param("startDate") LocalDate startDate,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime) {
+        // This method is deprecated and should not be used.
+        // Use ClassSessionRepository.findByCourtIdAndStartTimeBetween() instead.
+        return 0;
+    }
+
+    // 检查指定时间段内指定球场是否有活跃预订
+    @Query("SELECT COUNT(b) > 0 FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE s.courtId = :courtId " +
+           "AND b.status IN ('CONFIRMED', 'PENDING') " +
+           "AND s.date = :date " +
+           "AND s.startTime < :endTime " +
+           "AND s.endTime > :startTime")
+    boolean existsActiveBookingForCourtAndTime(
+            @Param("courtId") Integer courtId,
+            @Param("date") LocalDate date,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime);
+
+    // 查找所有过期的预订
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE b.status IN ('CONFIRMED', 'PENDING') " +
+           "AND (s.date < :currentDate " +
+           "OR (s.date = :currentDate AND s.endTime < :currentTime))")
+    List<Booking> findAllExpired(
+            @Param("currentDate") LocalDate currentDate,
+            @Param("currentTime") java.time.LocalTime currentTime);
 }

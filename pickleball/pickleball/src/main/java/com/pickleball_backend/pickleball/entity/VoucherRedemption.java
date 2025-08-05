@@ -3,7 +3,8 @@ package com.pickleball_backend.pickleball.entity;
 import jakarta.persistence.*;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
@@ -11,10 +12,17 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "voucher_redemption")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class VoucherRedemption {
+    
+    // Status constants
+    public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String STATUS_USED = "USED";
+    public static final String STATUS_PENDING_REFUND = "PENDING_REFUND";
+    public static final String STATUS_RESTORED = "RESTORED";
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -96,6 +96,7 @@ public class EventServiceImpl implements EventService {
         event.setStatus(eventDto.getStatus());
         event.setSchedule(eventDto.getSchedule());
         event.setFeeAmount(eventDto.getFeeAmount());
+        event.setLocation(eventDto.getLocation()); // 新增：設置事件地點
         event.setOrganizerId(organizer.getUser().getId());
         // [全場地自動分配]：當自動分配時，會直接分配所有可用場地給活動，不再根據人數裁剪，也不檢查總容量是否足夠。
         Set<Court> courts;
@@ -132,32 +133,37 @@ public class EventServiceImpl implements EventService {
         event.setStatus("PUBLISHED");
         Event savedEvent = eventRepository.save(event);
 
-        // Notification logic
-        List<User> allUsers = userRepository.findAll();
-        int emailsSent = 0;
-        int emailsSkipped = 0;
-        for (User user : allUsers) {
-            String userEmail = user.getEmail();
-            if (userEmail == null || userEmail.trim().isEmpty()) {
-                emailsSkipped++;
-                continue;
+        // Notification logic - 根據 sendNotification 參數決定是否發送郵件
+        if (eventDto.getSendNotification() != null && eventDto.getSendNotification()) {
+            List<User> allUsers = userRepository.findAll();
+            int emailsSent = 0;
+            int emailsSkipped = 0;
+            for (User user : allUsers) {
+                String userEmail = user.getEmail();
+                if (userEmail == null || userEmail.trim().isEmpty()) {
+                    emailsSkipped++;
+                    continue;
+                }
+                try {
+                    emailService.sendEventNotification(userEmail, savedEvent);
+                    emailsSent++;
+                } catch (Exception e) {
+                    emailsSkipped++;
+                    log.warn("Failed to send event notification to {}: {}", userEmail, e.getMessage());
+                }
             }
-            try {
-                emailService.sendEventNotification(userEmail, savedEvent);
-                emailsSent++;
-            } catch (Exception e) {
-                emailsSkipped++;
-            }
+            
+            log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
+                    emailsSent, emailsSkipped, allUsers.size());
+        } else {
+            log.info("Email notifications disabled for event: {}", savedEvent.getTitle());
         }
-        
-        log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                emailsSent, emailsSkipped, allUsers.size());
 
         return savedEvent;
     }
 
     @Override
-    public Event updateEvent(Integer id, EventUpdateDto eventDto, String organizerUsername, boolean notifyParticipants) {
+    public Event updateEvent(Integer id, EventUpdateDto eventDto, String organizerUsername) {
         Optional<Event> existingOpt = eventRepository.findById(id);
         if (existingOpt.isEmpty()) {
             throw new RuntimeException("Event not found");
@@ -189,6 +195,7 @@ public class EventServiceImpl implements EventService {
         event.setStatus(eventDto.getStatus());
         event.setSchedule(eventDto.getSchedule());
         event.setFeeAmount(eventDto.getFeeAmount());
+        event.setLocation(eventDto.getLocation()); // 新增：更新事件地點
         // courts
         if (eventDto.getCourtIds() != null && !eventDto.getCourtIds().isEmpty()) {
             Set<Court> courts = new java.util.HashSet<>(courtRepository.findAllById(eventDto.getCourtIds()));
@@ -196,20 +203,43 @@ public class EventServiceImpl implements EventService {
             int totalCapacity = courts.size() * 8;
             event.setCapacity(totalCapacity);
         }
-        // venue
+        // venue - 保留現有的 venue 關聯，除非明確提供新的 venueId
         if (eventDto.getVenueId() != null) {
             Venue venue = venueRepository.findById(eventDto.getVenueId()).orElse(null);
             event.setVenue(venue);
+            log.info("Event {} venue updated to: {}", id, venue != null ? venue.getName() : "null");
         } else {
-            event.setVenue(null);
+            // 如果沒有提供 venueId，保留現有的 venue 關聯
+            log.info("Event {} venue unchanged: {}", id, event.getVenue() != null ? event.getVenue().getName() : "null");
         }
         
         Event updatedEvent = eventRepository.save(event);
         
         // Send notifications if requested
-        if (notifyParticipants) {
-            log.info("Sending event update notifications for event: {}", updatedEvent.getTitle());
-            sendEventUpdateNotifications(updatedEvent);
+        if (eventDto.getSendNotification() != null && eventDto.getSendNotification()) {
+            log.info("Sending event update notifications to all users for event: {}", updatedEvent.getTitle());
+            
+            // 向所有用戶發送事件更新通知
+            List<User> allUsers = userRepository.findAll();
+            int emailsSent = 0;
+            int emailsSkipped = 0;
+            for (User user : allUsers) {
+                String userEmail = user.getEmail();
+                if (userEmail == null || userEmail.trim().isEmpty()) {
+                    emailsSkipped++;
+                    continue;
+                }
+                try {
+                    emailService.sendEventUpdateNotification(userEmail, updatedEvent);
+                    emailsSent++;
+                } catch (Exception e) {
+                    emailsSkipped++;
+                    log.warn("Failed to send event update notification to {}: {}", userEmail, e.getMessage());
+                }
+            }
+            
+            log.info("Event update notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
+                    emailsSent, emailsSkipped, allUsers.size());
         } else {
             log.info("Event updated without sending notifications: {}", updatedEvent.getTitle());
         }
@@ -349,6 +379,7 @@ public class EventServiceImpl implements EventService {
             filterDto.getEndDate(),
             status,
             filterDto.getSearchKeyword(),
+            LocalDateTime.now(),
             pageable
         );
     }
@@ -365,10 +396,35 @@ public class EventServiceImpl implements EventService {
         detailDto.setEndTime(event.getEndTime());
         detailDto.setEventType(event.getEventType());
         detailDto.setCapacity(event.getCapacity());
-        detailDto.setVenueId(event.getVenue() != null ? event.getVenue().getId() : null);
-        detailDto.setVenueName(event.getVenue() != null ? event.getVenue().getName() : "N/A");
-        detailDto.setVenueState(event.getVenue() != null ? event.getVenue().getState() : "N/A");
-        detailDto.setVenueLocation(event.getVenue() != null ? event.getVenue().getLocation() : "N/A");
+        // 如果 Event 的 location 是空的，使用 venue 的 location
+        String location = event.getLocation();
+        if (location == null || location.trim().isEmpty()) {
+            if (event.getVenue() != null) {
+                location = event.getVenue().getLocation();
+                log.info("Event {} location is empty, using venue location: {}", eventId, location);
+            }
+        }
+        detailDto.setLocation(location); // 新增：設置事件地點
+        log.info("Event {} final location: {}", eventId, location); // 調試日誌
+        // Set venue information
+        log.info("Event {} venue: {}", eventId, event.getVenue());
+        if (event.getVenue() != null) {
+            log.info("Venue ID: {}, Name: {}, State: {}, Location: {}", 
+                    event.getVenue().getId(), 
+                    event.getVenue().getName(), 
+                    event.getVenue().getState(), 
+                    event.getVenue().getLocation());
+            detailDto.setVenueId(event.getVenue().getId());
+            detailDto.setVenueName(event.getVenue().getName());
+            detailDto.setVenueState(event.getVenue().getState());
+            detailDto.setVenueLocation(event.getVenue().getLocation());
+        } else {
+            log.warn("Event {} has no venue associated", eventId);
+            detailDto.setVenueId(null);
+            detailDto.setVenueName("N/A");
+            detailDto.setVenueState("N/A");
+            detailDto.setVenueLocation("N/A");
+        }
         detailDto.setStatus(event.getStatus());
         detailDto.setSchedule(event.getSchedule());
         detailDto.setFeeAmount(event.getFeeAmount());
@@ -419,14 +475,22 @@ public class EventServiceImpl implements EventService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startTime"));
         LocalDateTime now = LocalDateTime.now();
         log.info("Getting upcoming events for user: {} page: {} size: {}", username, page, size);
-        return eventRepository.findEventsWithFilters(
+        log.info("Current time: {}", now);
+        
+        Page<Event> result = eventRepository.findEventsWithFilters(
             null, // eventType
             null, // startDate
             null, // endDate
             "PUBLISHED", // status
             null, // searchKeyword
+            now,
             pageable
         );
+        
+        log.info("Found {} events, total pages: {}, total elements: {}", 
+                result.getContent().size(), result.getTotalPages(), result.getTotalElements());
+        
+        return result;
     }
     
     @Override
@@ -441,6 +505,7 @@ public class EventServiceImpl implements EventService {
             null, // endDate
             "PUBLISHED", // status
             null, // searchKeyword
+            LocalDateTime.now(),
             pageable
         );
     }

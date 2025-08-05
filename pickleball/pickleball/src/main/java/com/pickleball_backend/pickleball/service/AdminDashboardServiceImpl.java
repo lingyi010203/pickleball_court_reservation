@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.dto.AdminBookingDto;
 import com.pickleball_backend.pickleball.dto.AdminUserDto;
+import com.pickleball_backend.pickleball.dto.CancellationRequestDto;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.BookingRepository;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
@@ -11,6 +12,7 @@ import com.pickleball_backend.pickleball.repository.SlotRepository;
 import com.pickleball_backend.pickleball.repository.PaymentRepository;
 import com.pickleball_backend.pickleball.repository.MemberRepository;
 import com.pickleball_backend.pickleball.repository.WalletRepository;
+import com.pickleball_backend.pickleball.repository.WalletTransactionRepository;
 import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.repository.CancellationRequestRepository;
 import com.pickleball_backend.pickleball.service.EmailService;
@@ -59,6 +61,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
     private final UserAccountRepository userAccountRepository;
     private final CancellationRequestRepository cancellationRequestRepository;
     private final BookingRepository bookingRepository;
@@ -166,13 +169,36 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             bookingSlot.setStatus("CANCELLED");
             bookingSlotRepository.save(bookingSlot);
         }
-        // 4. Refund payment if needed (optional, can be expanded)
+        // 4. 退款50%到钱包
+        double refund = booking.getTotalAmount() * 0.5;
+        Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
+            .orElseThrow(() -> new RuntimeException("Wallet not found"));
+        
+        double balanceBefore = wallet.getBalance();
+        wallet.setBalance(wallet.getBalance() + refund);
+        wallet.setTotalSpent(wallet.getTotalSpent() - refund); // 退款時減少總支出
+        walletRepository.save(wallet);
+        
+        // 创建退款交易记录
+        createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
+                              "BOOKING", booking.getId(), "Booking cancellation refund (50%) - Admin cancelled");
+
+        // 5. 更新用户统计数据（减少预订小时数）
+        User user = booking.getMember().getUser();
+        double cancelledHours = booking.getBookingSlots().stream()
+                .mapToDouble(bs -> bs.getSlot().getDurationHours())
+                .sum();
+        user.setBookingHours(Math.max(0, user.getBookingHours() - cancelledHours));
+        user.setAmountSpent(Math.max(0, user.getAmountSpent() - booking.getTotalAmount()));
+        userRepository.save(user);
+
+        // 6. 更新支付状态
         Payment payment = booking.getPayment();
         if (payment != null) {
             payment.setStatus("REFUNDED");
             paymentRepository.save(payment);
         }
-        // 5. 保存管理员备注和操作人到取消请求（如有）
+        // 7. 保存管理员备注和操作人到取消请求（如有）
         CancellationRequest cancellationRequest = booking.getCancellationRequest();
         if (cancellationRequest != null) {
             if (org.springframework.util.StringUtils.hasText(adminRemark)) {
@@ -1130,7 +1156,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
         Member member = user.getMember();
         if (member != null) {
-            dto.setPointBalance(member.getPointBalance());
+            dto.setPointBalance(member.getTierPointBalance());
             if (member.getTier() != null) {
                 // 修复这里：直接使用 tierName 字符串值，不需要 .name()
                 dto.setTier(member.getTier().getTierName()); // 移除了 .name()
@@ -1218,12 +1244,29 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                     }
                                     
                                     return slotDto;
-                                })
-                                .collect(Collectors.toList()));
+                                                        })
+                        .collect(Collectors.toList()));
                     }
                 }
             } catch (Exception e) {
                 System.err.println("Error processing booking slots for booking " + booking.getId() + ": " + e.getMessage());
+            }
+
+            // 設置取消請求信息
+            try {
+                List<CancellationRequest> cancellationRequests = cancellationRequestRepository.findByBookingId(booking.getId());
+                if (!cancellationRequests.isEmpty()) {
+                    CancellationRequest cancellationRequest = cancellationRequests.get(0); // 取第一個
+                    CancellationRequestDto cancellationRequestDto = new CancellationRequestDto();
+                    cancellationRequestDto.setId(cancellationRequest.getId());
+                    cancellationRequestDto.setStatus(cancellationRequest.getStatus());
+                    cancellationRequestDto.setReason(cancellationRequest.getReason());
+                    cancellationRequestDto.setRequestDate(cancellationRequest.getRequestDate());
+                    cancellationRequestDto.setAdminRemark(cancellationRequest.getAdminRemark());
+                    dto.setCancellationRequest(cancellationRequestDto);
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting cancellation request for booking " + booking.getId() + ": " + e.getMessage());
             }
             
         return dto;
@@ -1231,5 +1274,25 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             System.err.println("Error converting booking to DTO: " + e.getMessage());
             return null;
         }
+    }
+
+    private void createWalletTransaction(Wallet wallet, String transactionType, double amount, 
+                                       double balanceBefore, double balanceAfter, 
+                                       String referenceType, Integer referenceId, String description) {
+        WalletTransaction transaction = new WalletTransaction();
+        transaction.setWalletId(wallet.getId());
+        transaction.setTransactionType(transactionType);
+        transaction.setAmount(amount);
+        transaction.setBalanceBefore(balanceBefore);
+        transaction.setBalanceAfter(balanceAfter);
+        transaction.setFrozenBefore(wallet.getFrozenBalance());
+        transaction.setFrozenAfter(wallet.getFrozenBalance());
+        transaction.setReferenceType(referenceType);
+        transaction.setReferenceId(referenceId);
+        transaction.setDescription(description);
+        transaction.setStatus("COMPLETED");
+        transaction.setProcessedAt(java.time.LocalDateTime.now());
+        
+        walletTransactionRepository.save(transaction);
     }
 }

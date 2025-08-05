@@ -137,6 +137,20 @@ public class LeaveRequestService {
             replacementSession = classSessionRepository.findById(replacementSessionId)
                     .orElseThrow(() -> new IllegalArgumentException("Replacement session not found"));
             
+            // 設置補課課程的 replacementForSessionId
+            System.out.println("=== Setting replacementForSessionId ===");
+            System.out.println("Original session ID: " + request.getOriginalSession().getId());
+            System.out.println("Replacement session ID: " + replacementSessionId);
+            System.out.println("Before setting - replacementForSessionId: " + replacementSession.getReplacementForSessionId());
+            
+            replacementSession.setReplacementForSessionId(request.getOriginalSession().getId());
+            classSessionRepository.save(replacementSession);
+            
+            // 重新获取并验证
+            ClassSession savedSession = classSessionRepository.findById(replacementSessionId).orElse(null);
+            System.out.println("After saving - replacementForSessionId: " + (savedSession != null ? savedSession.getReplacementForSessionId() : "null"));
+            System.out.println("Set replacementForSessionId: " + request.getOriginalSession().getId() + " for session: " + replacementSessionId);
+            
             // 自動將學生註冊到補課課程
             User student = userRepository.findById(request.getStudent().getId())
                     .orElseThrow(() -> new IllegalArgumentException("Student not found"));
@@ -157,7 +171,7 @@ public class LeaveRequestService {
                 registration.setClassSession(replacementSession);
                 registration.setMember(studentMember);
                 registration.setRegistrationDate(LocalDateTime.now());
-                registration.setAttendanceStatus("PRESENT"); // 補課課程預設為出席
+                registration.setAttendanceStatus("MAKEUP"); // 補課課程標記為 MAKEUP
                 
                 classRegistrationRepository.save(registration);
                 System.out.println("Student " + student.getId() + " automatically registered for replacement session " + replacementSessionId);
@@ -210,11 +224,12 @@ public class LeaveRequestService {
                 .collect(Collectors.toList());
         System.out.println("Coach sessions found: " + coachSessions.size());
         
-        // 過濾出 AVAILABLE 狀態的課程
+        // 過濾出 AVAILABLE 狀態且允許補課的課程
         List<ClassSession> availableSessions = coachSessions.stream()
-                .filter(session -> "AVAILABLE".equals(session.getStatus()))
+                .filter(session -> "AVAILABLE".equals(session.getStatus()) && 
+                                 Boolean.TRUE.equals(session.getAllowReplacement()))
                 .collect(Collectors.toList());
-        System.out.println("Available sessions found: " + availableSessions.size());
+        System.out.println("Available replacement sessions found: " + availableSessions.size());
         
         // 獲取學生已預約的課程
         List<ClassRegistration> studentRegistrations = classRegistrationRepository.findByMemberUserId(studentId);
@@ -237,6 +252,8 @@ public class LeaveRequestService {
             sessionMap.put("startTime", session.getStartTime());
             sessionMap.put("endTime", session.getEndTime());
             sessionMap.put("maxParticipants", session.getMaxParticipants());
+            sessionMap.put("currentParticipants", session.getCurrentParticipants());
+            sessionMap.put("allowReplacement", session.getAllowReplacement());
             
             if (session.getCourt() != null) {
                 sessionMap.put("courtName", session.getCourt().getName());

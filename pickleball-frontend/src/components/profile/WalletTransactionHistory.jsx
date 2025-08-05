@@ -188,7 +188,7 @@ const WalletTransactionHistory = () => {
       {/* Wallet Summary Cards */}
       {walletDetails && (
         <Grid container spacing={4} sx={{ mb: 5 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6}>
             <Card sx={{ 
               background: 'linear-gradient(135deg, #4caf50, #66bb6a)',
               color: 'white',
@@ -219,38 +219,7 @@ const WalletTransactionHistory = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ff9800, #ffb74d)',
-              color: 'white',
-              borderRadius: 3,
-              boxShadow: `0 8px 32px ${alpha('#ff9800', 0.3)}`,
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: `radial-gradient(circle, ${alpha(theme.palette.common.white, 0.1)} 0%, transparent 70%)`,
-                borderRadius: '50%',
-                transform: 'translate(20px, -20px)'
-              }
-            }}>
-              <CardContent sx={{ p: 3, position: 'relative', zIndex: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Frozen Balance
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  RM{walletDetails.frozenBalance?.toFixed(2) || '0.00'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6}>
             <Card sx={{ 
               background: 'linear-gradient(135deg, #2196f3, #42a5f5)',
               color: 'white',
@@ -276,37 +245,6 @@ const WalletTransactionHistory = () => {
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                   RM{walletDetails.totalDeposited?.toFixed(2) || '0.00'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #f44336, #ef5350)',
-              color: 'white',
-              borderRadius: 3,
-              boxShadow: `0 8px 32px ${alpha('#f44336', 0.3)}`,
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '80px',
-                height: '80px',
-                background: `radial-gradient(circle, ${alpha(theme.palette.common.white, 0.1)} 0%, transparent 70%)`,
-                borderRadius: '50%',
-                transform: 'translate(20px, -20px)'
-              }
-            }}>
-              <CardContent sx={{ p: 3, position: 'relative', zIndex: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Total Spent
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  RM{(walletDetails.totalSpent || 0).toFixed(2)}
                 </Typography>
               </CardContent>
             </Card>

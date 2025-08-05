@@ -2,9 +2,11 @@ import api from './api';
 
 class EventService {
   // Get all upcoming events
-  static async getUpcomingEvents() {
+  static async getUpcomingEvents(page = 0, size = 9) {
     try {
-      const response = await api.get('/events/upcoming');
+      const response = await api.get('/events/upcoming', {
+        params: { page, size }
+      });
       return response.data;
     } catch (error) {
       throw error;
@@ -111,15 +113,7 @@ class EventService {
     }
   }
 
-  // Get available skill levels
-  static async getAvailableSkillLevels() {
-    try {
-      const response = await api.get('/events/skill-levels');
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
+
 
   // Get event statistics
   static async getEventStats() {

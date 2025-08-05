@@ -19,6 +19,13 @@ public class Booking {
     @Column(name = "total_amount", nullable = false, columnDefinition = "double(5,2)")
     private double totalAmount;
 
+    // 新增：折扣相關字段
+    @Column(name = "original_amount", columnDefinition = "double(5,2)")
+    private Double originalAmount;
+
+    @Column(name = "discount_amount", columnDefinition = "double(5,2) default 0.0")
+    private Double discountAmount = 0.0;
+
     @Column( length = 50)
     private String status;
 

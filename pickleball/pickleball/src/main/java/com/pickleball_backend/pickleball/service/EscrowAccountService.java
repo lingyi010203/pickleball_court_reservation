@@ -2,10 +2,14 @@ package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.entity.Payment;
 import com.pickleball_backend.pickleball.entity.Wallet;
+import com.pickleball_backend.pickleball.entity.WalletTransaction;
+import com.pickleball_backend.pickleball.entity.Member;
 import com.pickleball_backend.pickleball.entity.User;
 import com.pickleball_backend.pickleball.entity.ClassSession;
 import com.pickleball_backend.pickleball.repository.WalletRepository;
 import com.pickleball_backend.pickleball.repository.PaymentRepository;
+import com.pickleball_backend.pickleball.repository.WalletTransactionRepository;
+import com.pickleball_backend.pickleball.repository.MemberRepository;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,8 @@ public class EscrowAccountService {
 
     private final WalletRepository walletRepository;
     private final PaymentRepository paymentRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
+    private final MemberRepository memberRepository;
 
     /**
      * 用戶報名課程時，將錢存入託管狀態
@@ -81,11 +87,52 @@ public class EscrowAccountService {
         double platformAmount = totalEscrowedAmount * 0.2; // 20% 給平台
 
         // 轉給教練
-        Wallet coachWallet = walletRepository.findByMemberId(session.getCoach().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Coach wallet not found"));
+        User coach = session.getCoach();
+        if (coach == null) {
+            log.error("Coach not found for session: {}", session.getId());
+            return;
+        }
+        
+        Member coachMember = memberRepository.findByUser(coach);
+        if (coachMember == null) {
+            log.error("Coach member not found for coach: {}", coach.getId());
+            return;
+        }
+        
+        // 獲取或創建教練錢包
+        Wallet coachWallet = walletRepository.findByMemberId(coachMember.getId()).orElse(null);
+        if (coachWallet == null) {
+            // 創建教練錢包
+            coachWallet = new Wallet();
+            coachWallet.setMember(coachMember);
+            coachWallet.setBalance(0.00);
+            coachWallet.setFrozenBalance(0.00);
+            coachWallet.setTotalDeposited(0.00);
+            coachWallet.setTotalSpent(0.00);
+            coachWallet.setStatus("ACTIVE");
+            coachWallet = walletRepository.save(coachWallet);
+            log.info("Created new wallet for coach: {}", coach.getId());
+        }
 
-        coachWallet.setBalance(coachWallet.getBalance() + coachAmount);
+        // 更新教練錢包餘額
+        double oldBalance = coachWallet.getBalance();
+        coachWallet.setBalance(oldBalance + coachAmount);
         walletRepository.save(coachWallet);
+
+        // 創建錢包交易記錄
+        WalletTransaction coachTransaction = new WalletTransaction();
+        coachTransaction.setWalletId(coachWallet.getId());
+        coachTransaction.setTransactionType("COACH_INCOME");
+        coachTransaction.setAmount(coachAmount);
+        coachTransaction.setBalanceBefore(oldBalance);
+        coachTransaction.setBalanceAfter(coachWallet.getBalance());
+        coachTransaction.setFrozenBefore(coachWallet.getFrozenBalance());
+        coachTransaction.setFrozenAfter(coachWallet.getFrozenBalance());
+        coachTransaction.setReferenceType("CLASS_SESSION");
+        coachTransaction.setReferenceId(session.getId());
+        coachTransaction.setDescription("Class session revenue: " + session.getTitle() + " (80% share via escrow)");
+        coachTransaction.setStatus("COMPLETED");
+        walletTransactionRepository.save(coachTransaction);
 
         // 創建教練收入記錄
         Payment coachPayment = new Payment();
@@ -115,8 +162,8 @@ public class EscrowAccountService {
             paymentRepository.save(payment);
         });
 
-        log.info("Settled session {}: Coach received RM{}, Platform received RM{}", 
-                session.getId(), coachAmount, platformAmount);
+        log.info("Successfully settled session {}: Coach {} received RM{}, Platform received RM{}", 
+                session.getId(), coach.getId(), coachAmount, platformAmount);
     }
 
     /**

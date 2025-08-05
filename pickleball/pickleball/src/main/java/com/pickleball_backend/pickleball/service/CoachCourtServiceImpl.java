@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.time.LocalDate;
 
@@ -85,9 +86,10 @@ public class CoachCourtServiceImpl implements CoachCourtService {
         session.setDescription(slotDto.getDescription());
         session.setMaxParticipants(slotDto.getMaxParticipants());
         session.setPrice(slotDto.getPrice());
+        session.setAllowReplacement(slotDto.getAllowReplacement() != null ? slotDto.getAllowReplacement() : false);
 
-        log.info("Coach {} created new availability slot on court {} from {} to {}",
-                coachId, court.getId(), slotDto.getStartTime(), slotDto.getEndTime());
+        log.info("Coach {} created new availability slot on court {} from {} to {} (allowReplacement: {})",
+                coachId, court.getId(), slotDto.getStartTime(), slotDto.getEndTime(), session.getAllowReplacement());
 
         return sessionRepository.save(session);
     }
@@ -214,13 +216,44 @@ public List<ClassSession> findAvailableSlotsByCoachAndCourt(Integer coachId, Int
         return classRegistrationRepository.findStudentsByCoachId(coachId);
     }
 
+    @Override
+    public void updateSlotAllowReplacement(Integer coachId, Integer sessionId, Boolean allowReplacement) {
+        ClassSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot not found with ID: " + sessionId));
+
+        if (!session.getCoach().getId().equals(coachId)) {
+            throw new UnauthorizedException("You don't have permission to modify this slot");
+        }
+
+        session.setAllowReplacement(allowReplacement);
+        session.setUpdatedAt(LocalDateTime.now());
+        sessionRepository.save(session);
+
+        log.info("Coach {} updated slot {} allowReplacement to {}", coachId, sessionId, allowReplacement);
+    }
+
+    @Override
+    public List<ClassSession> getReplacementSessionsByCoach(Integer coachId) {
+        return sessionRepository.findByReplacementForSessionIdNotNullAndCoachId(coachId);
+    }
+
     @Transactional
     public void createRecurringClass(Integer coachId, RecurringSessionRequestDto dto) {
         // Defensive: ensure title is not null or blank
         String title = (dto.getTitle() == null || dto.getTitle().trim().isEmpty()) ? "Recurring Class" : dto.getTitle();
         LocalDate current = dto.getStartDate();
+        
+        // 星期幾對應的數字 (1=Monday, 2=Tuesday, ..., 7=Sunday)
+        Map<String, Integer> dayMap = Map.of(
+            "MON", 1, "TUES", 2, "WED", 3, "THURS", 4, "FRI", 5, "SAT", 6, "SUN", 7
+        );
+        
         while (!current.isAfter(dto.getEndDate())) {
-            if (dto.getDaysOfWeek().contains(current.getDayOfWeek())) {
+            // 檢查當前日期是否符合選擇的星期幾
+            int currentDayOfWeek = current.getDayOfWeek().getValue(); // 1=Monday, 2=Tuesday, ..., 7=Sunday
+            Integer targetDay = dayMap.get(dto.getDayOfWeek());
+            
+            if (targetDay != null && currentDayOfWeek == targetDay) {
                 LocalDateTime start = LocalDateTime.of(current, dto.getStartTime());
                 LocalDateTime end = LocalDateTime.of(current, dto.getEndTime());
                 if (!sessionRepository.existsByCourtIdAndStartTimeBetweenAndStatusNot(

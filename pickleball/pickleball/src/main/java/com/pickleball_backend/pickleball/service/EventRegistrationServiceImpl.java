@@ -65,8 +65,13 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
             member = new Member();
             member.setUser(user);
             member.setTier(defaultTier);
-            member.setPointBalance(0);  // Changed back to 0
+            member.setTierPointBalance(0);  // Initialize tier points
+            member.setRewardPointBalance(0); // Initialize reward points
             member = memberRepository.save(member);
+            
+            // Update the user's member reference
+            user.setMember(member);
+            userRepository.save(user);
         }
 
         // 1. Create Registration and link to member

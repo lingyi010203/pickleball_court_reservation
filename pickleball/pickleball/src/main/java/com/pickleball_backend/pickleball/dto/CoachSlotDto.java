@@ -18,6 +18,7 @@ public class CoachSlotDto {
     private String description;
     private Integer maxParticipants;
     private Double price;
+    private Boolean allowReplacement;
 
     // Getters and setters
 }

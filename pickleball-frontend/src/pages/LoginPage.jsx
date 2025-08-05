@@ -477,7 +477,7 @@ const LoginPage = () => {
                           </Link>
                         </Typography>
                       </Box>
-                      <Box sx={{ my: 3, position: 'relative' }}>
+                      {/*<Box sx={{ my: 3, position: 'relative' }}>
                         <Divider sx={{ borderColor: theme.palette.divider }}>
                           <Chip 
                             label="OR" 
@@ -491,7 +491,7 @@ const LoginPage = () => {
                           />
                         </Divider>
                       </Box>
-                      {/* Social Login Buttons */}
+                      {/* Social Login Buttons
                     <Box sx={{ mb: 3 }}>
                       <Stack spacing={2}>
                         <SocialLoginButton icon={Google} provider="Google" color="#4285f4" />
@@ -499,7 +499,7 @@ const LoginPage = () => {
                       </Stack>
                       
                       
-                    </Box>
+                    </Box>*/}
                     </Box>
                   </Paper>
                 </Fade>

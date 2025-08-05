@@ -36,6 +36,8 @@ public class Feedback {
     @JoinColumn(name = "booking_id", referencedColumnName = "id")
     private Booking booking; // 新增：关联到具体的预订
 
+    private Integer classSessionId; // 新增：关联到具体的课程
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @ElementCollection

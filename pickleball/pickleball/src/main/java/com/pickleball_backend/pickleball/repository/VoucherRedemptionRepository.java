@@ -25,9 +25,16 @@ public interface VoucherRedemptionRepository extends JpaRepository<VoucherRedemp
     boolean existsByVoucherIdAndUserId(Integer voucherId, Integer userId);
     
     // Find expired redemptions
-    @Query("SELECT vr FROM VoucherRedemption vr WHERE vr.expiryDate < :currentDate AND vr.status = 'active'")
-    List<VoucherRedemption> findExpiredRedemptions(@Param("currentDate") LocalDate currentDate);
+    @Query("SELECT vr FROM VoucherRedemption vr WHERE vr.expiryDate < :currentDate AND vr.status = :status")
+    List<VoucherRedemption> findExpiredRedemptions(@Param("currentDate") LocalDate currentDate, @Param("status") String status);
     
     // Count active redemptions by user
     long countByUserIdAndStatus(Integer userId, String status);
+    
+    // Find redemptions by status
+    List<VoucherRedemption> findByStatus(String status);
+    
+    // Find redemptions by user ID and multiple statuses (for active and restored vouchers)
+    @Query("SELECT vr FROM VoucherRedemption vr WHERE vr.userId = :userId AND vr.status IN (:statuses) ORDER BY vr.redemptionDate DESC")
+    List<VoucherRedemption> findByUserIdAndStatusInOrderByRedemptionDateDesc(@Param("userId") Integer userId, @Param("statuses") List<String> statuses);
 } 

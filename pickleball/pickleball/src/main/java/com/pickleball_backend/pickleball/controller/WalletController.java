@@ -101,7 +101,7 @@ public class WalletController {
     public ResponseEntity<?> processRefund(
             @RequestParam Integer paymentId,
             @RequestParam Double amount,
-            @RequestParam String reason) {
+            @RequestParam(required = false) String reason) {
         try {
             walletService.processRefund(paymentId, amount, reason);
             return ResponseEntity.ok().body(

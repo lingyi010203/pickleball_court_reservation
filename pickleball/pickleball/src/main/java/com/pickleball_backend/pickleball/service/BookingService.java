@@ -37,9 +37,12 @@ public class BookingService {
     private final BookingSlotRepository bookingSlotRepository;
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
+    private final WalletTransactionRepository walletTransactionRepository;
     private final FeedbackRepository feedbackRepository;
     private final FriendlyMatchService friendlyMatchService;
     private final TierService tierService;
+    private final ClassSessionRepository classSessionRepository;
+    private final VoucherRedemptionService voucherRedemptionService; // 新增：優惠券服務
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private static final String CANCELLED_STATUS = "CANCELLED";
@@ -108,17 +111,59 @@ public class BookingService {
         double ballSetFee = buyBallSet ? 12.0 : 0.0;
         double amount = baseAmount + paddleFee + ballSetFee;
 
+        // 新增：處理優惠券折扣
+        double originalAmount = amount;
+        double discountAmount = 0.0;
+        VoucherRedemptionDto appliedVoucher = null;
+        
+        if (request.getUseVoucher() != null && request.getUseVoucher() && request.getVoucherRedemptionId() != null) {
+            try {
+                appliedVoucher = voucherRedemptionService.useVoucher(request.getVoucherRedemptionId());
+                if (appliedVoucher != null) {
+                    if ("percentage".equals(appliedVoucher.getDiscountType())) {
+                        // 百分比折扣
+                        discountAmount = amount * (appliedVoucher.getDiscountValue() / 100.0);
+                    } else {
+                        // 固定金額折扣
+                        discountAmount = appliedVoucher.getDiscountValue();
+                    }
+                    
+                    // 確保折扣不超過總金額
+                    discountAmount = Math.min(discountAmount, amount);
+                    amount = amount - discountAmount;
+                    
+                    log.info("Applied voucher discount: RM{} ({}% of original RM{})", 
+                            discountAmount, appliedVoucher.getDiscountValue(), originalAmount);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to apply voucher: {}", e.getMessage());
+                // 如果優惠券應用失敗，繼續使用原始金額
+            }
+        }
+        
+        // 確保 originalAmount 在沒有折扣時也正確設置
+        if (discountAmount == 0.0) {
+            originalAmount = amount;
+        }
+
         // 7. Process wallet payment if requested
         Payment payment = new Payment();
         payment.setAmount(amount);
         payment.setPaymentDate(LocalDateTime.now());
         payment.setPaymentType("BOOKING");
+        
+        // 新增：記錄折扣信息
+        if (discountAmount > 0) {
+            payment.setDiscountAmount(discountAmount);
+            payment.setOriginalAmount(originalAmount);
+        }
 
         if (request.isUseWallet()) {
             if (wallet.getBalance() < amount) {
                 throw new ValidationException("Insufficient wallet balance. Available: " + wallet.getBalance());
             }
             wallet.setBalance(wallet.getBalance() - amount);
+            wallet.setTotalSpent(wallet.getTotalSpent() + amount); // 更新總支出
             walletRepository.save(wallet);
             payment.setPaymentMethod("WALLET");
             payment.setStatus("COMPLETED");
@@ -132,6 +177,8 @@ public class BookingService {
         Booking booking = new Booking();
         booking.setBookingDate(LocalDateTime.now());
         booking.setTotalAmount(amount);
+        booking.setOriginalAmount(originalAmount); // 新增：記錄原始金額
+        booking.setDiscountAmount(discountAmount); // 新增：記錄折扣金額
         String bookingStatus = "CONFIRMED";
         if (bookingStatus.length() > 50) {
             bookingStatus = bookingStatus.substring(0, 50);
@@ -145,81 +192,59 @@ public class BookingService {
         booking.setBuyBallSet(request.getBuyBallSet());
         booking = bookingRepository.save(booking);
 
-        // 9. Create BookingSlot records
-        log.info("Creating {} BookingSlot records for booking {}", slots.size(), booking.getId());
+        // 9. Create booking slots
         for (Slot slot : slots) {
-            // Check for existing booking slot to prevent duplicates
-            boolean existingBookingSlot = bookingSlotRepository.existsByBookingIdAndSlotId(booking.getId(), slot.getId());
-            if (existingBookingSlot) {
-                log.warn("BookingSlot already exists for bookingId={}, slotId={}", booking.getId(), slot.getId());
-                continue;
-            }
-
             BookingSlot bookingSlot = new BookingSlot();
             bookingSlot.setBooking(booking);
             bookingSlot.setSlot(slot);
-            String statusValue = "BOOKED";
-            if (statusValue.length() > 50) {
-                statusValue = statusValue.substring(0, 50);
-            }
-            bookingSlot.setStatus(statusValue);
+            bookingSlot.setStatus("BOOKED");
             bookingSlotRepository.save(bookingSlot);
-            log.info("Created BookingSlot: bookingId={}, slotId={}", booking.getId(), slot.getId());
-            // 10. Update slot availability
+            
+            // 更新 slot 的可用狀態
             slot.setAvailable(false);
             slotRepository.save(slot);
         }
 
-        // 11. Generate receipt
-        emailService.sendBookingConfirmation(account.getUser().getEmail(), booking, court, slots.get(0));
-
-        // 11.5. Add points reward (1 point per RM1 spent)
-        int pointsEarned = (int) Math.round(amount);
-
-        // Store old tier for comparison
+        // 10. Add points to member
+        int pointsEarned = (int) Math.round(amount); // 使用實際支付金額計算積分
         String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
 
-        member.setPointBalance(member.getPointBalance() + pointsEarned);
+        member.setTierPointBalance(member.getTierPointBalance() + pointsEarned);
+        member.setRewardPointBalance(member.getRewardPointBalance() + pointsEarned);
         memberRepository.save(member);
-        log.info("Added {} points to member {} for booking {}", pointsEarned, member.getId(), booking.getId());
+        log.info("Added {} tier points and {} reward points to member {} for booking {}",
+                pointsEarned, pointsEarned, member.getId(), booking.getId());
 
         // Automatic tier upgrade check after booking
         tierService.recalculateMemberTier(member);
 
-        // Refresh member data to get updated tier
-        member = memberRepository.findByUserId(member.getUser().getId());
-        String newTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
-
-        // Log tier upgrade if it occurred
-        if (!oldTierName.equals(newTierName)) {
-            log.info("🎉 Automatic tier upgrade after booking: {} -> {} (Points: {} -> {})",
-                    oldTierName, newTierName, member.getPointBalance() - pointsEarned, member.getPointBalance());
+        // 11. Send confirmation email
+        try {
+            emailService.sendBookingConfirmation(
+                    member.getUser().getEmail(),
+                    booking,
+                    court,
+                    slots.get(0)
+            );
+        } catch (Exception e) {
+            log.error("Failed to send booking confirmation email: {}", e.getMessage());
         }
 
-        // 12. Create response with updated balance
+        // 12. Create response
         BookingResponseDto response = mapToBookingResponse(booking, court, slots.get(0));
         response.setDurationHours(totalDuration);
         response.setWalletBalance(wallet.getBalance());
+        response.setPointsEarned(pointsEarned);
+        response.setCurrentPointBalance(member.getTierPointBalance());  // 保持向後兼容
+        response.setCurrentTierPointBalance(member.getTierPointBalance());
+        response.setCurrentRewardPointBalance(member.getRewardPointBalance());
 
         // 13. 更新用户统计数据
         User user = member.getUser();
-        if (user != null) {
-            List<Booking> userBookings = bookingRepository.findByMemberId(member.getId());
-            user.setBookingsMade(userBookings.size());
-            // 统计所有预订的总时长（小时）
-            double totalHours = userBookings.stream().mapToDouble(b -> {
-                if (b.getBookingSlots() != null && !b.getBookingSlots().isEmpty()) {
-                    return b.getBookingSlots().stream().mapToInt(bs -> bs.getSlot().getDurationHours()).sum();
-                } else if (b.getNumberOfPlayers() != null) {
-                    return 0; // 这里不能用 numberOfPlayers，老数据无 duration 时记为0
-                } else {
-                    return 0;
-                }
-            }).sum();
-            user.setBookingHours(totalHours);
-            user.setAmountSpent(userBookings.stream().mapToDouble(Booking::getTotalAmount).sum());
-            userRepository.save(user);
-        }
+        user.setBookingsMade(user.getBookingsMade() + 1);
+        user.setBookingHours(user.getBookingHours() + totalDuration);
+        user.setAmountSpent(user.getAmountSpent() + amount);
+        userRepository.save(user);
 
         return response;
     }
@@ -291,7 +316,23 @@ public class BookingService {
         // Add points information
         int pointsEarned = (int) Math.round(booking.getTotalAmount());
         response.setPointsEarned(pointsEarned);
-        response.setCurrentPointBalance(booking.getMember().getPointBalance());
+        response.setCurrentPointBalance(booking.getMember().getTierPointBalance());  // 保持向後兼容
+        response.setCurrentTierPointBalance(booking.getMember().getTierPointBalance());
+        response.setCurrentRewardPointBalance(booking.getMember().getRewardPointBalance());
+
+        // 新增：添加折扣信息
+        response.setOriginalAmount(booking.getOriginalAmount() != null ? booking.getOriginalAmount() : booking.getTotalAmount());
+        response.setDiscountAmount(booking.getDiscountAmount() != null ? booking.getDiscountAmount() : 0.0);
+        
+        // 設置是否使用了優惠券
+        response.setVoucherUsed(booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0);
+        
+        // 如果有折扣，嘗試獲取優惠券代碼
+        if (booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0 && booking.getPayment() != null) {
+            // 這裡可以從 VoucherRedemption 表中查詢使用的優惠券
+            // 暫時設為空，後續可以完善
+            response.setAppliedVoucherCode("Applied");
+        }
 
         return response;
     }
@@ -335,9 +376,6 @@ public class BookingService {
             booking.setStatus(bookingStatus);
             bookingRepository.save(booking);
 
-            // 新增：同步取消 FriendlyMatch
-            friendlyMatchService.cancelReservationAndMatch(bookingId);
-
             // 3. Update booking slot status
             BookingSlot bookingSlot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() ? booking.getBookingSlots().get(0) : null;
             if (bookingSlot != null) {
@@ -348,6 +386,9 @@ public class BookingService {
                 bookingSlot.setStatus(slotStatus);
                 bookingSlotRepository.save(bookingSlot);
             }
+
+            // 新增：同步取消 FriendlyMatch
+            friendlyMatchService.cancelReservationAndMatch(bookingId);
 
             // 4. Update or create cancellation request
             CancellationRequest request = booking.getCancellationRequest();
@@ -365,18 +406,33 @@ public class BookingService {
             double refund = booking.getTotalAmount() * 0.5;
             Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
+            
+            double balanceBefore = wallet.getBalance();
             wallet.setBalance(wallet.getBalance() + refund);
+            wallet.setTotalSpent(wallet.getTotalSpent() - refund); // 退款時減少總支出
             walletRepository.save(wallet);
-            // 可选：记录退款流水
+            
+            // 创建退款交易记录
+            createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
+                                  "BOOKING", booking.getId(), "Booking cancellation refund (50%)");
 
-            // 6. 更新支付状态
+            // 6. 更新用户统计数据（减少预订小时数）
+            User user = booking.getMember().getUser();
+            double cancelledHours = booking.getBookingSlots().stream()
+                    .mapToDouble(bs -> bs.getSlot().getDurationHours())
+                    .sum();
+            user.setBookingHours(Math.max(0, user.getBookingHours() - cancelledHours));
+            user.setAmountSpent(Math.max(0, user.getAmountSpent() - booking.getTotalAmount()));
+            userRepository.save(user);
+
+            // 7. 更新支付状态
             Payment payment = booking.getPayment();
             if (payment != null) {
                 payment.setStatus("REFUNDED");
                 paymentRepository.save(payment);
             }
 
-            // 7. 发送邮件通知
+            // 8. 发送邮件通知
             Court court = courtRepository.findById(slot.getCourtId())
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
             emailService.sendCancellationDecision(
@@ -442,11 +498,21 @@ public class BookingService {
                     LocalDateTime startDateTime = LocalDateTime.of(date, slot.getStartTime());
                     LocalDateTime endDateTime = LocalDateTime.of(date, slot.getEndTime());
 
-                    // 檢查是否有 type="class" 的 Booking 在這個時段
-                    long classBookings = bookingRepository.countClassBookingsInTimeRange(
-                        slot.getCourtId(), startDateTime, endDateTime);
+                    // 檢查是否有 ClassSession 在這個時段
+                    List<ClassSession> classSessions = classSessionRepository.findByCourtIdAndStartTimeBetween(
+                        slot.getCourtId(),
+                        startDateTime,
+                        endDateTime
+                    );
+                    
+                    // 過濾掉已取消的課程
+                    boolean hasActiveClassSessions = classSessions.stream()
+                        .anyMatch(session -> !"CANCELLED".equalsIgnoreCase(session.getStatus()));
 
-                    return classBookings == 0; // 只有沒有課程預約的時段才可用
+                    // 檢查是否有已預訂的 BookingSlot
+                    boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
+
+                    return !hasActiveClassSessions && !isBooked; // 只有沒有課程預約且未預訂的時段才可用
                 })
                 .map(slot -> {
                     SlotResponseDto dto = new SlotResponseDto();
@@ -523,9 +589,6 @@ public class BookingService {
             booking.setStatus(bookingStatus);
             bookingRepository.save(booking);
 
-            // 新增：同步取消 FriendlyMatch
-            friendlyMatchService.cancelReservationAndMatch(booking.getId());
-
             // 3. Update booking slot status
             String slotStatus = "CANCELLED";
             if (slotStatus.length() > 50) {
@@ -534,7 +597,40 @@ public class BookingService {
             bookingSlot.setStatus(slotStatus);
             bookingSlotRepository.save(bookingSlot);
 
-            // 4. Update request
+            // 新增：同步取消 FriendlyMatch
+            friendlyMatchService.cancelReservationAndMatch(booking.getId());
+
+            // 4. 退款50%到钱包
+            double refund = booking.getTotalAmount() * 0.5;
+            Wallet wallet = walletRepository.findByMemberId(booking.getMember().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
+            
+            double balanceBefore = wallet.getBalance();
+            wallet.setBalance(wallet.getBalance() + refund);
+            wallet.setTotalSpent(wallet.getTotalSpent() - refund); // 退款時減少總支出
+            walletRepository.save(wallet);
+            
+            // 创建退款交易记录
+            createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
+                                  "BOOKING", booking.getId(), "Booking cancellation refund (50%) - Admin approved");
+
+            // 5. 更新支付状态
+            Payment payment = booking.getPayment();
+            if (payment != null) {
+                payment.setStatus("REFUNDED");
+                paymentRepository.save(payment);
+            }
+
+            // 6. 更新用户统计数据（减少预订小时数）
+            User user = booking.getMember().getUser();
+            double cancelledHours = booking.getBookingSlots().stream()
+                    .mapToDouble(bs -> bs.getSlot().getDurationHours())
+                    .sum();
+            user.setBookingHours(Math.max(0, user.getBookingHours() - cancelledHours));
+            user.setAmountSpent(Math.max(0, user.getAmountSpent() - booking.getTotalAmount()));
+            userRepository.save(user);
+
+            // 7. Update request
             request.setStatus("APPROVED");
 
             // Get current admin ID
@@ -587,21 +683,21 @@ public class BookingService {
 
     public List<BookingHistoryDto> getBookingHistory(Integer memberId, String status) {
         try {
-        List<Booking> bookings = bookingRepository.findByMemberId(memberId);
+            List<Booking> bookings = bookingRepository.findByMemberId(memberId);
             log.info("Found {} bookings for member {}", bookings.size(), memberId);
 
-        // 自动修正已过期的CONFIRMED预订为COMPLETED
-        LocalDateTime now = LocalDateTime.now();
-        boolean updated = false;
-        for (Booking booking : bookings) {
-            if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
-                    // 检查所有 slots 是否都已过期
+            // 自動修正已過期的CONFIRMED預訂為COMPLETED
+            LocalDateTime now = LocalDateTime.now();
+            boolean updated = false;
+            for (Booking booking : bookings) {
+                if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+                    // 檢查所有 slots 是否都已過期
                     boolean allSlotsExpired = true;
                     if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
                         for (BookingSlot bookingSlot : booking.getBookingSlots()) {
                             Slot slot = bookingSlot.getSlot();
-                if (slot != null && slot.getDate() != null && slot.getEndTime() != null) {
-                    LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+                            if (slot != null && slot.getDate() != null && slot.getEndTime() != null) {
+                                LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
                                 if (endDateTime.isAfter(now)) {
                                     allSlotsExpired = false;
                                     break;
@@ -609,33 +705,33 @@ public class BookingService {
                             }
                         }
                         if (allSlotsExpired) {
-                        booking.setStatus("COMPLETED");
-                        bookingRepository.save(booking);
-                        updated = true;
+                            booking.setStatus("COMPLETED");
+                            bookingRepository.save(booking);
+                            updated = true;
+                        }
                     }
                 }
             }
-        }
-        // 重新获取最新状态
-        if (updated) {
-            bookings = bookingRepository.findByMemberId(memberId);
-        }
+            // 重新獲取最新狀態
+            if (updated) {
+                bookings = bookingRepository.findByMemberId(memberId);
+            }
 
-        return bookings.stream()
-                .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
-                .map(booking -> {
+            return bookings.stream()
+                    .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
+                    .map(booking -> {
                         try {
                             log.debug("Processing booking {} with {} booking slots", 
                                     booking.getId(), 
                                     booking.getBookingSlots() != null ? booking.getBookingSlots().size() : 0);
                             
-                            // 获取第一个和最后一个 slot 来显示时间范围
+                            // 獲取第一個和最後一個 slot 來顯示時間範圍
                             Slot firstSlot = null;
                             Slot lastSlot = null;
                             int totalDuration = 0;
                             
                             if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
-                                // 按时间排序
+                                // 按時間排序
                                 List<BookingSlot> sortedSlots = booking.getBookingSlots().stream()
                                         .sorted((a, b) -> a.getSlot().getStartTime().compareTo(b.getSlot().getStartTime()))
                                         .collect(Collectors.toList());
@@ -643,7 +739,7 @@ public class BookingService {
                                 firstSlot = sortedSlots.get(0).getSlot();
                                 lastSlot = sortedSlots.get(sortedSlots.size() - 1).getSlot();
                                 
-                                // 计算总时长
+                                // 計算總時長
                                 totalDuration = sortedSlots.stream()
                                         .mapToInt(bs -> bs.getSlot().getDurationHours() != null ? bs.getSlot().getDurationHours() : 1)
                                         .sum();
@@ -658,11 +754,11 @@ public class BookingService {
                             if (firstSlot != null) {
                                 court = courtRepository.findById(firstSlot.getCourtId()).orElse(new Court());
                             } else {
-                                // 如果没有slots，尝试从booking的其他信息获取court
+                                // 如果沒有slots，嘗試從booking的其他信息獲取court
                                 log.warn("No slots found for booking {}, trying to get court info from booking", booking.getId());
-                                // 尝试通过查询数据库获取court信息
+                                // 嘗試通過查詢數據庫獲取court信息
                                 try {
-                                    // 查询这个booking的所有bookingSlots
+                                    // 查詢這個booking的所有bookingSlots
                                     List<BookingSlot> bookingSlots = bookingSlotRepository.findByBookingId(booking.getId());
                                     if (!bookingSlots.isEmpty()) {
                                         Slot slot = bookingSlots.get(0).getSlot();
@@ -679,27 +775,43 @@ public class BookingService {
                                     court = new Court();
                                 }
                             }
-
-                    BookingHistoryDto dto = new BookingHistoryDto();
-                    dto.setId(booking.getId());
-                    dto.setCourtId(court.getId()); // 设置court ID
-                    dto.setCourtName(court.getName());
-                    dto.setLocation(court.getLocation());
+                            
+                            // 安全地處理 Payment 信息，避免 null 值問題
+                            Payment payment = booking.getPayment();
+                            if (payment != null) {
+                                // 如果 originalAmount 為 null，設置為 amount
+                                if (payment.getOriginalAmount() == null) {
+                                    payment.setOriginalAmount(payment.getAmount());
+                                }
+                                // discountAmount 是 double 類型，不需要 null 檢查
+                            }
+                            
+                            // 安全地處理 Booking 的折扣信息
+                            if (booking.getOriginalAmount() == null) {
+                                booking.setOriginalAmount(booking.getTotalAmount());
+                            }
+                            if (booking.getDiscountAmount() == null) {
+                                booking.setDiscountAmount(0.0);
+                            }
+                            
+                            BookingHistoryDto dto = new BookingHistoryDto();
+                            dto.setId(booking.getId());
+                            dto.setCourtId(court.getId());
+                            dto.setCourtName(court.getName());
+                            dto.setLocation(court.getLocation());
                             dto.setDate(firstSlot != null ? firstSlot.getDate() : null);
                             dto.setStartTime(firstSlot != null ? firstSlot.getStartTime() : null);
                             dto.setEndTime(lastSlot != null ? lastSlot.getEndTime() : null);
-                    dto.setAmount(booking.getTotalAmount());
-                    dto.setStatus(booking.getStatus());
-                    dto.setCreatedAt(booking.getBookingDate());
-                    dto.setPurpose(booking.getPurpose());
-                    dto.setNumberOfPlayers(booking.getNumberOfPlayers());
-                            // 新增：设置球拍和球组信息
+                            dto.setAmount(booking.getTotalAmount());
+                            dto.setStatus(booking.getStatus());
+                            dto.setCreatedAt(booking.getBookingDate());
+                            dto.setPurpose(booking.getPurpose());
+                            dto.setNumberOfPlayers(booking.getNumberOfPlayers());
+                            dto.setDurationHours(totalDuration);
                             dto.setNumPaddles(booking.getNumPaddles());
                             dto.setBuyBallSet(booking.getBuyBallSet());
-                            // 设置总时长
-                            dto.setDurationHours(totalDuration);
                             
-                            // 检查用户是否已经评价过这个预订
+                            // 檢查用戶是否已經評價過這個預訂
                             boolean hasReviewed = false;
                             if (booking.getMember() != null && booking.getMember().getUser() != null) {
                                 hasReviewed = feedbackRepository.findByUserId(booking.getMember().getUser().getId()).stream()
@@ -708,29 +820,26 @@ public class BookingService {
                             }
                             dto.setHasReviewed(hasReviewed);
                             
-                            log.debug("Created DTO for booking {}: courtName={}, date={}, startTime={}, endTime={}", 
-                                    booking.getId(), dto.getCourtName(), dto.getDate(), dto.getStartTime(), dto.getEndTime());
-                            
                             return dto;
                         } catch (Exception e) {
                             log.error("Error processing booking {}: {}", booking.getId(), e.getMessage());
-                            // 返回一个基本的 DTO，避免整个请求失败
+                            // 返回一個基本的 DTO，避免整個列表失敗
                             BookingHistoryDto dto = new BookingHistoryDto();
                             dto.setId(booking.getId());
                             dto.setStatus(booking.getStatus());
                             dto.setAmount(booking.getTotalAmount());
                             dto.setCreatedAt(booking.getBookingDate());
-                            // 尝试从第一个slot获取courtId
+                            // 嘗試從第一個slot獲取courtId
                             if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
                                 Slot firstSlot = booking.getBookingSlots().get(0).getSlot();
                                 if (firstSlot != null) {
                                     dto.setCourtId(firstSlot.getCourtId());
                                 }
                             }
-                    return dto;
+                            return dto;
                         }
-                })
-                .collect(Collectors.toList());
+                    })
+                    .collect(Collectors.toList());
         } catch (Exception e) {
             log.error("Error in getBookingHistory for member {}: {}", memberId, e.getMessage(), e);
             throw new RuntimeException("Failed to load booking history", e);
@@ -745,6 +854,26 @@ public class BookingService {
                     newWallet.setBalance(0.00);
                     return walletRepository.save(newWallet);
                 });
+    }
+
+    private void createWalletTransaction(Wallet wallet, String transactionType, double amount, 
+                                       double balanceBefore, double balanceAfter, 
+                                       String referenceType, Integer referenceId, String description) {
+        WalletTransaction transaction = new WalletTransaction();
+        transaction.setWalletId(wallet.getId());
+        transaction.setTransactionType(transactionType);
+        transaction.setAmount(amount);
+        transaction.setBalanceBefore(balanceBefore);
+        transaction.setBalanceAfter(balanceAfter);
+        transaction.setFrozenBefore(wallet.getFrozenBalance());
+        transaction.setFrozenAfter(wallet.getFrozenBalance());
+        transaction.setReferenceType(referenceType);
+        transaction.setReferenceId(referenceId);
+        transaction.setDescription(description);
+        transaction.setStatus("COMPLETED");
+        transaction.setProcessedAt(LocalDateTime.now());
+        
+        walletTransactionRepository.save(transaction);
     }
 
     /**

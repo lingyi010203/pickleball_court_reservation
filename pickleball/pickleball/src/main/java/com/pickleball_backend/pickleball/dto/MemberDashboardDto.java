@@ -13,7 +13,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class MemberDashboardDto {
     private String tierName;
-    private int pointBalance;
+    private int tierPointBalance;  // 改名為更明確的名稱
+    private int rewardPointBalance;  // 新增 reward points 字段
     private String benefits;
     private List<VoucherDto> redeemableVouchers;
     private int minPoints;  // Add this

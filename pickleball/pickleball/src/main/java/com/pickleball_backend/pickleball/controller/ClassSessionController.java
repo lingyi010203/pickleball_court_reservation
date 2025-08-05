@@ -8,6 +8,7 @@ import com.pickleball_backend.pickleball.exception.ConflictException;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.service.EscrowAccountService;
 import com.pickleball_backend.pickleball.entity.Feedback;
+import java.time.LocalDateTime;
 import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import com.pickleball_backend.pickleball.service.ClassSessionService;
 import com.pickleball_backend.pickleball.service.EmailService;
@@ -134,8 +135,8 @@ public class ClassSessionController {
             User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new com.pickleball_backend.pickleball.exception.ResourceNotFoundException("User not found"));
             Integer userId = user.getId();
-            boolean success = classSessionService.registerUserForMultipleSessions(userId, request.getSessionIds(), request.getPaymentMethod());
-            return ResponseEntity.ok(Map.of("success", success));
+            Map<String, Object> result = classSessionService.registerUserForMultipleSessions(userId, request.getSessionIds(), request.getPaymentMethod(), request.getNumPaddles(), request.getBuyBallSet());
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -351,16 +352,32 @@ public class ClassSessionController {
         Map<String, Object> dto = new java.util.HashMap<>();
         dto.put("id", session.getId());
         dto.put("title", session.getTitle());
+        dto.put("description", session.getDescription());
         dto.put("startTime", session.getStartTime());
         dto.put("endTime", session.getEndTime());
-        // 優先使用直接關聯的 venue，如果沒有則使用 court 的 venue
+        dto.put("maxParticipants", session.getMaxParticipants());
+        dto.put("price", session.getPrice());
+        dto.put("allowReplacement", session.getAllowReplacement());
+        dto.put("replacementForSessionId", session.getReplacementForSessionId());
+        
+        // 場地信息 - 優先使用直接關聯的 venue，如果沒有則使用 court 的 venue
         Venue venue = session.getVenue();
         if (venue == null && session.getCourt() != null) {
             venue = session.getCourt().getVenue();
         }
-        dto.put("venueName", venue != null ? venue.getName() : "");
-        dto.put("price", session.getPrice());
-        dto.put("replacementForSessionId", session.getReplacementForSessionId());
+        if (venue != null) {
+            dto.put("venueId", venue.getId());
+            dto.put("venueName", venue.getName());
+            dto.put("venue", venue);
+        }
+        
+        // 球場信息
+        if (session.getCourt() != null) {
+            dto.put("courtId", session.getCourt().getId());
+            dto.put("courtName", session.getCourt().getName());
+            dto.put("court", session.getCourt());
+        }
+        
         // 如果是補課，補上 allowedMemberIds
         if (session.getReplacementForSessionId() != null) {
             ClassSession origin = classSessionService.getSessionById(session.getReplacementForSessionId());
@@ -438,6 +455,7 @@ public class ClassSessionController {
             }
             dto.setVenueName(venue != null ? venue.getName() : null);
             dto.setVenueState(venue != null ? venue.getState() : null);
+            dto.setAllowReplacement(session.getAllowReplacement());
             // 報名名單
             List<ClassRegistrationDto> regDtos = session.getRegistrations() == null ? List.of() : session.getRegistrations().stream().map(reg ->
                 new ClassRegistrationDto(
@@ -724,6 +742,7 @@ public class ClassSessionController {
                 sessionInfo.put("status", session.getStatus());
                 sessionInfo.put("price", session.getPrice());
                 sessionInfo.put("recurringGroupId", session.getRecurringGroupId());
+                sessionInfo.put("replacementForSessionId", session.getReplacementForSessionId());
                 
                 // 教練信息
                 if (session.getCoach() != null) {
@@ -750,9 +769,46 @@ public class ClassSessionController {
                 sessionInfo.put("registrationDate", reg.getRegistrationDate());
                 sessionInfo.put("attendanceStatus", reg.getAttendanceStatus());
                 
-                // 教練評論（如果有）
+                // 教練對用戶的評價（如果有）
                 sessionInfo.put("coachComment", reg.getCoachComment());
-                sessionInfo.put("rating", reg.getRating());
+                
+                // 用戶對教練的評價（從 feedback 表獲取）
+                try {
+                    if (session.getCoach() != null) {
+                        // 查找用戶對這個教練的評價
+                        List<Feedback> userFeedbacks = feedbackRepository.findByUserId(user.getId());
+                        
+                        if (!userFeedbacks.isEmpty()) {
+                            // 找到用戶對這個教練的評價
+                            Feedback userFeedback = userFeedbacks.stream()
+                                .filter(feedback -> 
+                                    feedback.getTargetType() == Feedback.TargetType.COACH && 
+                                    feedback.getTargetId().equals(session.getCoach().getId())
+                                )
+                                .findFirst()
+                                .orElse(null);
+                            
+                            if (userFeedback != null) {
+                                sessionInfo.put("userRating", userFeedback.getRating());
+                                sessionInfo.put("userComment", userFeedback.getReview());
+                                System.out.println("Found user feedback for session " + session.getId() + ": rating=" + userFeedback.getRating() + ", comment=" + userFeedback.getReview());
+                            } else {
+                                sessionInfo.put("userRating", null);
+                                sessionInfo.put("userComment", null);
+                            }
+                        } else {
+                            sessionInfo.put("userRating", null);
+                            sessionInfo.put("userComment", null);
+                        }
+                    } else {
+                        sessionInfo.put("userRating", null);
+                        sessionInfo.put("userComment", null);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error fetching user feedback for session " + session.getId() + ": " + e.getMessage());
+                    sessionInfo.put("userRating", null);
+                    sessionInfo.put("userComment", null);
+                }
                 
                 System.out.println("Session " + session.getId() + " for user " + userId + ": " + sessionInfo);
                 return sessionInfo;
@@ -871,41 +927,64 @@ public class ClassSessionController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Class session not found"));
             }
 
-            // Update the registration with review data
+            // Get review type from request
+            String reviewType = (String) reviewData.get("reviewType");
             Integer rating = (Integer) reviewData.get("rating");
             String comment = (String) reviewData.get("comment");
             
-            if (rating != null && rating >= 1 && rating <= 5) {
-                registration.setRating(rating);
-                System.out.println("Setting rating: " + rating);
-            }
-            
-            if (comment != null) {
-                registration.setCoachComment(comment);
-                System.out.println("Setting comment: " + comment);
-            }
-            
-            classRegistrationRepository.save(registration);
-            
-            // 同时创建feedback记录（如果session有教练）
-            if (session.getCoach() != null) {
-                try {
-                    // 创建feedback记录
-                    Feedback feedback = new Feedback();
-                    feedback.setTargetType(Feedback.TargetType.COACH);
-                    feedback.setTargetId(session.getCoach().getId());
-                    feedback.setRating(rating);
-                    feedback.setReview(comment);
-                    feedback.setUser(user);
-                    feedback.setCreatedAt(LocalDateTime.now());
+            // 根據評價類型進行不同的處理
+            if ("USER_TO_COACH".equals(reviewType)) {
+                // 用戶對教練的評價 - 保存到 feedback 表
+                if (session.getCoach() != null) {
+                    try {
+                        // 創建 feedback 記錄
+                        Feedback feedback = new Feedback();
+                        feedback.setTargetType(Feedback.TargetType.COACH);
+                        feedback.setTargetId(session.getCoach().getId());
+                        feedback.setRating(rating);
+                        feedback.setReview(comment);
+                        feedback.setUser(user);
+                        feedback.setClassSessionId(sessionId); // 設置關聯的課程ID
+                        feedback.setCreatedAt(LocalDateTime.now());
 
-                    // 保存feedback记录
-                    feedbackRepository.save(feedback);
-                    System.out.println("Feedback record created for coach: " + session.getCoach().getId());
-                } catch (Exception feedbackError) {
-                    System.out.println("Warning: Failed to create feedback record: " + feedbackError.getMessage());
-                    // 不阻止主要流程，只是记录警告
+                        // 保存 feedback 記錄
+                        feedbackRepository.save(feedback);
+                        System.out.println("User to Coach feedback record created for coach: " + session.getCoach().getId());
+                    } catch (Exception feedbackError) {
+                        System.out.println("Error creating feedback record: " + feedbackError.getMessage());
+                        return ResponseEntity.badRequest().body(Map.of("error", "Failed to create feedback record: " + feedbackError.getMessage()));
+                    }
                 }
+                
+                // 同時更新 registration 中的用戶評價字段
+                if (rating != null && rating >= 1 && rating <= 5) {
+                    registration.setRating(rating);
+                    System.out.println("Setting user rating: " + rating);
+                }
+                
+                if (comment != null) {
+                    // 注意：這裡我們暫時不保存用戶評價到 registration 表
+                    // 因為 coachComment 字段是用來存儲教練對用戶的評價
+                    // 用戶對教練的評價只保存在 feedback 表中
+                    System.out.println("User comment will be saved to feedback table only: " + comment);
+                }
+                
+                classRegistrationRepository.save(registration);
+                
+            } else {
+                // 默認處理（向後兼容）
+                if (rating != null && rating >= 1 && rating <= 5) {
+                    registration.setRating(rating);
+                }
+                
+                if (comment != null) {
+                    // 注意：這裡我們暫時不保存用戶評價到 registration 表
+                    // 因為 coachComment 字段是用來存儲教練對用戶的評價
+                    // 用戶對教練的評價只保存在 feedback 表中
+                    System.out.println("User comment will be saved to feedback table only: " + comment);
+                }
+                
+                classRegistrationRepository.save(registration);
             }
 
             System.out.println("Review submitted successfully for session " + sessionId + " by user " + user.getId());
@@ -915,6 +994,79 @@ public class ClassSessionController {
             System.out.println("Error in submitReview: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", "Error submitting review: " + e.getMessage()));
+        }
+    }
+
+    // 教練給用戶的評價
+    @PostMapping("/{sessionId}/coach-feedback")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> submitCoachFeedback(@PathVariable Integer sessionId, @RequestBody Map<String, Object> feedbackData) {
+        try {
+            System.out.println("=== submitCoachFeedback called for sessionId: " + sessionId + " ===");
+            System.out.println("Feedback data: " + feedbackData);
+            
+            // Get the current coach from JWT token
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            System.out.println("Current coach from JWT: " + username);
+            
+            // Try to find coach by username first, then by email
+            User coach = userRepository.findByUserAccount_Username(username).orElse(null);
+            if (coach == null) {
+                coach = userRepository.findByEmail(username).orElse(null);
+            }
+            
+            if (coach == null) {
+                System.out.println("Coach not found for username/email: " + username);
+                return ResponseEntity.badRequest().body(Map.of("error", "Coach not found for: " + username));
+            }
+
+            System.out.println("Found coach: " + coach.getId() + " - " + coach.getName());
+
+            // Get the class session
+            ClassSession session = classSessionRepository.findById(sessionId).orElse(null);
+            if (session == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Class session not found"));
+            }
+
+            // Verify that the current user is the coach of this session
+            if (!session.getCoach().getId().equals(coach.getId())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "You are not the coach of this session"));
+            }
+
+            // Get student ID from feedback data
+            Integer studentId = (Integer) feedbackData.get("studentId");
+            String comment = (String) feedbackData.get("comment");
+            
+            if (studentId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Student ID is required"));
+            }
+
+            // Find the class registration for this student and session
+            ClassRegistration registration = classRegistrationRepository.findByMemberUserIdAndClassSessionId(studentId, sessionId);
+            
+            if (registration == null) {
+                System.out.println("Registration not found for student " + studentId + " and session " + sessionId);
+                return ResponseEntity.badRequest().body(Map.of("error", "Registration not found for this student and session"));
+            }
+            
+            System.out.println("Found registration: " + registration.getId());
+
+            // Update the registration with coach feedback
+            if (comment != null) {
+                registration.setCoachComment(comment);
+                System.out.println("Setting coach comment: " + comment);
+            }
+            
+            classRegistrationRepository.save(registration);
+
+            System.out.println("Coach feedback submitted successfully for session " + sessionId + " for student " + studentId);
+            return ResponseEntity.ok(Map.of("message", "Coach feedback submitted successfully"));
+            
+        } catch (Exception e) {
+            System.out.println("Error in submitCoachFeedback: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", "Error submitting coach feedback: " + e.getMessage()));
         }
     }
 
@@ -981,6 +1133,27 @@ public class ClassSessionController {
             ClassSession updated = classSessionService.updateClassSession(sessionId, sessionDto);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // 新增：部分更新課程（只更新特定字段）
+    @PatchMapping("/{sessionId}")
+    @PreAuthorize("hasAuthority('ROLE_COACH')")
+    public ResponseEntity<?> partialUpdateClassSession(
+            @PathVariable Integer sessionId,
+            @RequestBody Map<String, Object> updates) {
+        try {
+            // 调试信息
+            System.out.println("=== PATCH Request Debug ===");
+            System.out.println("Session ID: " + sessionId);
+            System.out.println("Updates: " + updates);
+            
+            ClassSession updated = classSessionService.partialUpdateClassSession(sessionId, updates);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            System.out.println("PATCH Error: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

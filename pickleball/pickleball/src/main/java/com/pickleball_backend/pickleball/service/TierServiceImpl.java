@@ -201,7 +201,7 @@ public class TierServiceImpl implements TierService {
     @Transactional
     public void recalculateMemberTier(Member member) {
         List<MembershipTier> activeTiers = tierRepository.findAllByActiveTrueOrderByMinPointsAsc();
-        int userPoints = member.getPointBalance();
+        int userPoints = member.getTierPointBalance();
         MembershipTier newTier = null;
 
         // Debug logging

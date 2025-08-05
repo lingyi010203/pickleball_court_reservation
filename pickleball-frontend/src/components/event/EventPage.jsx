@@ -24,6 +24,13 @@ import {
   Paper,
   CircularProgress,
   Alert,
+  Pagination,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
   useTheme,
   alpha
 } from '@mui/material';
@@ -57,6 +64,25 @@ const EventPage = () => {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [showDialog, setShowDialog] = useState(false);
   const [showFriendlyMatch, setShowFriendlyMatch] = useState(false);
+  const [page, setPage] = useState(1); // MUI 分頁從 1 開始
+  const [totalPages, setTotalPages] = useState(1);
+  const [venues, setVenues] = useState([]); // 新增 venues 狀態
+  const [venueMaxCapacity, setVenueMaxCapacity] = useState(0);
+  const [formData, setFormData] = useState({
+    title: '',
+    eventType: '',
+    date: '',
+    time: '',
+    endTime: '',
+    capacity: 1,
+    location: '',
+    price: 0,
+    description: '',
+    eligibility: '',
+    tags: [],
+    schedule: [],
+    venue: null,
+  });
 
   const { currentUser } = useAuth();
   const isEventOrganizer = currentUser?.role === 'EVENTORGANIZER' || currentUser?.role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer';
@@ -65,22 +91,40 @@ const EventPage = () => {
   const theme = useTheme();
 
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (pageNum = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const eventList = await EventService.getUpcomingEvents();
+      console.log('Fetching events for page:', pageNum);
+      const eventList = await EventService.getUpcomingEvents(pageNum - 1, 3); // 每頁顯示3個事件
+      console.log('Received event list:', eventList);
+      console.log('Total pages:', eventList.totalPages);
+      console.log('Total elements:', eventList.totalElements);
+      console.log('Current page:', eventList.number);
+      console.log('Content length:', eventList.content?.length);
       setEvents(eventList.content || eventList);
+      setTotalPages(eventList.totalPages || 1);
     } catch (err) {
+      console.error('Error fetching events:', err);
       setError('Failed to load events.');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchVenues = async () => {
+    try {
+      const res = await api.get('/api/venues');
+      setVenues(res.data);
+    } catch (err) {
+      console.error('Failed to fetch venues:', err);
+    }
+  };
+
   useEffect(() => {
     // Always fetch events on mount or path change
-    fetchEvents();
+    fetchEvents(page);
+    fetchVenues(); // 在 mount 時也 fetch venues
 
     // If coming back from edit and refresh flag is set, fetch again
     if (location.state?.refresh) {
@@ -88,7 +132,7 @@ const EventPage = () => {
       // Clear the state so it doesn't refetch every time
       window.history.replaceState({}, document.title);
     }
-  }, [location.pathname]); // location from react-router
+  }, [location.pathname, page]); // location from react-router
 
   // Update handleEventClick to fetch event details from backend
   const handleEventClick = async (event) => {
@@ -99,6 +143,13 @@ const EventPage = () => {
     setCheckingRegistration(true);
     try {
       const eventDetails = await EventService.getEventDetails(event.id);
+      console.log('Event details received:', eventDetails);
+      console.log('Venue info:', {
+        venueId: eventDetails.venueId,
+        venueName: eventDetails.venueName,
+        venueState: eventDetails.venueState,
+        venueLocation: eventDetails.venueLocation
+      });
       setSelectedEvent(eventDetails);
       setError(null); // <-- Clear error on success
       const isRegistered = await EventService.isRegisteredForEvent(event.id);
@@ -194,14 +245,18 @@ const EventPage = () => {
       image: event.imageUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=200&fit=crop',
       organizer: event.organizerName || 'Organizer',
       tags: event.tags || [],
+      venue: event.venue, // 保留 venue 欄位
     };
   };
 
   const handleRegisterClick = (event) => {
-    setRegisterEvent(event);
-    setShowRegisterDialog(true);
-    setRegisterSuccess(false);
-    setRegisterError('');
+    // 直接跳轉到支付頁面，傳遞事件詳情
+    navigate('/payment', { 
+      state: { 
+        eventDetails: event,
+        paymentType: 'event_registration'
+      } 
+    });
   };
 
   const handleRegisterCancel = () => {
@@ -363,7 +418,9 @@ const EventPage = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <LocationOn sx={{ mr: 1, fontSize: 16 }} />
                     <Typography variant="body2">
-                      {event.location}
+                      {typeof event.venue === 'object'
+                        ? event.venue?.name
+                        : (venues?.find(v => v.id === event.venue)?.name || 'N/A')}
                     </Typography>
                   </Box>
 
@@ -380,8 +437,8 @@ const EventPage = () => {
                       {event.registered}/{event.capacity} registered
                     </Typography>
                     <Chip
-                      label={availability.text}
-                      color={availability.color}
+                      label={event.registered >= event.capacity ? 'Fully Booked' : availability.text}
+                      color={event.registered >= event.capacity ? 'error' : availability.color}
                       size="small"
                       sx={{ ml: 1 }}
                     />
@@ -405,6 +462,19 @@ const EventPage = () => {
           );
         })}
       </Grid>
+
+      {totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, value) => setPage(value)}
+            color="primary"
+            shape="rounded"
+            size="large"
+          />
+        </Box>
+      )}
 
       {/* Event Detail Dialog */}
       <Dialog
@@ -471,8 +541,16 @@ const EventPage = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                       <LocationOn sx={{ mr: 1, fontSize: 20 }} />
                       <Box>
-                        <Typography variant="body2" color="text.secondary">Location</Typography>
-                        <Typography variant="body1">{selectedEvent.location}</Typography>
+                        <Typography variant="body2" color="text.secondary">Venue</Typography>
+                        <Typography variant="body1">{selectedEvent.venue?.name}</Typography>
+                        {/* 新增 State */}
+                        <Typography variant="body2" color="text.secondary">
+                          State: {selectedEvent.venueState || 'N/A'}
+                        </Typography>
+                        {/* 新增 Location */}
+                        <Typography variant="body2" color="text.secondary">
+                          Location: {selectedEvent.venueLocation || 'N/A'}
+                        </Typography>
                       </Box>
                     </Box>
 
@@ -481,20 +559,14 @@ const EventPage = () => {
                       <Box>
                         <Typography variant="body2" color="text.secondary">Price</Typography>
                         <Typography variant="body1">
-                          Free
+                          {selectedEvent.feeAmount > 0
+                            ? `$${selectedEvent.feeAmount}`
+                            : selectedEvent.price > 0
+                              ? `$${selectedEvent.price}`
+                              : 'Free'}
                         </Typography>
                       </Box>
                     </Box>
-
-                    {selectedEvent.skillLevel && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <People sx={{ mr: 1, fontSize: 20 }} />
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Skill Level</Typography>
-                          <Typography variant="body1">{selectedEvent.skillLevel}</Typography>
-                        </Box>
-                      </Box>
-                    )}
 
                     {selectedEvent.eligibility && (
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -544,7 +616,7 @@ const EventPage = () => {
                     {selectedEvent.timeUntilEvent && (
                       <Box sx={{ mt: 2 }}>
                         <Chip
-                          label={selectedEvent.timeUntilEvent}
+                          label={`Event starts in ${selectedEvent.timeUntilEvent}`}
                           color={selectedEvent.isUpcoming ? 'primary' : 'default'}
                         />
                       </Box>
@@ -600,6 +672,11 @@ const EventPage = () => {
                       ? 'Already Registered'
                       : 'Register Now'}
                 </Button>
+              )}
+              {selectedEvent.currentParticipants >= selectedEvent.capacity && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  This event is fully booked and cannot accept more registrations.
+                </Alert>
               )}
               {currentUser?.userType === "EventOrganizer" && (
                 <Button onClick={() => handleViewRegisteredUsers(selectedEvent.id)}>

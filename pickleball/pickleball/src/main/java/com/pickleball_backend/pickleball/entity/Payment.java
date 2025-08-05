@@ -60,6 +60,13 @@ public class Payment {
     @Column(name = "group_booking_id")
     private String groupBookingId; // UUID字串
 
+    // 新增：折扣相關字段
+    @Column(name = "discount_amount", columnDefinition = "decimal(10,2) default 0.0")
+    private double discountAmount = 0.0;
+
+    @Column(name = "original_amount", columnDefinition = "decimal(10,2)")
+    private Double originalAmount;
+
     @OneToOne(mappedBy = "payment")
     private Booking booking;
 

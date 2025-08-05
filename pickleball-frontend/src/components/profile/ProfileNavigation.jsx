@@ -88,7 +88,7 @@ const ProfileNavigation = (props) => {
             <ListItemText primary="My Bookings" />
           </ListItemButton>
         </ListItem>
-        <ListItem disablePadding>
+        {/* <ListItem disablePadding>
           <ListItemButton
             onClick={() => handleNavigation('/profile/my-games')}
             selected={isActive('/profile/my-games')}
@@ -123,7 +123,7 @@ const ProfileNavigation = (props) => {
             </ListItemIcon>
             <ListItemText primary="My Invoices" />
           </ListItemButton>
-        </ListItem>
+        </ListItem> */}
         <ListItem disablePadding>
           <ListItemButton
             onClick={() => handleNavigation('/profile/rewards')}
@@ -238,7 +238,7 @@ const ProfileNavigation = (props) => {
             <ListItemText primary="Notification Preferences" />
           </ListItemButton>
         </ListItem>
-        <ListItem disablePadding>
+        {/*<ListItem disablePadding>
           <ListItemButton
             onClick={() => handleNavigation('/profile/language')}
             selected={isActive('/profile/language')}
@@ -255,7 +255,7 @@ const ProfileNavigation = (props) => {
             </ListItemIcon>
             <ListItemText primary="Language" />
           </ListItemButton>
-        </ListItem>
+        </ListItem>*/}
       </List>
     </Box>
   );

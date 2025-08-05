@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -19,18 +19,10 @@ import {
   Paper,
   InputAdornment,
   IconButton,
-  Fade,
-  Slide,
   Stack,
   LinearProgress,
   Card,
   CardContent,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  Collapse,
-  Zoom,
   Tooltip,
   CircularProgress,
   Container
@@ -58,7 +50,7 @@ import {
   DeleteForever
 } from '@mui/icons-material';
 
-const EditProfileForm = ({ 
+const EditProfileForm = React.memo(({ 
   profile = {
     username: 'johndoe',
     email: 'john@example.com',
@@ -77,9 +69,15 @@ const EditProfileForm = ({
   onRemovePhoto = () => {} 
 }) => {
   const theme = useTheme();
-  const [editedProfile, setEditedProfile] = useState({
+ 
+  // Memoize the initial profile state to prevent unnecessary re-renders
+  const initialProfile = useMemo(() => ({
     ...profile,
     requestedUserType: profile.requestedUserType || profile.userType || "User"
+  }), [profile.userType, profile.requestedUserType]);
+ 
+  const [editedProfile, setEditedProfile] = useState({
+    ...initialProfile
   });
 
   const [errors, setErrors] = useState({});
@@ -87,23 +85,29 @@ const EditProfileForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const validationTimeoutRef = useRef(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
 
-  const [previewImage, setPreviewImage] = useState(
-    profile.profileImage ? `http://localhost:8081/uploads/${profile.profileImage}` : null
+  // Memoize preview image to prevent unnecessary re-renders
+  const previewImage = useMemo(() => 
+    profile.profileImage ? `http://localhost:8081/uploads/${profile.profileImage}` : null,
+    [profile.profileImage]
   );
 
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [activeStep, setActiveStep] = useState(0);
-  const [expandedSections, setExpandedSections] = useState({
-    contact: true,
-    personal: true,
-    userType: true
-  });
+
+  // Cleanup validation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (fileInputRef.current) {
@@ -111,11 +115,11 @@ const EditProfileForm = ({
     }
 
     if (profile.profileImage) {
-      setPreviewImage(
-        `http://localhost:8081/uploads/${profile.profileImage}?ts=${Date.now()}`
-      );
+      // setPreviewImage(
+      //   `http://localhost:8081/uploads/${profile.profileImage}?ts=${Date.now()}`
+      // );
     } else {
-      setPreviewImage(null);
+      // setPreviewImage(null);
     }
   }, [profile.profileImage]);
 
@@ -179,8 +183,7 @@ const EditProfileForm = ({
         else if (value.length < 2) error = 'Name must be at least 2 characters';
         break;
       case 'requestedUserType':
-        if (value === profile.userType) error = 'Cannot select current user type';
-        else if (!['User', 'Coach', 'EventOrganizer'].includes(value)) error = 'Invalid user type selection';
+        if (!['User', 'Coach', 'EventOrganizer'].includes(value)) error = 'Invalid user type selection';
         break;
     }
     
@@ -190,23 +193,61 @@ const EditProfileForm = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     
+    // Special handling for requestedUserType
+    let finalValue = value;
+    if (name === 'requestedUserType') {
+      // If user selects current user type, set to empty string (no change requested)
+      if (value === profile.userType) {
+        finalValue = '';
+      }
+    }
+    
     setEditedProfile(prev => ({
       ...prev,
-      [name]: value
+      [name]: finalValue
     }));
 
-    // Validate field
-    const error = validateField(name, value);
-    setErrors(prev => ({
-      ...prev,
-      [name]: error
-    }));
+    // Clear previous validation timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    // Only validate immediately for critical fields like username and email
+    if (name === 'username' || name === 'email') {
+      validationTimeoutRef.current = setTimeout(() => {
+        const error = validateField(name, finalValue);
+        setErrors(prev => ({
+          ...prev,
+          [name]: error
+        }));
+      }, 300); // 300ms delay
+    }
 
     if (name === 'username' && value !== profile.username) {
       setUsernameChanged(true);
     } else if (name === 'username' && value === profile.username) {
       setUsernameChanged(false);
     }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    
+    // Special handling for requestedUserType
+    let finalValue = value;
+    if (name === 'requestedUserType') {
+      // If user selects current user type, set to empty string (no change requested)
+      if (value === profile.userType) {
+        finalValue = '';
+      }
+    }
+    
+    // Validate field on blur for all fields
+    const error = validateField(name, finalValue);
+    setErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -292,7 +333,7 @@ const EditProfileForm = ({
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPreviewImage(reader.result);
+      // setPreviewImage(reader.result);
     };
     reader.readAsDataURL(file);
 
@@ -318,465 +359,405 @@ const EditProfileForm = ({
 
   const handleRemovePhoto = () => {
     onRemovePhoto();
-    setPreviewImage(null);
+    // setPreviewImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
   const ProfilePhotoSection = () => (
-    <Card elevation={0} sx={{ mb: 4, border: `2px dashed ${theme.palette.divider}`, borderRadius: 3 }}>
-      <CardContent sx={{ textAlign: 'center', py: 4 }}>
-        <Box sx={{ position: 'relative', display: 'inline-block', mb: 3 }}>
-          <Avatar
-            src={previewImage}
-            sx={{
-              width: 120,
-              height: 120,
-              bgcolor: theme.palette.primary.main,
-              fontSize: '2.5rem',
-              fontWeight: 'bold',
-              border: `4px solid ${theme.palette.background.paper}`,
-              boxShadow: theme.shadows[8],
-              transition: 'transform 0.3s ease-in-out',
-              '&:hover': {
-                transform: 'scale(1.05)'
-              }
-            }}
-          >
-            {!previewImage && (
-              <Person sx={{ fontSize: '3rem' }} />
-            )}
-          </Avatar>
-          
-          {uploadProgress > 0 && uploadProgress < 100 && (
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              borderRadius: '50%',
-              color: 'white'
-            }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <CircularProgress 
-                  variant="determinate" 
-                  value={uploadProgress} 
-                  size={40} 
-                  sx={{ color: 'white', mb: 1 }}
-                />
-                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                  {uploadProgress}%
-                </Typography>
+    <Card sx={{ 
+      mb: 3, 
+      borderRadius: 3, 
+      boxShadow: theme.shadows[2]
+    }}>
+      <CardContent sx={{ p: 0 }}>
+        <Box sx={{ 
+          p: 3, 
+          pb: 2,
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <CameraAlt color="primary" />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Profile Photo
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Box sx={{ p: 3 }}>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ position: 'relative' }}>
+                  <Avatar
+                    src={previewImage}
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      border: `3px solid ${theme.palette.primary.main}`,
+                      boxShadow: theme.shadows[4]
+                    }}
+                  />
+                  <IconButton
+                    sx={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      backgroundColor: theme.palette.primary.main,
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: theme.palette.primary.dark
+                      }
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <PhotoCamera />
+                  </IconButton>
+                </Box>
               </Box>
-            </Box>
-          )}
+            </Grid>
+            
+            <Grid item xs={12} md={8}>
+              <Stack spacing={2}>
+                <Typography variant="body1" color="text.secondary">
+                  Upload a profile photo to personalize your account
+                </Typography>
+                
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUpload />}
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Upload Photo
+                  </Button>
+                  
+                  {previewImage && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteForever />}
+                      onClick={handleRemovePhoto}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Remove Photo
+                    </Button>
+                  )}
+                </Box>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+                
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <Box sx={{ width: '100%' }}>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={uploadProgress}
+                      sx={{ borderRadius: 1 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      Uploading... {uploadProgress}%
+                    </Typography>
+                  </Box>
+                )}
+              </Stack>
+            </Grid>
+          </Grid>
         </Box>
-
-        <Box
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          sx={{
-            border: `2px dashed ${isDragOver ? theme.palette.primary.main : theme.palette.grey[300]}`,
-            borderRadius: 2,
-            p: 3,
-            backgroundColor: isDragOver ? theme.palette.primary.light + '20' : 'transparent',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer',
-            '&:hover': {
-              borderColor: theme.palette.primary.main,
-              backgroundColor: theme.palette.primary.light + '10'
-            }
-          }}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <CloudUpload sx={{ fontSize: 48, color: theme.palette.grey[400], mb: 1 }} />
-          <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-            Drop your photo here, or click to browse
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            JPG, PNG, GIF • Maximum 800KB
-          </Typography>
-          
-          <Stack direction="row" spacing={2} justifyContent="center">
-            <Button
-              variant="outlined"
-              startIcon={<PhotoCamera />}
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              sx={{ borderRadius: 2 }}
-            >
-              Choose Photo
-            </Button>
-            {previewImage && (
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteForever />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemovePhoto();
-                }}
-                sx={{ borderRadius: 2 }}
-              >
-                Remove
-              </Button>
-            )}
-          </Stack>
-        </Box>
-
-        <input
-          type="file"
-          accept="image/*"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
       </CardContent>
     </Card>
   );
 
-  const FormSection = ({ title, icon: IconComponent, children, section, step }) => (
-    <Card 
-      elevation={2} 
-      sx={{ 
-        mb: 3, 
-        borderRadius: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          boxShadow: theme.shadows[4]
-        }
-      }}
-    >
+  const FormSection = ({ title, icon: IconComponent, children }) => (
+    <Card sx={{ 
+      mb: 3, 
+      borderRadius: 3, 
+      boxShadow: theme.shadows[2],
+      overflow: 'visible'
+    }}>
       <CardContent sx={{ p: 0 }}>
-        <Box
-          sx={{
-            p: 3,
-            background: `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.primary.light}10 100%)`,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            cursor: 'pointer'
-          }}
-          onClick={() => toggleSection(section)}
-        >
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Box sx={{
-                p: 1,
-                borderRadius: 2,
-                backgroundColor: theme.palette.primary.main,
-                color: 'white'
-              }}>
-                <IconComponent />
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                {title}
-              </Typography>
-            </Stack>
-            <IconButton size="small">
-              <Edit />
-            </IconButton>
-          </Stack>
+        <Box sx={{ 
+          p: 3, 
+          pb: 2,
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconComponent color="primary" />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {title}
+            </Typography>
+          </Box>
         </Box>
         
-        <Collapse in={expandedSections[section]}>
-          <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 3 }}>
             {children}
           </Box>
-        </Collapse>
       </CardContent>
     </Card>
   );
 
   return (
     <Container maxWidth="md">
-      <Slide direction="up" in={true} mountOnEnter unmountOnExit>
-        <Box sx={{ py: 4 }}>
-          {/* Header Card */}
-          <Card 
-            elevation={4} 
-            sx={{ 
-              mb: 4, 
-              borderRadius: 3,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              color: 'white',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            <CardContent sx={{ p: 4 }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                Edit Profile
-              </Typography>
-              <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400 }}>
-                Update your personal information and preferences
-              </Typography>
-              
-              <Chip
-                icon={statusConfig.icon}
-                label={statusConfig.label}
-                sx={{
-                  position: 'absolute',
-                  top: 20,
-                  right: 20,
-                  backgroundColor: statusConfig.bgColor,
-                  color: statusConfig.textColor,
-                  fontWeight: 'bold',
-                  boxShadow: theme.shadows[2]
-                }}
-              />
-            </CardContent>
-          </Card>
+      <Box sx={{ py: 4 }}>
+        {/* Header Card */}
+        <Card sx={{ 
+          mb: 4, 
+          borderRadius: 3, 
+          boxShadow: theme.shadows[2],
+          background: `linear-gradient(135deg, ${theme.palette.primary.main}15 0%, ${theme.palette.primary.light}10 100%)`
+        }}>
+          <CardContent sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h4" sx={{ 
+              fontWeight: 'bold', 
+              color: theme.palette.primary.main,
+              mb: 1
+            }}>
+              Edit Profile
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Update your personal information and account settings
+            </Typography>
+          </CardContent>
+        </Card>
 
-          <Box component="form" onSubmit={handleSubmit}>
-            {/* Photo Upload */}
-            <ProfilePhotoSection />
-
-            {/* Contact Information */}
-            <FormSection title="Contact Information" icon={Email} section="contact">
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Username"
-                    name="username"
-                    value={editedProfile.username}
-                    onChange={handleChange}
-                    error={!!errors.username}
-                    helperText={errors.username || (usernameChanged ? "You'll need to log in again with your new username" : "")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Person color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    name="email"
-                    value={editedProfile.email}
-                    onChange={handleChange}
-                    type="email"
-                    error={!!errors.email}
-                    helperText={errors.email || "We'll send booking confirmations to this email"}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Email color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Mobile Number"
-                    name="phone"
-                    value={editedProfile.phone}
-                    onChange={handleChange}
-                    error={!!errors.phone}
-                    helperText={errors.phone || "Enter your mobile number for booking updates"}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Phone color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                </Grid>
-              </Grid>
-            </FormSection>
-
-            {/* Personal Information */}
-            <FormSection title="Personal Information" icon={Person} section="personal">
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    name="name"
-                    value={editedProfile.name}
-                    onChange={handleChange}
-                    error={!!errors.name}
-                    helperText={errors.name}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Gender"
-                    name="gender"
-                    value={editedProfile.gender}
-                    onChange={handleChange}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  >
-                    <MenuItem value="Male">Male</MenuItem>
-                    <MenuItem value="Female">Female</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Date of Birth"
-                    type="date"
-                    name="dob"
-                    value={editedProfile.dob ? editedProfile.dob.substring(0, 10) : ''}
-                    onChange={handleChange}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarToday color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                </Grid>
-              </Grid>
-            </FormSection>
-
-            {/* User Type */}
-            <FormSection title="Account Type" icon={Badge} section="userType">
-              <FormControl fullWidth error={!!errors.requestedUserType}>
-                <InputLabel>Request User Type Change</InputLabel>
-                <Select
-                  name="requestedUserType"
-                  value={editedProfile.requestedUserType}
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          <ProfilePhotoSection />
+          
+          {/* Contact Information */}
+          <FormSection title="Contact Information" icon={Email}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  name="username"
+                  value={editedProfile.username}
                   onChange={handleChange}
-                  label="Request User Type Change"
-                  sx={{ borderRadius: 2 }}
+                  onBlur={handleBlur}
+                  error={!!errors.username}
+                  helperText={errors.username || (usernameChanged ? "You'll need to log in again with your new username" : "")}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Person color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  name="email"
+                  value={editedProfile.email}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  type="email"
+                  error={!!errors.email}
+                  helperText={errors.email}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Email color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  name="phone"
+                  value={editedProfile.phone}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  error={!!errors.phone}
+                  helperText={errors.phone || "Enter your mobile number for booking updates"}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Phone color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Grid>
+            </Grid>
+          </FormSection>
+
+          {/* Personal Information */}
+          <FormSection title="Personal Information" icon={Person}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Full Name"
+                  name="name"
+                  value={editedProfile.name}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  error={!!errors.name}
+                  helperText={errors.name}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Gender"
+                  name="gender"
+                  value={editedProfile.gender}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
-                  <MenuItem value="User">User</MenuItem>
-                  <MenuItem value="Coach">Coach</MenuItem>
-                  <MenuItem value="EventOrganizer">Event Organizer</MenuItem>
-                </Select>
-                {errors.requestedUserType && (
-                  <FormHelperText>{errors.requestedUserType}</FormHelperText>
-                )}
-              </FormControl>
-              
-              {profile.requestedUserType && (
-                <Alert 
-                  severity="info" 
-                  icon={<Info />}
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Date of Birth"
+                  type="date"
+                  name="dob"
+                  value={editedProfile.dob ? editedProfile.dob.substring(0, 10) : ''}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalendarToday color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Grid>
+            </Grid>
+          </FormSection>
+
+          {/* User Type */}
+          <FormSection title="Account Type" icon={Badge}>
+            <FormControl fullWidth error={!!errors.requestedUserType}>
+              <InputLabel>Request User Type Change</InputLabel>
+              <Select
+                name="requestedUserType"
+                value={editedProfile.requestedUserType || profile.userType}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                label="Request User Type Change"
+                sx={{ borderRadius: 2 }}
+              >
+                <MenuItem value="User">User</MenuItem>
+                <MenuItem value="Coach">Coach</MenuItem>
+                <MenuItem value="EventOrganizer">Event Organizer</MenuItem>
+              </Select>
+              {errors.requestedUserType && (
+                <FormHelperText>{errors.requestedUserType}</FormHelperText>
+              )}
+            </FormControl>
+            
+            {profile.requestedUserType && (
+              <Alert 
+                severity="info" 
+                icon={<Info />}
+                sx={{ 
+                  mt: 2, 
+                  borderRadius: 2,
+                  '& .MuiAlert-message': {
+                    fontWeight: 500
+                  }
+                }}
+              >
+                Current request: Change to {profile.requestedUserType} (pending admin approval)
+              </Alert>
+            )}
+          </FormSection>
+
+          {/* Action Buttons */}
+          <Card sx={{ 
+            mt: 4, 
+            borderRadius: 3, 
+            boxShadow: theme.shadows[2],
+            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.grey[50]} 100%)`
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  onClick={onCancel}
+                  startIcon={<Cancel />}
                   sx={{ 
-                    mt: 2, 
                     borderRadius: 2,
-                    '& .MuiAlert-message': {
-                      fontWeight: 500
+                    borderColor: theme.palette.text.secondary,
+                    color: theme.palette.text.secondary
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={isSubmitting}
+                  startIcon={isSubmitting ? <CircularProgress size={20} /> : <Save />}
+                  sx={{ 
+                    borderRadius: 2,
+                    backgroundColor: theme.palette.primary.main,
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark
                     }
                   }}
                 >
-                  Current request: Change to {profile.requestedUserType} (pending admin approval)
-                </Alert>
-              )}
-            </FormSection>
-
-            {/* Action Buttons */}
-            <Card elevation={2} sx={{ borderRadius: 3, mt: 4 }}>
-              <CardContent>
-                <Stack 
-                  direction={{ xs: 'column', sm: 'row' }} 
-                  spacing={2} 
-                  justifyContent="flex-end"
-                  alignItems="center"
-                >
-                  <Button
-                    variant="outlined"
-                    onClick={onCancel}
-                    startIcon={<Cancel />}
-                    disabled={isSubmitting}
-                    size="large"
-                    sx={{
-                      minWidth: 140,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      py: 1.5
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <Save />}
-                    disabled={isSubmitting}
-                    size="large"
-                    sx={{
-                      minWidth: 180,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      py: 1.5,
-                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                      '&:hover': {
-                        background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                      }
-                    }}
-                  >
-                    {isSubmitting ? 'Saving Changes...' : 'Save Changes'}
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-      </Slide>
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </form>
+      </Box>
 
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        TransitionComponent={Fade}
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ 
-            width: '100%',
-            borderRadius: 2,
-            boxShadow: theme.shadows[8],
-            '& .MuiAlert-message': {
-              fontWeight: 500
-            }
-          }}
+          sx={{ width: '100%' }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
     </Container>
   );
-};
+});
 
 export default EditProfileForm;

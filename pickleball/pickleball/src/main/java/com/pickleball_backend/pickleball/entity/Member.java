@@ -18,8 +18,11 @@ public class Member {
     @Column(name = "user_id")
     private Integer id;
 
-    @Column(name = "point_balance", nullable = false, columnDefinition = "int default 0")
-    private int pointBalance = 0;
+    @Column(name = "tier_point_balance", nullable = false, columnDefinition = "int default 0")
+    private int tierPointBalance = 0;
+
+    @Column(name = "reward_point_balance", nullable = false, columnDefinition = "int default 0")
+    private int rewardPointBalance = 0;
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL)
     private List<Voucher> vouchers = new ArrayList<>();

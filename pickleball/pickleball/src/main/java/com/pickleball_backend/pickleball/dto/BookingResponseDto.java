@@ -21,5 +21,13 @@ public class BookingResponseDto {
     private String paymentStatus;
     private Double walletBalance;
     private Integer pointsEarned;  // Points earned from this booking
-    private Integer currentPointBalance;  // Current total point balance
+    private Integer currentPointBalance;  // Current total point balance (for backward compatibility)
+    private Integer currentTierPointBalance;  // Current tier point balance
+    private Integer currentRewardPointBalance;  // Current reward point balance
+    
+    // 新增：折扣相關字段
+    private Double originalAmount;  // 原始金額
+    private Double discountAmount;  // 折扣金額
+    private String appliedVoucherCode;  // 使用的優惠券代碼
+    private Boolean voucherUsed;  // 是否使用了優惠券
 }
