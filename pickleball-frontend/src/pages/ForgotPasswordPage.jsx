@@ -7,8 +7,11 @@ import {
   TextField, 
   Button, 
   Container,
-  useTheme
+  useTheme,
+  InputAdornment,
+  CircularProgress
 } from '@mui/material';
+import { Email, ArrowBack } from '@mui/icons-material';
 import Navbar from '../components/common/Navbar';
 import axios from 'axios';
 
@@ -18,9 +21,41 @@ const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    setEmailError('');
+    setMessage('');
+    setIsSuccess(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Clear previous messages
+    setMessage('');
+    setEmailError('');
+    setIsSuccess(false);
+    
+    // Validate email
+    if (!email.trim()) {
+      setEmailError('Please enter your email address');
+      return;
+    }
+    
+    if (!validateEmail(email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -30,7 +65,11 @@ const ForgotPasswordPage = () => {
       );
       
       if (response.status === 200) {
-        navigate('/reset-password-email-sent');
+        setIsSuccess(true);
+        setMessage('Reset link sent to your email!');
+        setTimeout(() => {
+          navigate('/reset-password-email-sent');
+        }, 2000);
       }
     } catch (error) {
       setMessage(error.response?.data || 'Error sending reset email. Please try again later.');
@@ -55,21 +94,24 @@ const ForgotPasswordPage = () => {
           <Box
             sx={{
               backgroundColor: theme.palette.background.paper,
-              borderRadius: 2,
+              borderRadius: '24px',
               boxShadow: theme.shadows[2],
               padding: 4,
               textAlign: 'center',
             }}
           >
             <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: theme.palette.text.primary }}>
-              Forgot your password?
+              Reset your password
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
-              Enter your email and we'll send you instructions to reset your password
+              We'll email you a link to create a new one
             </Typography>
             
             {message && (
-              <Typography color="error" sx={{ mt: 1, mb: 2 }}>
+              <Typography 
+                color={isSuccess ? "success" : "error"} 
+                sx={{ mt: 1, mb: 2, fontWeight: 500 }}
+              >
                 {message}
               </Typography>
             )}
@@ -79,9 +121,19 @@ const ForgotPasswordPage = () => {
               label="Email Address"
               variant="outlined"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
+              autoFocus
+              error={!!emailError}
+              helperText={emailError}
               sx={{ mb: 3 }}
-              placeholder="e.g. your.email@example.com"
+              placeholder="Enter your email"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Email sx={{ color: emailError ? theme.palette.error.main : theme.palette.text.secondary }} />
+                  </InputAdornment>
+                ),
+              }}
             />
             
             <Button
@@ -93,20 +145,37 @@ const ForgotPasswordPage = () => {
                 '&:hover': { backgroundColor: theme.palette.primary.dark },
                 fontSize: '1rem',
                 fontWeight: 'bold',
-                mb: 2
+                mb: 2,
+                textTransform: 'none',
+                borderRadius: '8px'
               }}
               onClick={handleSubmit}
               disabled={isLoading}
             >
-              {isLoading ? 'Sending...' : 'Send Reset Instructions'}
+              {isLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={20} sx={{ color: 'white' }} />
+                  Sending...
+                </Box>
+              ) : (
+                'Send Link'
+              )}
             </Button>
             
             <Button 
               color="inherit"
-              sx={{ color: theme.palette.primary.main, fontWeight: 'bold' }}
+              sx={{ 
+                color: theme.palette.primary.main, 
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                mt: 1
+              }}
               onClick={() => navigate('/login')}
             >
-              Return to Login
+              <ArrowBack sx={{ fontSize: 18 }} />
+              Back to Login
             </Button>
           </Box>
         </Container>

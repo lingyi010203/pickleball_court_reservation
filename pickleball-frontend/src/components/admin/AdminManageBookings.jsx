@@ -27,8 +27,10 @@ import {
 import BookingService from '../../service/BookingService';
 import ModernBookingDetailsDialog from './ModernBookingDetailsDialog';
 import { getStatusChip } from './statusConfig';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const AdminManageBookings = () => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);

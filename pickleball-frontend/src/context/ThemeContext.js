@@ -3,13 +3,60 @@ import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/st
 
 const ThemeContext = createContext();
 
+// 定义颜色配置
+const COLOR_CONFIG = {
+  // 用户页面颜色配置
+  user: {
+    light: {
+      primary: '#5e17eb', // 紫色
+      primaryDark: '#4a0fd8',
+      primaryLight: '#7c3aed',
+    },
+    dark: {
+      primary: '#2d4aa1', // 蓝色
+      primaryDark: '#1e3a8a',
+      primaryLight: '#3b82f6',
+    }
+  },
+  // Admin页面颜色配置
+  admin: {
+    light: {
+      primary: '#2d4aa1', // 蓝色
+      primaryDark: '#1e3a8a',
+      primaryLight: '#3b82f6',
+    },
+    dark: {
+      primary: '#5e17eb', // 紫色
+      primaryDark: '#4a0fd8',
+      primaryLight: '#7c3aed',
+    }
+  }
+};
+
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'light');
+  const [pageType, setPageType] = useState('user'); // 'user' or 'admin'
 
   useEffect(() => {
     localStorage.setItem('adminTheme', theme);
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // 根据页面类型和主题模式获取主色调
+  const getPrimaryColor = () => {
+    const config = COLOR_CONFIG[pageType];
+    return config[theme].primary;
+  };
+
+  const getPrimaryDarkColor = () => {
+    const config = COLOR_CONFIG[pageType];
+    return config[theme].primaryDark;
+  };
+
+  const getPrimaryLightColor = () => {
+    const config = COLOR_CONFIG[pageType];
+    return config[theme].primaryLight;
+  };
 
   const muiTheme = createTheme({
     palette: {
@@ -22,8 +69,10 @@ export function ThemeProvider({ children }) {
               paper: '#1e1e1e',
             },
             primary: {
-              main: '#bb86fc',
-              contrastText: '#fff',
+              main: getPrimaryColor(),
+              dark: getPrimaryDarkColor(),
+              light: getPrimaryLightColor(),
+              contrastText: '#ffffff',
             },
             secondary: {
               main: '#03dac6',
@@ -35,23 +84,23 @@ export function ThemeProvider({ children }) {
             divider: '#424242',
           }
         : {
-            // ☀️ LIGHT MODE PALETTE (以紫色为主)
+            // ☀️ LIGHT MODE PALETTE
             background: {
               default: '#f5f5f9',
               paper: '#ffffff',
             },
             primary: {
-              main: '#2d4aa1', // 深蓝
-              dark: '#16204a',
-              light: '#5d6bb0',
+              main: getPrimaryColor(),
+              dark: getPrimaryDarkColor(),
+              light: getPrimaryLightColor(),
               contrastText: '#ffffff',
             },
             secondary: {
-              main: '#1976d2', // 强调色/次色
+              main: '#1976d2',
             },
             text: {
-              primary: '#222', // 正文偏黑色
-              secondary: '#444', // 次要字体色
+              primary: '#222',
+              secondary: '#444',
             },
             divider: '#e0e0e0',
           }),
@@ -89,18 +138,18 @@ export function ThemeProvider({ children }) {
             textTransform: 'none',
           },
           containedPrimary: {
-            backgroundColor: '#8e44ad',
-            color: '#fff',
+            backgroundColor: getPrimaryColor(),
+            color: '#ffffff',
             '&:hover': {
-              backgroundColor: '#732d91',
+              backgroundColor: getPrimaryDarkColor(),
             },
           },
           outlinedPrimary: {
-            borderColor: theme === 'dark' ? '#bb86fc' : '#8e44ad',
-            color: theme === 'dark' ? '#e0e0e0' : '#8e44ad',
+            borderColor: getPrimaryColor(),
+            color: getPrimaryColor(),
             '&:hover': {
-              borderColor: theme === 'dark' ? '#d0a6ff' : '#732d91',
-              backgroundColor: theme === 'dark' ? '#2c2c2c' : '#f0e6f6',
+              borderColor: getPrimaryDarkColor(),
+              backgroundColor: theme === 'dark' ? '#2c2c2c' : `${getPrimaryColor()}10`,
             },
           },
         },
@@ -108,7 +157,7 @@ export function ThemeProvider({ children }) {
       MuiAppBar: {
         styleOverrides: {
           colorPrimary: {
-            backgroundColor: theme === 'dark' ? '#23262F' : '#8e44ad',
+            backgroundColor: theme === 'dark' ? '#23262F' : getPrimaryColor(),
             transition: 'background-color 0.3s ease',
           },
         },
@@ -117,7 +166,15 @@ export function ThemeProvider({ children }) {
   });
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      setTheme, 
+      pageType, 
+      setPageType,
+      getPrimaryColor,
+      getPrimaryDarkColor,
+      getPrimaryLightColor
+    }}>
       <MuiThemeProvider theme={muiTheme}>
         {children}
       </MuiThemeProvider>

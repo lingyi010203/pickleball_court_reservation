@@ -12,6 +12,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getStatusChip } from './statusConfig';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const formatDate = (date) => {
   if (!date) return '-';
@@ -52,6 +53,7 @@ const ModernBookingDetailsDialog = ({
   cancellationRequest = null,
   isAdmin = false,
 }) => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [shareMenuAnchor, setShareMenuAnchor] = useState(null);
   const safeBooking = booking || {};

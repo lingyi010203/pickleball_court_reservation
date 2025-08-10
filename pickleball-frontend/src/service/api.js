@@ -26,7 +26,7 @@ api.interceptors.response.use(
       const isAdminRoute = error.config?.url?.startsWith('/admin/');
       if (isAdminRoute) {
         UserService.adminLogout();
-        window.location.href = '/admin/login';
+        window.location.href = '/login';
       } else {
         UserService.logout();
         window.location.href = '/login';

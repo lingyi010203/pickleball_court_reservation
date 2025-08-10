@@ -6,16 +6,20 @@ import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.repository.*;
 import com.pickleball_backend.pickleball.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminServiceImpl implements AdminService {
 
     private final AdminRepository adminRepository;
@@ -23,6 +27,7 @@ public class AdminServiceImpl implements AdminService {
     private final UserAccountRepository userAccountRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     @Override
     public Admin login(String username, String password) {
@@ -118,4 +123,6 @@ public void changePassword(String username, String currentPassword, String newPa
     account.setPassword(passwordEncoder.encode(newPassword));
     userAccountRepository.save(account);
 }
+
+
 }

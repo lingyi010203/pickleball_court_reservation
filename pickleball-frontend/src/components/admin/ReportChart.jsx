@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 // 注册Chart.js组件
 ChartJS.register(
@@ -27,6 +28,7 @@ ChartJS.register(
 );
 
 const ReportChart = ({ type, data, title, useBrandColors = true }) => {
+  usePageTheme('admin'); // 设置页面类型为admin
   // 调试信息
   console.log('ReportChart props:', { type, data, title, useBrandColors });
   console.log('Chart components available:', { Bar, Line, Pie });

@@ -11,7 +11,8 @@ import {
   useMediaQuery,
   IconButton,
   Skeleton,
-  useTheme
+  useTheme,
+  Tooltip
 } from '@mui/material';
 import {
   SportsTennis as CourtsIcon,
@@ -32,9 +33,9 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme as useCustomTheme } from '../../context/ThemeContext';
 import MobileDrawer from './MobileDrawer';
 import ProfileMenu from './ProfileMenu';
-import { THEME } from '../../constants';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width:900px)');
   const theme = useTheme();
+  const customTheme = useCustomTheme();
 
   const username = currentUser?.username || '';
   const role = currentUser?.role || '';
@@ -93,10 +95,18 @@ function Navbar() {
   }, [location]);
 
   const navigateTo = useCallback((path, id) => {
-    navigate(path);
-    setActiveTab(id);
+    // 检查是否是私有页面（需要登录）
+    const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(id);
+    
+    if (!isLoggedIn && isPrivateItem) {
+      // 未登录用户点击私有页面时重定向到登录页面
+      navigate('/login');
+    } else {
+      navigate(path);
+      setActiveTab(id);
+    }
     setMobileOpen(false);
-  }, [navigate]);
+  }, [navigate, isLoggedIn]);
 
   const handleDrawerToggle = useCallback(() => {
     setMobileOpen(prev => !prev);
@@ -117,31 +127,52 @@ function Navbar() {
   }, []);
 
   const navItems = useMemo(() => {
-    const baseItems = [
+    // 未登录用户可以访问的页面
+    const publicItems = [
       { id: 'home', label: 'Home', icon: <HomeIcon />, path: '/' },
-      { id: 'book', label: 'Book', icon: <BookIcon />, path: '/book' },
+      { id: 'courts', label: 'Courts', icon: <CourtsIcon />, path: '/courts' },
       { id: 'events', label: 'Events', icon: <EventIcon />, path: '/events' },
       { id: 'friendly-matches', label: 'Friendly Match', icon: <Group />, path: '/friendly-matches' },
-      { id: 'courts', label: 'Courts', icon: <CourtsIcon />, path: '/courts' },
+    ];
+
+    // 需要登录才能访问的页面
+    const privateItems = [
+      { id: 'book', label: 'Book', icon: <BookIcon />, path: '/book' },
       { id: 'deals', label: 'Deals', icon: <DealsIcon />, path: '/deals' },
       { id: 'helpdesk', label: 'Help', icon: <HelpIcon />, path: '/helpdesk' },
       { id: 'coaching', label: 'Coaching', icon: <BookIcon />, path: '/coaching/browse' },
     ];
-    let items = [...baseItems];
-    if (isLoggedIn && (role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer')) {
-      items.splice(3, 0, {
-        id: 'create-event',
-        label: 'Create Event',
-        icon: <CreateEventIcon />,
-        path: '/events/create'
-      });
+
+    let items = [...publicItems];
+    
+    // 如果已登录，添加私有页面
+    if (isLoggedIn) {
+      items = [...items, ...privateItems];
+      
+      // 添加EventOrganizer特有的页面
+      if (role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer') {
+        items.splice(3, 0, {
+          id: 'create-event',
+          label: 'Create Event',
+          icon: <CreateEventIcon />,
+          path: '/events/create'
+        });
+      }
+      
+      // 添加Messages页面（非管理员）
+      if (role !== 'ADMIN') {
+        items.push({ id: 'messages', label: 'Messages', icon: <MailIcon />, path: '/messages' });
+      }
+      
+      // 添加管理员页面
+      if (role === 'ADMIN') {
+        items.push({ id: 'admin', label: 'Manage Requests', icon: <ManageRequestsIcon />, path: '/admin' });
+      }
+    } else {
+      // 未登录用户只显示公开页面
+      items = [...publicItems];
     }
-    if (isLoggedIn && role !== 'ADMIN') {
-      items.push({ id: 'messages', label: 'Messages', icon: <MailIcon />, path: '/messages' });
-    }
-    if (isLoggedIn && role === 'ADMIN') {
-      items.push({ id: 'admin', label: 'Manage Requests', icon: <ManageRequestsIcon />, path: '/admin' });
-    }
+    
     return items;
   }, [isLoggedIn, role, currentUser]);
 
@@ -154,45 +185,78 @@ function Navbar() {
 
   const renderNavItems = (items) => (
     <>
-      {items.map((item) => (
-        <Button
-          key={item.id}
-          startIcon={!isMobile && item.icon}
-          onClick={() => navigateTo(item.path, item.id)}
-          sx={{
-            mx: 1,
-            px: 2,
-            color: activeTab === item.id
-              ? (isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary)
-              : 'text.primary',
-            fontWeight: activeTab === item.id ? 'bold' : 'normal',
-            position: 'relative',
-            transition: 'color 0.2s ease, font-weight 0.2s ease',
-            '&:after': {
-              content: '""',
-              position: 'absolute',
-              bottom: '-10px',
-              left: 0,
-              right: 0,
-              height: activeTab === item.id ? '3px' : 0,
-              borderRadius: '3px',
-              backgroundColor: isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary,
-              transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)',
-              transition: 'height 0.3s ease, transform 0.3s ease',
-            },
-            '&:hover': {
-              color: isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary,
-              backgroundColor: 'transparent',
+      {items.map((item) => {
+        // 检查是否是私有页面（需要登录）
+        const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(item.id);
+        
+        const button = (
+          <Button
+            key={item.id}
+            startIcon={!isMobile && item.icon}
+            onClick={() => navigateTo(item.path, item.id)}
+            disabled={!isLoggedIn && isPrivateItem}
+            sx={{
+              mx: 1,
+              px: 2,
+              color: activeTab === item.id
+                ? theme.palette.primary.main
+                : theme.palette.text.primary,
+              fontWeight: activeTab === item.id ? 'bold' : 'normal',
+              position: 'relative',
+              transition: 'color 0.2s ease, font-weight 0.2s ease',
+              opacity: !isLoggedIn && isPrivateItem ? 0.6 : 1,
               '&:after': {
-                height: '2px',
-                backgroundColor: isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary
+                content: '""',
+                position: 'absolute',
+                bottom: '-10px',
+                left: 0,
+                right: 0,
+                height: activeTab === item.id ? '3px' : 0,
+                borderRadius: '3px',
+                backgroundColor: theme.palette.primary.main,
+                transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)',
+                transition: 'height 0.3s ease, transform 0.3s ease',
+              },
+              '&:hover': {
+                color: theme.palette.primary.main,
+                backgroundColor: 'transparent',
+                '&:after': {
+                  height: '2px',
+                  backgroundColor: theme.palette.primary.main
+                }
+              },
+              '&:disabled': {
+                color: theme.palette.text.disabled,
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                  '&:after': {
+                    height: '2px',
+                    backgroundColor: theme.palette.text.disabled
+                  }
+                }
               }
-            }
-          }}
-        >
-          {item.label}
-        </Button>
-      ))}
+            }}
+          >
+            {item.label}
+          </Button>
+        );
+
+        // 为未登录用户显示工具提示
+        if (!isLoggedIn && isPrivateItem) {
+          return (
+            <Tooltip 
+              key={item.id}
+              title="Login to access this feature" 
+              arrow
+              placement="bottom"
+            >
+              {button}
+            </Tooltip>
+          );
+        }
+
+        return button;
+      })}
     </>
   );
 
@@ -200,10 +264,7 @@ function Navbar() {
     return null;
   }
 
-  const {
-    gradients: { admin, primary: primaryGradient },
-    colors: { adminPrimary, primary, primaryHover }
-  } = THEME;
+
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
@@ -217,7 +278,7 @@ function Navbar() {
         boxShadow: theme.shadows[2],
         borderBottom: theme.palette.mode === 'dark' ? '1px solid #23262F' : '1px solid #e0e0e0',
         transition: 'background-color 0.3s, color 0.3s',
-        zIndex: (theme) => theme.zIndex.drawer + 1
+        zIndex: (muiTheme) => muiTheme.zIndex.drawer + 1
       }}
     >
       <Container maxWidth={false} sx={{ maxWidth: '1200px', width: '100%', mx: 'auto', px: { xs: 1, sm: 2, lg: 3 } }}>
@@ -246,19 +307,31 @@ function Navbar() {
                 cursor: 'pointer',
               }}
             >
-              <Typography
-                variant={isMobile ? "h5" : "h4"}
-                sx={{
-                  fontWeight: 'bold',
-                  background: isAdminRoute ? admin : primaryGradient,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: 1.5,
-                  fontFamily: '"Roboto Condensed", sans-serif'
-                }}
-              >
-                {isAdminRoute ? 'ADMIN PORTAL' : 'Picklefy'}
-              </Typography>
+              {isAdminRoute ? (
+                <Typography
+                  variant={isMobile ? "h5" : "h4"}
+                  sx={{
+                    fontWeight: 'bold',
+                    background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: 1.5,
+                    fontFamily: '"Roboto Condensed", sans-serif'
+                  }}
+                >
+                  ADMIN PORTAL
+                </Typography>
+              ) : (
+                <Box
+                  component="img"
+                  src={`${process.env.PUBLIC_URL}/web-name.png`}
+                  alt="Brand"
+                  sx={{
+                    height: isMobile ? 28 : 36,
+                    display: 'block'
+                  }}
+                />
+              )}
             </Box>
           </Box>
 
@@ -272,11 +345,11 @@ function Navbar() {
                       onClick={() => navigate('/login')}
                       sx={{
                         mx: 1,
-                        borderColor: primary,
-                        color: primary,
+                        borderColor: theme.palette.primary.main,
+                        color: theme.palette.primary.main,
                         '&:hover': {
-                          backgroundColor: '#f5eef8',
-                          borderColor: primaryHover
+                          backgroundColor: theme.palette.primary.light + '20',
+                          borderColor: theme.palette.primary.dark
                         }
                       }}
                     >
@@ -287,27 +360,15 @@ function Navbar() {
                       onClick={() => navigate('/register')}
                       sx={{
                         mx: 1,
-                        backgroundColor: primary,
-                        '&:hover': { backgroundColor: primaryHover }
+                        backgroundColor: theme.palette.primary.main,
+                        '&:hover': { backgroundColor: theme.palette.primary.dark }
                       }}
                     >
                       Register
                     </Button>
                   </>
                 )}
-                {!isMobile && (
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate('/admin/login')}
-                    sx={{
-                      mx: 1,
-                      backgroundColor: primary,
-                      '&:hover': { backgroundColor: primaryHover }
-                    }}
-                  >
-                    Admin Login
-                  </Button>
-                )}
+
               </>
             ) : (
               <Box
@@ -317,7 +378,7 @@ function Navbar() {
                   alignItems: 'center',
                   cursor: 'pointer',
                   '&:hover': {
-                    backgroundColor: '#f5f5f5',
+                    backgroundColor: theme.palette.action.hover,
                     borderRadius: '4px'
                   },
                   p: 1,
@@ -344,7 +405,7 @@ function Navbar() {
                     sx={{
                       width: 40,
                       height: 40,
-                      bgcolor: isAdminRoute ? '#667eea' : '#8e44ad',
+                      bgcolor: theme.palette.primary.main,
                       fontSize: '1.2rem',
                       fontWeight: 'bold'
                     }}
@@ -362,7 +423,7 @@ function Navbar() {
           </Box>
         </Toolbar>
 
-        <Divider sx={{ backgroundColor: '#e0e0e0', mb: 1 }} />
+        <Divider sx={{ backgroundColor: theme.palette.divider, mb: 1 }} />
 
         {!isMobile && (
           <Box sx={{

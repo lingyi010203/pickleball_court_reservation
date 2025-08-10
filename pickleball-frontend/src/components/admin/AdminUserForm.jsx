@@ -7,8 +7,10 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [formData, setFormData] = useState({
     name: '',

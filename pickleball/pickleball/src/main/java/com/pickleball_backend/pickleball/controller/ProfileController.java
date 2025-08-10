@@ -37,9 +37,22 @@ public class ProfileController {
 
     @GetMapping
     public ResponseEntity<ProfileDto> getProfile(Authentication authentication) {
+        logger.info("=== getProfile called ===");
+        logger.info("Authentication: {}", authentication);
+        logger.info("Authentication name: {}", authentication != null ? authentication.getName() : "null");
+        logger.info("Authentication authorities: {}", authentication != null ? authentication.getAuthorities() : "null");
+        
         String username = authentication.getName();
-        ProfileDto profile = profileService.getProfile(username);
-        return ResponseEntity.ok(profile);
+        logger.info("Username extracted: {}", username);
+        
+        try {
+            ProfileDto profile = profileService.getProfile(username);
+            logger.info("Profile retrieved successfully: {}", profile);
+            return ResponseEntity.ok(profile);
+        } catch (Exception e) {
+            logger.error("Error getting profile for username: {}", username, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PutMapping

@@ -4,7 +4,6 @@ import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,14 +14,12 @@ public class CourtPublicController {
     private CourtRepository courtRepository;
 
     @GetMapping("/api/courts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'EVENTORGANIZER', 'COACH')")
     public ResponseEntity<List<Court>> getAllCourtsForAllRoles() {
         List<Court> courts = courtRepository.findAll();
         return ResponseEntity.ok(courts);
     }
 
     @GetMapping("/api/courts/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'EVENTORGANIZER', 'COACH')")
     public ResponseEntity<Court> getCourtById(@PathVariable Integer id) {
         Court court = courtRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Court not found"));
@@ -30,7 +27,6 @@ public class CourtPublicController {
     }
 
     @GetMapping("/api/courts/booked")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'EVENTORGANIZER', 'COACH')")
     public ResponseEntity<List<Court>> getBookedCourts() {
         // TODO: Implement logic to get courts booked by current user
         List<Court> courts = courtRepository.findAll();
@@ -38,7 +34,6 @@ public class CourtPublicController {
     }
 
     @GetMapping("/api/courts/available")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'EVENTORGANIZER', 'COACH')")
     public ResponseEntity<List<Court>> getAvailableCourts(
             @RequestParam String date,
             @RequestParam String startTime,

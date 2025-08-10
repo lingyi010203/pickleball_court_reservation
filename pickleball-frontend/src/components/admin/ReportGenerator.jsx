@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import ReportChart from './ReportChart';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 // 配置
 const REPORT_CONFIG = {
@@ -46,6 +47,7 @@ const REPORT_CONFIG = {
 };
 
 const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
+  usePageTheme('admin'); // 设置页面类型为admin
   // State
   const [reportType, setReportType] = useState('revenue');
   const [exportFormat, setExportFormat] = useState('pdf');

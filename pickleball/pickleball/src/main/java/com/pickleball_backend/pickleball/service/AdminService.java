@@ -11,4 +11,5 @@ public interface AdminService {
     ProfileDto getProfileByUsername(String username);
     ProfileDto updateProfile(String username, ProfileDto dto);
     void changePassword(String username, String currentPassword, String newPassword);
+
 }

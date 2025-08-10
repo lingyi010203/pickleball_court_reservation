@@ -19,9 +19,11 @@ import UserService from '../../service/UserService';
 import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
 import { getStatusChip } from './statusConfig';
 import api from '../../service/api';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 
 const AdminManageCourts = () => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);

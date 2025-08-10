@@ -130,7 +130,7 @@ export default function BrowseClassPage() {
   const [coaches, setCoaches] = useState(mockCoaches); // 新增：存儲教練數據，初始值為 mock 數據
   const [loadingCoaches, setLoadingCoaches] = useState(false); // 新增：教練數據加載狀態
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, authToken } = useAuth();
 
   // 獲取教練數據
   useEffect(() => {
@@ -491,11 +491,19 @@ export default function BrowseClassPage() {
   };
 
   const handleBooking = (session) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     setSelectedSession(session);
     setBookingDialog(true);
   };
 
   const handleBookGroup = (group) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     // 直接跳轉到 payment 頁面，帶上 group 資料
     navigate('/payment', { state: { sessionGroup: group } });
   };
@@ -786,10 +794,16 @@ export default function BrowseClassPage() {
           </Box>
           <Button 
             variant="contained" 
-            onClick={() => handleBooking(session)}
+            onClick={() => {
+              if (!authToken) {
+                navigate('/login');
+              } else {
+                handleBooking(session);
+              }
+            }}
             sx={{ ml: 2 }}
           >
-            Book Now
+            {authToken ? 'Book Now' : 'Login to Book'}
           </Button>
         </Box>
       </CardContent>
@@ -805,7 +819,7 @@ export default function BrowseClassPage() {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="By Coach" />
-          <Tab label="All Available Sessions" />
+          {authToken && <Tab label="All Available Sessions" />}
         </Tabs>
       </Box>
 
@@ -917,8 +931,15 @@ export default function BrowseClassPage() {
                               </Button>
                               <Button 
                                 variant="contained" 
-                                onClick={() => handleBookGroup(group)}
+                                onClick={() => {
+                                  if (!authToken) {
+                                    navigate('/login');
+                                  } else {
+                                    handleBookGroup(group);
+                                  }
+                                }}
                                 disabled={(() => {
+                                  if (!authToken) return false;
                                   const currentUserId = parseInt(currentUser?.id);
                                   return group.some(sess => {
                                     if (!sess.registrations || sess.registrations.length === 0) {
@@ -932,6 +953,7 @@ export default function BrowseClassPage() {
                                 })()}
                               >
                                 {(() => {
+                                  if (!authToken) return 'Login to Book';
                                   const currentUserId = parseInt(currentUser?.id);
                                   const isBooked = group.some(sess => {
                                     if (!sess.registrations || sess.registrations.length === 0) {
@@ -1146,9 +1168,16 @@ export default function BrowseClassPage() {
                             <Button
                               variant="contained"
                               color="primary"
-                              onClick={() => isRecurring ? handleBookGroup(group) : handleBooking(first)}
+                              onClick={() => {
+                                if (!authToken) {
+                                  navigate('/login');
+                                } else {
+                                  isRecurring ? handleBookGroup(group) : handleBooking(first);
+                                }
+                              }}
                               fullWidth
                               disabled={(() => {
+                                if (!authToken) return false;
                                 const currentUserId = parseInt(currentUser?.id);
                                 // 檢查是否已預訂或課程已滿
                                 return group.some(sess => {
@@ -1162,6 +1191,7 @@ export default function BrowseClassPage() {
                               })()}
                             >
                               {(() => {
+                                if (!authToken) return 'Login to Book';
                                 const currentUserId = parseInt(currentUser?.id);
                                 const isBooked = group.some(sess => {
                                   return sess.registrations && sess.registrations.some(r => {

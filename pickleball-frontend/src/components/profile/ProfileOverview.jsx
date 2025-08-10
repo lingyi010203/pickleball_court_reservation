@@ -3,7 +3,7 @@ import { Box, Typography, Button, CircularProgress, Snackbar, Alert, alpha, useT
 import ProfileStats from './ProfileStats';
 import RecentBookings from './RecentBookings';
 import RecentInvoices from './RecentInvoices';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 import { getWalletBalance, initializeWallet, topUpWallet } from '../../service/WalletService';
 
@@ -19,9 +19,7 @@ const ProfileOverview = () => {
       try {
         const token = UserService.getToken();
         if (!token) return;
-        const response = await axios.get('http://localhost:8081/api/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/profile');
         setProfile(response.data);
       } catch {}
     };

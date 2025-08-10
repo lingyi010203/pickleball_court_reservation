@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, Grid, Typography, Link, IconButton, Divider } from '@mui/material';
+import { Box, Container, Grid, Typography, Link, IconButton, Divider, useTheme } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { 
   Facebook, 
@@ -8,28 +8,27 @@ import {
   LinkedIn, 
   Email, 
   Phone, 
-  LocationOn,
-  SportsTennis 
+  LocationOn
 } from '@mui/icons-material';
 import { THEME } from '../../constants';
 
 const Footer = () => {
+  const theme = useTheme();
   const socialLinks = [
-    { icon: <Facebook />, href: '#', label: 'Facebook' },
-    { icon: <Twitter />, href: '#', label: 'Twitter' },
-    { icon: <Instagram />, href: '#', label: 'Instagram' },
-    { icon: <LinkedIn />, href: '#', label: 'LinkedIn' }
+    { icon: <Facebook />, href: 'https://facebook.com/picklefy', label: 'Facebook' },
+    { icon: <Twitter />, href: 'https://twitter.com/picklefy', label: 'Twitter' },
+    { icon: <Instagram />, href: 'https://instagram.com/picklefy', label: 'Instagram' },
+    { icon: <LinkedIn />, href: 'https://linkedin.com/company/picklefy', label: 'LinkedIn' }
   ];
 
   const quickLinks = [
     { text: 'Home', path: '/' },
     { text: 'Find Courts', path: '/courts' },
-    { text: 'Tournaments', path: '/tournaments' },
-    { text: 'Community', path: '/community' }
+    { text: 'Events', path: '/events' }
   ];
 
   const supportLinks = [
-    { text: 'Help Center', path: '/help' },
+    { text: 'Help Center', path: '/helpdesk' },
     { text: 'About Us', path: '/about' },
     { text: 'Contact', path: '/contact' },
     { text: 'Privacy Policy', path: '/privacy' },
@@ -40,11 +39,14 @@ const Footer = () => {
     <Box
       component="footer"
       sx={{
-        background: `linear-gradient(135deg, ${THEME.colors.darkBg} 0%, #1a1a2e 100%)`,
-        color: 'white',
+        background: theme.palette.mode === 'dark' 
+          ? `linear-gradient(135deg, ${theme.palette.background.default} 0%, #1a1a2e 100%)`
+          : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, #f8f9fa 100%)`,
+        color: theme.palette.text.primary,
         mt: 'auto',
         position: 'relative',
         overflow: 'hidden',
+        borderTop: `1px solid ${theme.palette.divider}`,
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -52,7 +54,7 @@ const Footer = () => {
           left: 0,
           right: 0,
           height: '4px',
-          background: `linear-gradient(90deg, ${THEME.colors.primary}, ${THEME.colors.secondary || '#ff6b6b'})`,
+          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
         }
       }}
     >
@@ -64,31 +66,20 @@ const Footer = () => {
             <Grid item xs={12} md={6}>
               <Box sx={{ mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <SportsTennis 
-                    sx={{ 
-                      fontSize: 32, 
-                      color: THEME.colors.primary, 
-                      mr: 1 
-                    }} 
-                  />
-                  <Typography 
-                    variant="h5" 
-                    component="h2"
-                    sx={{ 
-                      fontWeight: 'bold',
-                      background: `linear-gradient(45deg, ${THEME.colors.primary}, white)`,
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent'
+                  <Box
+                    component="img"
+                    src={`${process.env.PUBLIC_URL}/web-name.png`}
+                    alt="Brand"
+                    sx={{
+                      height: 40,
+                      display: 'block'
                     }}
-                  >
-                    Picklefy
-                  </Typography>
+                  />
                 </Box>
                 <Typography 
                   variant="body1" 
                   sx={{ 
-                    color: THEME.colors.lightText || '#b0b0b0',
+                    color: theme.palette.text.secondary,
                     mb: 3,
                     lineHeight: 1.6
                   }}
@@ -104,17 +95,17 @@ const Footer = () => {
                       key={index}
                       href={social.href}
                       sx={{
-                        color: THEME.colors.lightText || '#b0b0b0',
-                        border: `1px solid ${THEME.colors.lightText || '#b0b0b0'}`,
+                        color: theme.palette.text.secondary,
+                        border: `1px solid ${theme.palette.text.secondary}`,
                         borderRadius: '50%',
                         width: 40,
                         height: 40,
                         transition: 'all 0.3s ease',
                         '&:hover': {
-                          color: THEME.colors.primary,
-                          borderColor: THEME.colors.primary,
+                          color: theme.palette.primary.main,
+                          borderColor: theme.palette.primary.main,
                           transform: 'translateY(-2px)',
-                          boxShadow: `0 4px 12px ${THEME.colors.primary}30`
+                          boxShadow: `0 4px 12px ${theme.palette.primary.main}30`
                         }
                       }}
                       aria-label={social.label}
@@ -135,7 +126,7 @@ const Footer = () => {
                     variant="h6" 
                     sx={{ 
                       mb: 2, 
-                      color: 'white',
+                      color: theme.palette.text.primary,
                       fontWeight: 'bold'
                     }}
                   >
@@ -148,12 +139,12 @@ const Footer = () => {
                         component={RouterLink}
                         to={link.path}
                         sx={{
-                          color: THEME.colors.lightText || '#b0b0b0',
+                          color: theme.palette.text.secondary,
                           textDecoration: 'none',
                           py: 0.5,
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            color: THEME.colors.primary,
+                            color: theme.palette.primary.main,
                             transform: 'translateX(5px)'
                           }
                         }}
@@ -170,7 +161,7 @@ const Footer = () => {
                     variant="h6" 
                     sx={{ 
                       mb: 2, 
-                      color: 'white',
+                      color: theme.palette.text.primary,
                       fontWeight: 'bold'
                     }}
                   >
@@ -183,12 +174,12 @@ const Footer = () => {
                         component={RouterLink}
                         to={link.path}
                         sx={{
-                          color: THEME.colors.lightText || '#b0b0b0',
+                          color: theme.palette.text.secondary,
                           textDecoration: 'none',
                           py: 0.5,
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            color: THEME.colors.primary,
+                            color: theme.palette.primary.main,
                             transform: 'translateX(5px)'
                           }
                         }}
@@ -205,7 +196,7 @@ const Footer = () => {
                     variant="h6" 
                     sx={{ 
                       mb: 2, 
-                      color: 'white',
+                      color: theme.palette.text.primary,
                       fontWeight: 'bold'
                     }}
                   >
@@ -213,27 +204,27 @@ const Footer = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: '50%',
-                          backgroundColor: `${THEME.colors.primary}20`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Email sx={{ color: THEME.colors.primary, fontSize: 20 }} />
-                      </Box>
-                      <Box>
-                        <Typography variant="body2" sx={{ color: THEME.colors.lightText || '#b0b0b0' }}>
-                          Email Us
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: 'white' }}>
-                          support@pickleball.com
-                        </Typography>
-                      </Box>
+                                              <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            backgroundColor: `${theme.palette.primary.main}20`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Email sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                            Email Us
+                          </Typography>
+                          <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
+                            support@pickleball.com
+                          </Typography>
+                        </Box>
                     </Box>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -242,19 +233,19 @@ const Footer = () => {
                           width: 40,
                           height: 40,
                           borderRadius: '50%',
-                          backgroundColor: `${THEME.colors.primary}20`,
+                          backgroundColor: `${theme.palette.primary.main}20`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
                       >
-                        <Phone sx={{ color: THEME.colors.primary, fontSize: 20 }} />
+                        <Phone sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
                       </Box>
                       <Box>
-                        <Typography variant="body2" sx={{ color: THEME.colors.lightText || '#b0b0b0' }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                           Call Us
                         </Typography>
-                        <Typography variant="body1" sx={{ color: 'white' }}>
+                        <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
                           +60 12-345 6789
                         </Typography>
                       </Box>
@@ -266,19 +257,19 @@ const Footer = () => {
                           width: 40,
                           height: 40,
                           borderRadius: '50%',
-                          backgroundColor: `${THEME.colors.primary}20`,
+                          backgroundColor: `${theme.palette.primary.main}20`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
                       >
-                        <LocationOn sx={{ color: THEME.colors.primary, fontSize: 20 }} />
+                        <LocationOn sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
                       </Box>
                       <Box>
-                        <Typography variant="body2" sx={{ color: THEME.colors.lightText || '#b0b0b0' }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                           Visit Us
                         </Typography>
-                        <Typography variant="body1" sx={{ color: 'white' }}>
+                        <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
                           Kuala Lumpur, Malaysia
                         </Typography>
                       </Box>
@@ -291,7 +282,7 @@ const Footer = () => {
         </Box>
 
         {/* 底部分隔线和版权信息 */}
-        <Divider sx={{ borderColor: `${THEME.colors.primary}30` }} />
+        <Divider sx={{ borderColor: `${theme.palette.primary.main}30` }} />
         
         <Box 
           sx={{ 
@@ -306,7 +297,7 @@ const Footer = () => {
           <Typography 
             variant="body2" 
             sx={{ 
-              color: THEME.colors.lightText || '#b0b0b0',
+              color: theme.palette.text.secondary,
               textAlign: { xs: 'center', sm: 'left' }
             }}
           >
@@ -321,28 +312,16 @@ const Footer = () => {
               justifyContent: { xs: 'center', sm: 'flex-end' }
             }}
           >
-            <Link
-              component={RouterLink}
-              to="/sitemap"
-              sx={{
-                color: THEME.colors.lightText || '#b0b0b0',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-                transition: 'color 0.3s ease',
-                '&:hover': { color: THEME.colors.primary }
-              }}
-            >
-              Sitemap
-            </Link>
+            {/* sitemap link removed */}
             <Link
               component={RouterLink}
               to="/cookies"
               sx={{
-                color: THEME.colors.lightText || '#b0b0b0',
+                color: theme.palette.text.secondary,
                 textDecoration: 'none',
                 fontSize: '0.875rem',
                 transition: 'color 0.3s ease',
-                '&:hover': { color: THEME.colors.primary }
+                '&:hover': { color: theme.palette.primary.main }
               }}
             >
               Cookies Policy
@@ -351,11 +330,11 @@ const Footer = () => {
               component={RouterLink}
               to="/accessibility"
               sx={{
-                color: THEME.colors.lightText || '#b0b0b0',
+                color: theme.palette.text.secondary,
                 textDecoration: 'none',
                 fontSize: '0.875rem',
                 transition: 'color 0.3s ease',
-                '&:hover': { color: THEME.colors.primary }
+                '&:hover': { color: theme.palette.primary.main }
               }}
             >
               Accessibility

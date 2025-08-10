@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react';
 import { 
   Box, Typography, Divider, List, ListItem, ListItemIcon, 
-  ListItemText, Button, Avatar, Drawer 
+  ListItemText, Button, Avatar, Drawer, Tooltip
 } from '@mui/material';
 import { ExitToApp as LogoutIcon } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-import { THEME } from '../../constants';
+import { useTheme } from '@mui/material';
 
 const MobileDrawer = ({
   isAdminRoute,
@@ -22,15 +22,19 @@ const MobileDrawer = ({
   mobileOpen,
   handleDrawerToggle
 }) => {
+  const theme = useTheme();
   const handleItemClick = useCallback((path, id) => {
-    navigateTo(path, id);
+    // 检查是否是私有页面（需要登录）
+    const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(id);
+    
+    if (!isLoggedIn && isPrivateItem) {
+      // 未登录用户点击私有页面时重定向到登录页面
+      navigate('/login');
+    } else {
+      navigateTo(path, id);
+    }
     handleDrawerToggle();
-  }, [navigateTo, handleDrawerToggle]);
-
-  const { 
-    gradients: { admin, primary: primaryGradient },
-    colors: { adminPrimary, primary, primaryHover, logout, logoutHover, text } 
-  } = THEME;
+  }, [navigateTo, handleDrawerToggle, isLoggedIn, navigate]);
 
   return (
     <Drawer
@@ -46,9 +50,7 @@ const MobileDrawer = ({
             variant="h5"
             sx={{
               fontWeight: 'bold',
-              background: isAdminRoute 
-                ? THEME.gradients.admin 
-                : THEME.gradients.primary,
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               fontFamily: '"Roboto Condensed", sans-serif'
@@ -59,30 +61,52 @@ const MobileDrawer = ({
         </Box>
         <Divider />
         <List>
-          {(isAdminRoute ? adminNavItems : navItems).map((item) => (
-            <ListItem 
-              key={item.id}
-              onClick={() => handleItemClick(item.path, item.id)}
-              onKeyPress={(e) => { if (e.key === 'Enter') handleItemClick(item.path, item.id); }}
-              tabIndex={0}
-              sx={{
-                py: 1.5,
-                color: activeTab === item.id 
-                  ? (isAdminRoute ? THEME.colors.adminPrimary : THEME.colors.primary) 
-                  : THEME.colors.text,
-                fontWeight: activeTab === item.id ? 'bold' : 'normal',
-                cursor: 'pointer',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                }
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItem>
-          ))}
+          {(isAdminRoute ? adminNavItems : navItems).map((item) => {
+            // 检查是否是私有页面（需要登录）
+            const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(item.id);
+            
+            const listItem = (
+              <ListItem 
+                key={item.id}
+                onClick={() => handleItemClick(item.path, item.id)}
+                onKeyPress={(e) => { if (e.key === 'Enter') handleItemClick(item.path, item.id); }}
+                tabIndex={0}
+                sx={{
+                  py: 1.5,
+                  color: activeTab === item.id 
+                    ? theme.palette.primary.main
+                    : theme.palette.text.primary,
+                  fontWeight: activeTab === item.id ? 'bold' : 'normal',
+                  cursor: !isLoggedIn && isPrivateItem ? 'not-allowed' : 'pointer',
+                  opacity: !isLoggedIn && isPrivateItem ? 0.6 : 1,
+                  '&:hover': {
+                    backgroundColor: !isLoggedIn && isPrivateItem ? 'transparent' : theme.palette.action.hover
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.label} />
+              </ListItem>
+            );
+
+            // 为未登录用户显示工具提示
+            if (!isLoggedIn && isPrivateItem) {
+              return (
+                <Tooltip 
+                  key={item.id}
+                  title="Login to access this feature" 
+                  arrow
+                  placement="right"
+                >
+                  {listItem}
+                </Tooltip>
+              );
+            }
+
+            return listItem;
+          })}
         </List>
         <Divider />
         {isLoggedIn ? (
@@ -93,7 +117,7 @@ const MobileDrawer = ({
                 sx={{
                   width: 40,
                   height: 40,
-                  bgcolor: isAdminRoute ? adminPrimary : primary,
+                  bgcolor: theme.palette.primary.main,
                   fontSize: '1.2rem',
                   fontWeight: 'bold',
                   mr: 2
@@ -111,11 +135,11 @@ const MobileDrawer = ({
               startIcon={<LogoutIcon />}
               onClick={handleLogout}
               sx={{
-                borderColor: logout,
-                color: logout,
+                borderColor: theme.palette.error.main,
+                color: theme.palette.error.main,
                 '&:hover': {
-                  backgroundColor: '#fdeded',
-                  borderColor: logoutHover
+                  backgroundColor: theme.palette.error.light + '20',
+                  borderColor: theme.palette.error.dark
                 }
               }}
             >
@@ -129,11 +153,11 @@ const MobileDrawer = ({
               fullWidth
               onClick={() => navigate('/login')}
               sx={{
-                borderColor: primary,
-                color: primary,
+                borderColor: theme.palette.primary.main,
+                color: theme.palette.primary.main,
                 '&:hover': {
-                  backgroundColor: '#f5eef8',
-                  borderColor: primaryHover
+                  backgroundColor: theme.palette.primary.light + '20',
+                  borderColor: theme.palette.primary.dark
                 }
               }}
             >
@@ -144,23 +168,13 @@ const MobileDrawer = ({
               fullWidth
               onClick={() => navigate('/register')}
               sx={{
-                backgroundColor: primary,
-                '&:hover': { backgroundColor: primaryHover }
+                backgroundColor: theme.palette.primary.main,
+                '&:hover': { backgroundColor: theme.palette.primary.dark }
               }}
             >
               Register
             </Button>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={() => navigate('/admin/login')}
-              sx={{
-                backgroundColor: primary,
-                '&:hover': { backgroundColor: primaryHover }
-              }}
-            >
-              Admin Login
-            </Button>
+
           </Box>
         )}
       </Box>

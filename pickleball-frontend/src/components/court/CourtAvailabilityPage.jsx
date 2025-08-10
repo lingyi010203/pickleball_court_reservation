@@ -15,10 +15,12 @@ import {
 import CourtCard from './CourtCard';
 import CourtService from '../../service/CourtService';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const CourtAvailabilityPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { authToken } = useAuth();
   const [selectedDate, setSelectedDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -58,7 +60,13 @@ const CourtAvailabilityPage = () => {
   };
 
   const handleBookNow = (courtId) => {
-    navigate(`/booking/${courtId}`);
+    if (!authToken) {
+      // 未登录用户重定向到登录页面
+      navigate('/login');
+    } else {
+      // 已登录用户直接跳转到预订页面
+      navigate(`/booking/${courtId}`);
+    }
   };
 
   const formatDate = (dateString) => {

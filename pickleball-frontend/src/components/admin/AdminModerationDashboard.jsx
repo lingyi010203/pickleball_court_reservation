@@ -59,8 +59,10 @@ import {
 } from '@mui/icons-material';
 import api from '../../service/api';
 import UserService from '../../service/UserService';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const AdminModerationDashboard = () => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -4,8 +4,6 @@ import {
   Box,
   Container,
   Link,
-  FormControlLabel,
-  Checkbox,
   Typography,
   Button,
   Paper,
@@ -13,36 +11,23 @@ import {
   IconButton,
   Alert,
   Divider,
-  Chip,
-  Card,
-  CardContent,
   Fade,
   Slide,
-  CircularProgress,
-  Stack,
-  Avatar
+  CircularProgress
 } from '@mui/material';
 import {
   Visibility,
   VisibilityOff,
   Person,
   Lock,
-  Email,
-  SportsTennis,
-  Login as LoginIcon,
-  ArrowForward,
-  Security,
-  CheckCircle,
-  Google,
-  Facebook,
-  Apple
+  Email
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../service/api';
 import UserService from '../service/UserService';
 import Navbar from '../components/common/Navbar';
 import { useAuth } from '../context/AuthContext';
-import { useTheme, alpha } from '@mui/material';
+import { useTheme } from '@mui/material';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -68,31 +53,54 @@ const LoginPage = () => {
     if (error) setError('');
   };
 
-  // Update handleLogin function with coach routing logic:
+  // Update handleLogin function with coach and admin routing logic:
   const handleLogin = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      const response = await axios.post('http://localhost:8081/api/auth/login', {
-        usernameOrEmail: credentials.usernameOrEmail,
-        password: credentials.password
-      });
-      
-      if (response.data.token) {
-        // 用 context 的 login 方法同步状态
-        login(response.data.token);
-        // 解析 userType
-        const payload = JSON.parse(atob(response.data.token.split('.')[1]));
-        const userType = payload.userType || payload.role || '';
-        if (userType === 'Coach' || userType === 'COACH') {
-          navigate('/coaching');
-        } else {
-          navigate('/home');
+      // First try regular user login
+      try {
+        const response = await api.post('/auth/login', {
+          usernameOrEmail: credentials.usernameOrEmail,
+          password: credentials.password
+        });
+        
+        if (response.data.token) {
+          // 用 context 的 login 方法同步状态
+          login(response.data.token);
+          // 解析 userType
+          const payload = JSON.parse(atob(response.data.token.split('.')[1]));
+          const userType = payload.userType || payload.role || '';
+          if (userType === 'Coach' || userType === 'COACH') {
+            navigate('/coaching');
+          } else {
+            navigate('/home');
+          }
+          return;
+        }
+      } catch (userErr) {
+        // If user login fails, try admin login
+        try {
+          const adminResponse = await api.post('/admin/login', {
+            username: credentials.usernameOrEmail,
+            password: credentials.password
+          });
+          
+          if (adminResponse.data.token) {
+            // Store admin credentials using UserService
+            UserService.adminLogin(adminResponse.data.token, credentials.usernameOrEmail);
+            navigate('/admin/dashboard');
+            return;
+          }
+        } catch (adminErr) {
+          // Both user and admin login failed
+          setError('Invalid credentials. Please try again.');
+          console.error('Login error:', userErr, adminErr);
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+      setError('Login failed. Please try again.');
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);
@@ -109,302 +117,221 @@ const LoginPage = () => {
     setShowPassword(!showPassword);
   };
 
-  const SocialLoginButton = ({ icon: Icon, provider, color }) => (
-    <Button
-      variant="outlined"
-      fullWidth
-      startIcon={<Icon />}
-      sx={{
-        py: 1.5,
-        borderColor: theme.palette.divider,
-        color: theme.palette.text.primary,
-        '&:hover': {
-          borderColor: color,
-          backgroundColor: `${color}10`,
-          transform: 'translateY(-1px)',
-        },
-        transition: 'all 0.3s ease',
-        borderRadius: 2,
-        textTransform: 'none',
-        fontWeight: 500
-      }}
-    >
-      Continue with {provider}
-    </Button>
-  );
 
-  const FeatureCard = ({ icon: Icon, title, description }) => (
-    <Card 
-      elevation={0} 
-      sx={{ 
-        backgroundColor: alpha(theme.palette.background.paper, 0.85),
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: 3,
-        p: 2,
-        height: '100%',
-        transition: 'transform 0.3s ease',
-        '&:hover': {
-          transform: 'translateY(-4px)'
-        }
-      }}
-    >
-      <CardContent sx={{ textAlign: 'center', color: theme.palette.text.primary }}>
-        <Box sx={{
-          width: 60,
-          height: 60,
-          borderRadius: '50%',
-          backgroundColor: theme.palette.primary.light,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          mb: 2
-        }}>
-          <Icon sx={{ fontSize: 30, color: theme.palette.primary.main }} />
-        </Box>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          {title}
-        </Typography>
-        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-          {description}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f5f5f9 0%, #e8eaf6 100%)',
+      fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
+      position: 'relative',
+      overflow: 'hidden',
+      py: 4,
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <Navbar />
       
       <Box sx={{ 
         flexGrow: 1, 
         display: 'flex', 
         alignItems: 'center', 
+        justifyContent: 'center',
         py: 4,
         pt: { xs: 10, sm: 12 },
-        backgroundColor: theme.palette.background.default,
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Removed decorative background circles for clarity and theme consistency */}
 
-        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+
+        <Container maxWidth="lg" sx={{ py: 4, position: 'relative', zIndex: 1 }}>
           <Slide direction="up" in={true} mountOnEnter unmountOnExit>
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 4, alignItems: 'center', pt: 10 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', lg: 'row' }, 
+              gap: 4, 
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               
-              {/* Left Side - Welcome Content */}
-              <Box sx={{ 
-                flex: 1, 
-                color: theme.palette.text.primary,
-                textAlign: { xs: 'center', lg: 'left' },
-                mb: { xs: 4, lg: 0 }
-              }}>
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h2" sx={{ 
-                    fontWeight: 800, 
-                    mb: 2,
-                    color: theme.palette.primary.main,
-                    fontSize: { xs: '2.5rem', md: '3.5rem' }
-                  }}>
-                    Welcome Back!
-                  </Typography>
-                  <Typography variant="h5" sx={{ 
-                    opacity: 0.9, 
-                    fontWeight: 400,
-                    mb: 4
-                  }}>
-                    Continue your pickleball journey with us
-                  </Typography>
-                  
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 4 }}>
-                    <Chip 
-                      icon={<CheckCircle />} 
-                      label="Trusted by 10,000+ players" 
-                      sx={{ 
-                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                        color: theme.palette.primary.main,
-                        fontWeight: 500
-                      }} 
-                    />
-                    <Chip 
-                      icon={<Security />} 
-                      label="Secure & Safe" 
-                      sx={{ 
-                        backgroundColor: alpha(theme.palette.success.main, 0.12),
-                        color: theme.palette.success.main,
-                        fontWeight: 500
-                      }} 
-                    />
-                  </Stack>
-                </Box>
-
-                {/* Feature Cards */}
-                <Box sx={{ 
-                  display: { xs: 'none', lg: 'grid' },
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 2,
-                  mt: 4
-                }}>
-                  <FeatureCard 
-                    icon={SportsTennis}
-                    title="Book Courts"
-                    description="Reserve your favorite courts instantly"
-                  />
-                  <FeatureCard 
-                    icon={Person}
-                    title="Find Partners"
-                    description="Connect with players at your level"
-                  />
-                </Box>
-              </Box>
-
-              {/* Right Side - Login Form */}
+              {/* Left Side - Login Form */}
               <Box sx={{ 
                 flex: { xs: 'none', lg: 1 }, 
                 width: { xs: '100%', sm: '400px', lg: '450px' },
-                maxWidth: '450px'
+                maxWidth: '450px',
+                order: { xs: 2, lg: 1 }
               }}>
                 <Fade in={true} timeout={800}>
                   <Paper
-                    elevation={4}
+                    elevation={24}
                     sx={{
                       p: 4,
-                      pt: 6,
-                      borderRadius: 4,
-                      backgroundColor: theme.palette.background.paper,
-                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: '24px',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
                       position: 'relative',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                     }}
                   >
-                    {/* Header */}
-                    <Box sx={{ textAlign: 'center', mb: 4 }}>
+                    {/* Background Mascot with Low Opacity */}
+                    <Box
+                      component="img"
+                      src={`${process.env.PUBLIC_URL}/mascot_lowopacity.png`}
+                      alt="Background Mascot"
+                      sx={{
+                        position: 'absolute',
+                        top: '60%',
+                        right: '-20px',
+                        transform: 'translateY(-50%)',
+                        width: '500px',
+                        height: 'auto',
+                        opacity: 0.35,
+                        zIndex: 0,
+                        pointerEvents: 'none'
+                      }}
+                    />
                     
-                      <Typography variant="h4" sx={{ 
-                        fontWeight: 700, 
-                        color: theme.palette.text.primary,
-                        mb: 1
-                      }}>
-                        Sign In
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">
-                        Enter your credentials to access your account
-                      </Typography>
+                    {/* Header */}
+                    <Box sx={{ textAlign: 'center', mb: 4, position: 'relative', zIndex: 1 }}>
+                      <Box
+                        component="img"
+                        src={`${process.env.PUBLIC_URL}/web-name.png`}
+                        alt="Brand"
+                        sx={{
+                          height: 40,
+                          display: 'block',
+                          margin: '0 auto',
+                          mb: 1
+                        }}
+                      />
+                                              <Typography variant="h4" sx={{ 
+                          fontWeight: 700, 
+                          color: theme.palette.text.primary,
+                          mb: 1
+                        }}>
+                          User Login
+                        </Typography>
                     </Box>
               
                     {/* Login Form */}
-                    <Box component="form" onKeyPress={handleKeyPress}>
-                      <TextField
-                        margin="normal"
-                        required
-                        fullWidth
-                        label="Username or Email"
-                        name="usernameOrEmail"
-                        value={credentials.usernameOrEmail}
-                        onChange={handleChange}
-                        onFocus={() => setFocusedField('usernameOrEmail')}
-                        onBlur={() => setFocusedField('')}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              {credentials.usernameOrEmail.includes('@') ? 
-                                <Email color={focusedField === 'usernameOrEmail' ? 'primary' : 'action'} /> :
-                                <Person color={focusedField === 'usernameOrEmail' ? 'primary' : 'action'} />
+                    <Box component="form" onKeyPress={handleKeyPress} sx={{ position: 'relative', zIndex: 1 }}>
+                      <Box sx={{ mb: 3 }}>
+                        <Typography component="label" sx={{ 
+                          fontWeight: 600,
+                          color: theme.palette.text.primary,
+                          fontSize: '0.95rem',
+                          mb: 1,
+                          display: 'block'
+                        }}>
+                          Email or Username
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          variant="outlined"
+                          placeholder="username@gmail.com"
+                          name="usernameOrEmail"
+                          value={credentials.usernameOrEmail}
+                          onChange={handleChange}
+                          onFocus={() => setFocusedField('usernameOrEmail')}
+                          onBlur={() => setFocusedField('')}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                {credentials.usernameOrEmail.includes('@') ? 
+                                  <Email sx={{ color: focusedField === 'usernameOrEmail' ? theme.palette.primary.main : theme.palette.text.secondary }} /> :
+                                  <Person sx={{ color: focusedField === 'usernameOrEmail' ? theme.palette.primary.main : theme.palette.text.secondary }} />
+                                }
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ 
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '12px',
+                              backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.default : '#f9fafb',
+                              '&:focus-within': {
+                                backgroundColor: theme.palette.background.paper,
+                                boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
                               }
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ 
-                          mb: 2,
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-1px)',
-                              boxShadow: theme.shadows[4]
                             }
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                      </Box>
 
-                      <TextField
-                        margin="normal"
-                        required
-                        fullWidth
-                        name="password"
-                        label="Password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={credentials.password}
-                        onChange={handleChange}
-                        onFocus={() => setFocusedField('password')}
-                        onBlur={() => setFocusedField('')}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <Lock color={focusedField === 'password' ? 'primary' : 'action'} />
-                            </InputAdornment>
-                          ),
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle password visibility"
-                                onClick={togglePasswordVisibility}
-                                edge="end"
-                              >
-                                {showPassword ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ 
-                          mb: 2,
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-1px)',
-                              boxShadow: theme.shadows[4]
+                      <Box sx={{ mb: 3 }}>
+                        <Typography component="label" sx={{ 
+                          fontWeight: 600,
+                          color: theme.palette.text.primary,
+                          fontSize: '0.95rem',
+                          mb: 1,
+                          display: 'block'
+                        }}>
+                          Password
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          variant="outlined"
+                          placeholder="Password"
+                          type={showPassword ? 'text' : 'password'}
+                          name="password"
+                          value={credentials.password}
+                          onChange={handleChange}
+                          onFocus={() => setFocusedField('password')}
+                          onBlur={() => setFocusedField('')}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Lock sx={{ color: focusedField === 'password' ? theme.palette.primary.main : theme.palette.text.secondary }} />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  aria-label="toggle password visibility"
+                                  onClick={togglePasswordVisibility}
+                                  edge="end"
+                                >
+                                  {showPassword ? <Visibility /> : <VisibilityOff />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ 
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '12px',
+                              backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.default : '#f9fafb',
+                              '&:focus-within': {
+                                backgroundColor: theme.palette.background.paper,
+                                boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                              }
                             }
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                      </Box>
 
                       <Box sx={{ 
                         display: 'flex', 
-                        justifyContent: 'space-between',
+                        justifyContent: 'flex-end',
                         alignItems: 'center',
                         mb: 3
                       }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={credentials.rememberMe}
-                              onChange={handleChange}
-                              name="rememberMe"
-                              color="primary"
-                            />
-                          }
-                          label={
-                            <Typography variant="body2" fontWeight={500}>
-                              Remember Me
-                            </Typography>
-                          }
-                        />
                         <Link
                           component="button"
                           type="button"
                           variant="body2"
                           sx={{ 
                             color: theme.palette.primary.main, 
-                            fontWeight: 600,
+                            fontWeight: 500,
                             textDecoration: 'none',
+                            fontSize: '0.9rem',
                             '&:hover': {
                               textDecoration: 'underline'
                             }
                           }}
                           onClick={() => navigate('/forgot-password')}
                         >
-                          Forgot password?
+                          Forgot Password?
                         </Link>
                       </Box>
 
@@ -430,35 +357,39 @@ const LoginPage = () => {
                         variant="contained"
                         onClick={handleLogin}
                         disabled={isLoading}
-                        endIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <ArrowForward />}
                         sx={{
-                          mt: 1,
-                          mb: 3,
-                          py: 1.8,
+                          py: 1.5,
                           fontSize: '1rem',
-                          fontWeight: 700,
-                          borderRadius: 2,
+                          fontWeight: 600,
+                          borderRadius: '12px',
                           textTransform: 'none',
                           backgroundColor: theme.palette.primary.main,
-                          boxShadow: theme.shadows[8],
+                          color: theme.palette.primary.contrastText,
+                          boxShadow: `0 4px 14px ${theme.palette.primary.main}40`,
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            transform: 'translateY(-2px)',
-                            boxShadow: theme.shadows[12],
                             backgroundColor: theme.palette.primary.dark,
+                            boxShadow: `0 6px 20px ${theme.palette.primary.main}60`,
+                            transform: 'translateY(-1px)'
                           },
                           '&:disabled': {
-                            transform: 'none',
-                            boxShadow: theme.shadows[4]
+                            backgroundColor: theme.palette.action.disabledBackground,
+                            transform: 'none'
                           }
                         }}
                       >
-                        {isLoading ? 'Signing In...' : 'Sign In'}
+                        {isLoading ? (
+                          <CircularProgress size={24} sx={{ color: 'white' }} />
+                        ) : (
+                          'Sign in'
+                        )}
                       </Button>
 
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Don't have an account?{' '}
+
+
+                      <Box sx={{ textAlign: 'center', mt: 3 }}>
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                          Don't have an account yet?{' '}
                           <Link 
                             component="button"
                             type="button"
@@ -466,14 +397,14 @@ const LoginPage = () => {
                             onClick={() => navigate('/register')}
                             sx={{ 
                               color: theme.palette.primary.main, 
-                              fontWeight: 700,
+                              fontWeight: 600,
                               textDecoration: 'none',
                               '&:hover': {
                                 textDecoration: 'underline'
                               }
                             }}
                           >
-                            Create Account
+                            Register for free
                           </Link>
                         </Typography>
                       </Box>
@@ -503,6 +434,27 @@ const LoginPage = () => {
                     </Box>
                   </Paper>
                 </Fade>
+              </Box>
+
+              {/* Right Side - Mascot */}
+              <Box sx={{ 
+                flex: 1,
+                display: { xs: 'none', lg: 'flex' },
+                justifyContent: 'center',
+                alignItems: 'center',
+                order: { xs: 1, lg: 2 }
+              }}>
+                <Box
+                  component="img"
+                  src={`${process.env.PUBLIC_URL}/mascot.png`}
+                  alt="Pickleball Mascot"
+                  sx={{
+                    maxWidth: '100%',
+                    height: 'auto',
+                    maxHeight: '600px',
+                    filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1))'
+                  }}
+                />
               </Box>
             </Box>
           </Slide>

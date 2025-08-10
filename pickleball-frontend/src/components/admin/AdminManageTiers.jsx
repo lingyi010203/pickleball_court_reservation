@@ -21,8 +21,10 @@ import axios from 'axios';
 import UserService from '../../service/UserService';
 import { getStatusChip } from './statusConfig';
 import { formatDateToDDMMYYYY, formatDateForHTMLInput, formatDateFromHTMLInput } from '../../utils/dateUtils';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const AdminManageTiers = () => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [tiers, setTiers] = useState([]);

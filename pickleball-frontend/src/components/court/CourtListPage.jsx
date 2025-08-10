@@ -93,7 +93,13 @@ const CourtListPage = () => {
   const uniqueLocations = [...new Set(courts.map(court => court.location))];
 
   const handleBookNow = (courtId) => {
-    navigate(`/booking/${courtId}`);
+    if (!authToken) {
+      // 未登录用户重定向到登录页面
+      navigate('/login');
+    } else {
+      // 已登录用户直接跳转到预订页面
+      navigate(`/booking/${courtId}`);
+    }
   };
 
   return (

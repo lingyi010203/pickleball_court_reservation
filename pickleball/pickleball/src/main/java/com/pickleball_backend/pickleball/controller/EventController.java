@@ -85,7 +85,7 @@ public class EventController {
     public ResponseEntity<Page<Event>> browseEvents(
             @ModelAttribute EventFilterDto filterDto,
             Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.browseEvents(filterDto, username);
         return ResponseEntity.ok(events);
     }
@@ -98,7 +98,7 @@ public class EventController {
     public ResponseEntity<EventDetailDto> getEventDetails(
             @PathVariable Integer id,
             Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         EventDetailDto eventDetails = eventService.getEventDetails(id, username);
         return ResponseEntity.ok(eventDetails);
     }
@@ -111,7 +111,7 @@ public class EventController {
             Principal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "9") int size) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.getUpcomingEvents(username, page, size);
         return ResponseEntity.ok(events);
     }
@@ -123,7 +123,7 @@ public class EventController {
     public ResponseEntity<Page<Event>> getEventsByType(
             @PathVariable String eventType,
             Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.getEventsByType(eventType, username);
         return ResponseEntity.ok(events);
     }
@@ -133,7 +133,7 @@ public class EventController {
      */
     @GetMapping("/friendly-matches")
     public ResponseEntity<Page<Event>> getFriendlyMatches(Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.getEventsByType("friendly match", username);
         return ResponseEntity.ok(events);
     }
@@ -143,7 +143,7 @@ public class EventController {
      */
     @GetMapping("/tournaments")
     public ResponseEntity<Page<Event>> getTournaments(Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.getEventsByType("tournament", username);
         return ResponseEntity.ok(events);
     }
@@ -153,7 +153,7 @@ public class EventController {
      */
     @GetMapping("/leagues")
     public ResponseEntity<Page<Event>> getLeagues(Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         Page<Event> events = eventService.getEventsByType("league", username);
         return ResponseEntity.ok(events);
     }
@@ -172,7 +172,7 @@ public class EventController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Object> getEventStats(Principal principal) {
-        String username = principal.getName();
+        String username = principal != null ? principal.getName() : null;
         
         // Get counts for different event types
         Page<Event> tournaments = eventService.getEventsByType("tournament", username);

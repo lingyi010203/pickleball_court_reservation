@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const roleOptions = [
   { value: 'User', label: 'User' },
@@ -11,6 +12,7 @@ const roleOptions = [
 ];
 
 const AdminInviteForm = ({ open, onClose, onSuccess }) => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('User');
   const [loading, setLoading] = useState(false);

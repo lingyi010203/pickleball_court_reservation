@@ -54,9 +54,11 @@ import ConfirmationDialog from './ConfirmationDialog';
 import AdminInviteForm from './AdminInviteForm';
 import { useTheme, alpha } from '@mui/material/styles';
 import { getStatusChip } from './statusConfig';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 const AdminManageUsers = () => {
   const navigate = useNavigate();
+  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -598,7 +600,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
       if (err.response?.status === 401) {
         UserService.logout();
-        window.location.href = '/admin/login';
+        window.location.href = '/login';
       } else if (err.response?.status === 403) {
         setError('You do not have permission to access this page');
       } else {

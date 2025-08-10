@@ -4,9 +4,11 @@ import { Card, CardMedia, CardContent, CardActions, Typography, Button, Chip, Bo
 import { useNavigate } from 'react-router-dom';
 import { getCourtImagesPublic } from '../../service/CourtService';
 import ThemedCard from '../common/ThemedCard';
+import { useAuth } from '../../context/AuthContext';
 
 const CourtCard = ({ court }) => {
   const navigate = useNavigate();
+  const { authToken } = useAuth();
   const [imageUrl, setImageUrl] = useState(null);
 
   useEffect(() => {
@@ -28,7 +30,13 @@ const CourtCard = ({ court }) => {
   };
   
   const handleBookNow = () => {
-    navigate(`/booking/${court.id}`);
+    if (!authToken) {
+      // 未登录用户重定向到登录页面
+      navigate('/login');
+    } else {
+      // 已登录用户直接跳转到预订页面
+      navigate(`/booking/${court.id}`);
+    }
   };
 
   return (

@@ -3,12 +3,19 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
+import CookiesPage from './pages/CookiesPage';
+import AccessibilityPage from './pages/AccessibilityPage';
+
 import ProfilePage from './components/profile/ProfilePage';
 import RewardsPage from './components/profile/RewardsPage';
 import FeedbackPage from './components/feedback/FeedbackPage';
 import MyFeedbackPage from './components/feedback/MyFeedbackPage';
 
-import AdminLogin from './components/admin/AdminLogin';
+
 import AdminDashboard from './components/admin/AdminDashboard';
 import MainLayout from './components/layout/MainLayout';
 import UserService from './service/UserService';
@@ -51,13 +58,14 @@ import ProfileOverview from './components/profile/ProfileOverview';
 import EditProfileForm from './components/profile/EditProfileForm';
 import AdminModerationDashboard from './components/admin/AdminModerationDashboard';
 
+
 const ProtectedRoute = ({ children }) => {
   const { authToken } = useAuth();
   return authToken ? children : <Navigate to="/login" replace />;
 };
 
 const AdminProtectedRoute = ({ children }) => {
-  return UserService.isAdminLoggedIn() ? children : <Navigate to="/admin/login" replace />;
+  return UserService.isAdminLoggedIn() ? children : <Navigate to="/login" replace />;
 };
 
 function AdminDashboardLayout() {
@@ -105,7 +113,8 @@ function App() {
         <Route path="/reset-password-email-sent" element={<ResetPasswordEmailSent />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/reset-password-success" element={<ResetPasswordSuccess />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+
+
 
         {/* Protected user routes with layout */}
         <Route path="/" element={<MainLayout />}>
@@ -168,18 +177,10 @@ function App() {
           } />
 
           {/* Court listing */}
-          <Route path="courts" element={
-            <ProtectedRoute>
-              <CourtListPage />
-            </ProtectedRoute>
-          } />
+          <Route path="courts" element={<CourtListPage />} />
 
           {/* Court details */}
-          <Route path="courts/:id" element={
-            <ProtectedRoute>
-              <CourtDetailPage />
-            </ProtectedRoute>
-          } />
+          <Route path="courts/:id" element={<CourtDetailPage />} />
 
           {/* Booking flow */}
           <Route path="booking/:courtId" element={
@@ -210,11 +211,7 @@ function App() {
           } />
 
           {/* Event listing */}
-          <Route path="events" element={
-            <ProtectedRoute>
-              <EventPage />
-            </ProtectedRoute>
-          } />
+          <Route path="events" element={<EventPage />} />
 
           {/* Event creation */}
           <Route path="events/create" element={
@@ -231,11 +228,7 @@ function App() {
           } />
 
           {/* Friendly Match page */}
-          <Route path="friendly-matches" element={
-            <ProtectedRoute>
-              <FriendlyMatchPage />
-            </ProtectedRoute>
-          } />
+          <Route path="friendly-matches" element={<FriendlyMatchPage />} />
 
           {/* Friendly Match create page */}
           <Route path="friendly-matches/create" element={
@@ -264,6 +257,16 @@ function App() {
           <Route path="coaching/browse" element={<BrowseClassPage />} />
           <Route path="class/:id" element={<ClassSessionRegisterPage />} />
           <Route path="class/:id/register" element={<ClassSessionRegisterPage />} />
+
+          {/* Footer Links - Public Pages */}
+          <Route path="about" element={<AboutPage />} />
+          <Route path="contact" element={<ContactPage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
+          <Route path="terms" element={<TermsPage />} />
+          {/* sitemap removed */}
+          <Route path="cookies" element={<CookiesPage />} />
+          <Route path="accessibility" element={<AccessibilityPage />} />
+          {/* community removed */}
         </Route>
 
         {/* Admin routes with nested structure */}

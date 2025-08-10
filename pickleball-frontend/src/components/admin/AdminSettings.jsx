@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import { useTheme as useAppTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 import {
   Box, Tabs, Tab, Typography, Paper, TextField, Button, Avatar, Switch, FormControlLabel, Snackbar, Alert,
@@ -512,6 +513,7 @@ function LanguageTab() {
 }
 
 const AdminSettings = () => {
+  usePageTheme('admin'); // 设置页面类型为admin
   const [tab, setTab] = useState(0);
   const theme = useMuiTheme();
   const { t } = useLanguage();

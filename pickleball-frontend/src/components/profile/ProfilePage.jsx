@@ -16,7 +16,7 @@ import ProfileStats from './ProfileStats';
 import RecentBookings from './RecentBookings';
 import RecentInvoices from './RecentInvoices';
 import ProfileNavigation from './ProfileNavigation';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import EditProfileForm from './EditProfileForm';
@@ -67,9 +67,7 @@ const ProfilePage = ({ editMode = false }) => {
           return;
         }
 
-        const response = await axios.get('http://localhost:8081/api/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/profile');
 
         const enhancedProfile = {
           ...response.data,
@@ -127,11 +125,7 @@ const ProfilePage = ({ editMode = false }) => {
         dob: updatedProfile.dob ? new Date(updatedProfile.dob).toISOString() : null
       };
 
-      const response = await axios.put(
-        'http://localhost:8081/api/profile',
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.put('/profile', payload);
 
       const filename = response.data.filename;
       UserService.setProfileImage(filename);

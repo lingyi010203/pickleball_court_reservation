@@ -31,6 +31,7 @@ public class JwtService {
                 .claim("role", cleanedRole)
                 .claim("userType", cleanedRole) // 添加 userType 聲明
                 .claim("userId", userId)
+                .claim("username", subject) // 添加 username 聲明
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
                 .signWith(key, Jwts.SIG.HS256)

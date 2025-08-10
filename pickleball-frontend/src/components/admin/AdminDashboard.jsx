@@ -38,12 +38,15 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import ReportGenerator from './ReportGenerator';
 import { useTheme, alpha } from '@mui/material/styles';
+import { usePageTheme } from '../../hooks/usePageTheme';
 
 dayjs.extend(relativeTime);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  usePageTheme('admin'); // 设置页面类型为admin
+  
   const bookingChartRef = useRef(null);
   const revenueChartRef = useRef(null);
   const bookingChartInstance = useRef(null);
@@ -343,7 +346,7 @@ const AdminDashboard = () => {
 
   const handleLogout = () => {
     UserService.adminLogout();
-    navigate('/admin/login');
+            navigate('/login');
   };
 
   const generateReport = async (report) => {

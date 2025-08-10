@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Box, Typography, Grid, Paper, Button, Chip, Divider, Stack } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const CourtDetails = ({ court = {} }) => {
+  const navigate = useNavigate();
+  const { authToken } = useAuth();
+  
   // 默认数据
   const defaultCourt = {
     id: 1,
@@ -186,7 +191,15 @@ const CourtDetails = ({ court = {} }) => {
               fullWidth
               size="large"
               sx={{ fontWeight: 700, borderRadius: 2, py: 1.5, mb: 2, background: 'linear-gradient(90deg, #6366f1 0%, #a21caf 100%)' }}
-              onClick={() => window.location.href = `/booking/${courtData.id}`}
+              onClick={() => {
+                if (!authToken) {
+                  // 未登录用户重定向到登录页面
+                  navigate('/login');
+                } else {
+                  // 已登录用户直接跳转到预订页面
+                  navigate(`/booking/${courtData.id}`);
+                }
+              }}
             >
               Book This Court
             </Button>

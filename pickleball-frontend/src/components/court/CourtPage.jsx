@@ -10,6 +10,7 @@ import CourtCard from './CourtCard';
 import Footer from '../common/Footer';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 
 const CourtPage = () => {
@@ -22,6 +23,7 @@ const CourtPage = () => {
   const [locationFilter, setLocationFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
+  const { authToken } = useAuth();
 
   useEffect(() => {
     const loadCourts = async () => {
@@ -75,7 +77,13 @@ const CourtPage = () => {
   };
 
   const handleBookNow = (courtId) => {
-    navigate(`/booking/${courtId}`);
+    if (!authToken) {
+      // 未登录用户重定向到登录页面
+      navigate('/login');
+    } else {
+      // 已登录用户直接跳转到预订页面
+      navigate(`/booking/${courtId}`);
+    }
   };
 
   if (loading) {

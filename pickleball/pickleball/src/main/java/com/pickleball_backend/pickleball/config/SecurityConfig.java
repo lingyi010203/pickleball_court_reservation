@@ -66,8 +66,31 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
+                        
                         // 允许公开访问球场图片
                         .requestMatchers("/api/admin/courts/public/**").permitAll()
+                        
+                        // Public court access for unauthenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/courts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courts/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courts/booked").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courts/available").permitAll()
+                        
+                        // Public event access for unauthenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/events/upcoming").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/browse").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/{id}/details").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/type/{eventType}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/friendly-matches").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/tournaments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/leagues").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/types").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/stats").permitAll()
+                        
+                        // Public friendly match access for unauthenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/friendly-matches/open").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/friendly-matches/all").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/friendly-matches/invitations").permitAll()
                         // Tier Management Endpoints
                         .requestMatchers(HttpMethod.POST, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/admin/*/vouchers").hasAuthority("ROLE_ADMIN")

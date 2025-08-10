@@ -94,7 +94,7 @@ const FriendlyMatchPage = () => {
   const [currentPlayers, setCurrentPlayers] = useState(1);
   const [matchExistsError, setMatchExistsError] = useState('');
 
-  const { currentUser } = useAuth();
+  const { currentUser, authToken } = useAuth();
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -165,6 +165,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleSendMessage = () => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     setMessageDialogOpen(true);
     setMessageContent('');
     setMessageError('');
@@ -179,6 +183,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleSubmitMessage = async () => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     if (!messageContent.trim()) {
       setMessageError('Please enter a message');
       return;
@@ -277,6 +285,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleCreate = async (e) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     e.preventDefault();
     setSubmitting(true);
     setCreateError('');
@@ -321,6 +333,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleJoin = async (id) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     setJoiningId(id);
     setJoinSuccess('');
     try {
@@ -452,6 +468,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handlePayForMatchFromList = (invite) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     console.log('handlePayForMatchFromList called for invite:', invite.id); // Debug log
     
     // 導航到付款頁面，傳遞 friendly match 的詳細資訊
@@ -492,6 +512,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleDeleteMatch = async (matchId) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     console.log('=== Delete button clicked ===');
     console.log('Match ID:', matchId);
     console.log('Current user:', currentUser);
@@ -528,6 +552,10 @@ const FriendlyMatchPage = () => {
   };
 
   const handleConfirmCancelJoin = async () => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     console.log('handleConfirmCancelJoin called'); // Debug log
     if (!viewInvite || !currentUser) {
       console.log('Missing viewInvite or currentUser:', { viewInvite, currentUser }); // Debug log
@@ -720,7 +748,7 @@ Click here to join: [Friendly Match #${match.id}]`;
                 Friendly Matches
               </Typography>
               <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                Create and join tennis matches with fellow players
+                {authToken ? 'Create and join pickleball matches with fellow players' : 'Browse and join tennis matches with fellow players'}
               </Typography>
             </Box>
           </Box>
@@ -728,7 +756,7 @@ Click here to join: [Friendly Match #${match.id}]`;
 
         {/* Success/Error Alerts */}
         <Stack spacing={2} sx={{ mb: 3 }}>
-          {createError && (
+          {createError && authToken && (
             <Slide direction="down" in={!!createError}>
               <Alert 
                 severity="error" 
@@ -783,31 +811,34 @@ Click here to join: [Friendly Match #${match.id}]`;
         </Stack>
 
         <Grid container spacing={4}>
-          {/* Create New Match Button */}
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => navigate('/friendly-matches/create')}
-                sx={{
-                  py: 2,
-                  px: 4,
-                  borderRadius: 3,
-                  background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
-                  fontWeight: 'bold',
-                  textTransform: 'none',
-                  fontSize: '1.1rem'
-                }}
-                startIcon={<AddIcon />}
-              >
-                Create New Friendly Match (No Payment Required)
-              </Button>
-            </Box>
-          </Grid>
+          {/* Create New Match Button - Only show for authenticated users */}
+          {authToken && (
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => navigate('/friendly-matches/create')}
+                  sx={{
+                    py: 2,
+                    px: 4,
+                    borderRadius: 3,
+                    background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
+                    fontWeight: 'bold',
+                    textTransform: 'none',
+                    fontSize: '1.1rem'
+                  }}
+                  startIcon={<AddIcon />}
+                >
+                  Create New Friendly Match (No Payment Required)
+                </Button>
+              </Box>
+            </Grid>
+          )}
 
-          {/* Create Invitation Form */}
-          <Grid item xs={12} lg={4}>
+          {/* Create Invitation Form - Only show for authenticated users */}
+          {authToken && (
+            <Grid item xs={12} lg={4}>
             <Paper 
               elevation={3}
               sx={{ 
@@ -929,9 +960,10 @@ Click here to join: [Friendly Match #${match.id}]`;
               </CardContent>
             </Paper>
           </Grid>
+          )}
 
           {/* Invitations List */}
-          <Grid item xs={12} lg={8}>
+          <Grid item xs={12} lg={authToken ? 8 : 12}>
             <Box sx={{ mb: 3 }}>
               <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
                 Available Matches
@@ -1325,12 +1357,13 @@ Click here to join: [Friendly Match #${match.id}]`;
                   No matches available
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Be the first to create a friendly match!
+                  {authToken ? 'Be the first to create a friendly match!' : 'No matches are currently available. Please check back later!'}
                 </Typography>
               </Paper>
             )}
           </Grid>
         </Grid>
+      </Box>
 
         {/* View Match Dialog */}
         <Dialog 
@@ -1882,7 +1915,7 @@ Click here to join: [Friendly Match #${match.id}]`;
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
+      
     </Container>
   );
 };

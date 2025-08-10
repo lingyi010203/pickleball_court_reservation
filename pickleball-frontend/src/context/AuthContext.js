@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
         
         const user = {
           id: decodedToken.userId || decodedToken.sub, // 優先使用 userId，如果沒有則使用 sub
-          username: decodedToken.username || decodedToken.name || decodedToken.sub,
+          username: decodedToken.username || decodedToken.sub, // 優先使用 username，如果沒有則使用 sub
           email: decodedToken.email,
           role: cleanRole,
           userType: decodedToken.userType || cleanRole, // 優先使用 userType，如果沒有則使用 role

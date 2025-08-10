@@ -84,7 +84,7 @@ const EventPage = () => {
     venue: null,
   });
 
-  const { currentUser } = useAuth();
+  const { currentUser, authToken } = useAuth();
   const isEventOrganizer = currentUser?.role === 'EVENTORGANIZER' || currentUser?.role === 'EventOrganizer' || currentUser?.userType === 'EventOrganizer';
   const navigate = useNavigate();
   const location = useLocation();
@@ -250,6 +250,10 @@ const EventPage = () => {
   };
 
   const handleRegisterClick = (event) => {
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
     // 直接跳轉到支付頁面，傳遞事件詳情
     navigate('/payment', { 
       state: { 
