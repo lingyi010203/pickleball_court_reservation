@@ -3,12 +3,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Grid, 
-  Card, 
   CardActionArea, 
   CardContent, 
   Typography, 
   Box, 
-  useTheme 
+  useTheme,
+  Stack,
+  Chip
 } from '@mui/material';
 import { 
   CalendarMonth as CalendarIcon,
@@ -65,11 +66,11 @@ const QUICK_ACTIONS = [
 const ActionCard = ({ action, navigate }) => {
   const theme = useTheme();
   return (
-    <Grid item xs={12} sm={6} md={2.4}>
+    <Grid item xs={12} sm={6} md={3}>
       <ThemedCard
         sx={{
           borderRadius: 3,
-          height: 220,
+          height: 200,
           width: '100%',
           transition: theme.transitions.create(['transform', 'box-shadow'], {
             duration: theme.transitions.duration.short,
@@ -82,7 +83,7 @@ const ActionCard = ({ action, navigate }) => {
       >
         <CardActionArea
           onClick={() => navigate(action.path)}
-          sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}
+          sx={{ height: '100%', p: 2.5, display: 'flex', flexDirection: 'column' }}
           aria-label={`Go to ${action.title}`}
         >
           <CardContent sx={{ 
@@ -97,10 +98,11 @@ const ActionCard = ({ action, navigate }) => {
             <Box sx={{
               mb: 1.5,
               display: 'inline-flex',
-              p: 1.5,
-              borderRadius: '50%',
-              bgcolor: theme.palette[action.color]?.light || theme.palette.background.paper,
+              p: 1.25,
+              borderRadius: '16px',
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
               color: theme.palette[action.color]?.main || theme.palette.text.primary,
+              border: `1px solid ${theme.palette.divider}`,
               alignSelf: 'center'
             }}>
               <action.Icon fontSize="large" />
@@ -110,8 +112,8 @@ const ActionCard = ({ action, navigate }) => {
               fontWeight="bold"
               gutterBottom
               sx={{ 
-                minHeight: '2.5rem',
-                fontSize: '1rem',
+                minHeight: '2.2rem',
+                fontSize: '1.05rem',
                 lineHeight: 1.2,
                 display: 'flex',
                 alignItems: 'center',
@@ -124,7 +126,7 @@ const ActionCard = ({ action, navigate }) => {
               variant="body2"
               color="text.secondary"
               sx={{ 
-                minHeight: '2.5rem',
+                minHeight: '2.2rem',
                 fontSize: '0.875rem',
                 lineHeight: 1.3,
                 display: 'flex',
@@ -146,31 +148,17 @@ const QuickActions = () => {
   const navigate = useNavigate();
   
   return (
-    <Box 
-      component="section" 
-      sx={{ 
-        mb: 6,
-        maxWidth: 1200,
-        mx: 'auto',
-        width: '100%'
-      }}
-    >
-      <Typography 
-        variant="h5" 
-        component="h2"
-        fontWeight="bold" 
-        sx={{ mb: 3 }}
-      >
-        Quick Actions
-      </Typography>
-      
-      <Grid container spacing={3}>
+    <Box component="section" sx={{ mb: 6, maxWidth: 1200, mx: 'auto', width: '100%' }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Typography variant="h5" component="h2" fontWeight="bold">
+          Quick Actions
+        </Typography>
+        <Chip label="Shortcut" size="small" color="primary" variant="outlined" />
+      </Stack>
+
+      <Grid container spacing={2.5}>
         {QUICK_ACTIONS.map((action) => (
-          <ActionCard 
-            key={action.id} 
-            action={action} 
-            navigate={navigate} 
-          />
+          <ActionCard key={action.id} action={action} navigate={navigate} />
         ))}
       </Grid>
     </Box>

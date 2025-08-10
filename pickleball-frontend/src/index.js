@@ -7,6 +7,8 @@ import { AuthProvider } from './context/AuthContext';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { CookieConsentProvider } from './context/CookieConsentContext';
+import CookieBanner from './components/common/CookieBanner';
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -16,7 +18,10 @@ root.render(
       <AuthProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <App />
+            <CookieConsentProvider>
+              <App />
+              <CookieBanner />
+            </CookieConsentProvider>
           </LanguageProvider>
         </ThemeProvider>
       </AuthProvider>
