@@ -535,7 +535,7 @@ const AdminSettings = () => {
   useEffect(() => {
     setProfileLoading(true);
     axios.get('http://localhost:8081/api/admin/profile', {
-      headers: { Authorization: `Bearer ${UserService.getAdminToken()}` }
+      headers: { Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}` }
     })
       .then(res => {
         setProfile(res.data);
@@ -560,7 +560,7 @@ const AdminSettings = () => {
     setProfileLoading(true);
     setProfileError('');
     axios.put('http://localhost:8081/api/admin/profile', profile, {
-      headers: { Authorization: `Bearer ${UserService.getAdminToken()}` }
+      headers: { Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}` }
     })
       .then(res => {
         setProfile(res.data);
@@ -623,7 +623,7 @@ const AdminSettings = () => {
         currentPassword: changePwd.current,
         newPassword: changePwd.next
       }, {
-        headers: { Authorization: `Bearer ${UserService.getAdminToken()}` }
+        headers: { Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}` }
       });
       setPwdSuccess(true);
       setChangePwd({ current: '', next: '', confirm: '' });
@@ -671,7 +671,7 @@ const AdminSettings = () => {
     try {
       const res = await axios.post('http://localhost:8081/api/admin/avatar', formData, {
         headers: {
-          Authorization: `Bearer ${UserService.getAdminToken()}`,
+          Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}`,
           'Content-Type': 'multipart/form-data'
         }
       });
@@ -691,7 +691,7 @@ const AdminSettings = () => {
     setAvatarLoading(true);
     try {
       await axios.delete('http://localhost:8081/api/admin/avatar', {
-        headers: { Authorization: `Bearer ${UserService.getAdminToken()}` }
+        headers: { Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}` }
       });
       setProfile(prev => ({ ...prev, profileImage: null }));
       setProfileSuccess(true);
@@ -709,7 +709,7 @@ const AdminSettings = () => {
     setDeleteAccountLoading(true);
     try {
       await axios.delete('http://localhost:8081/api/admin/delete-account', {
-        headers: { Authorization: `Bearer ${UserService.getAdminToken()}` }
+        headers: { Authorization: `Bearer ${UserService.getAdminToken() || UserService.getToken()}` }
       });
       // Optionally, redirect to login page or show a success message
       window.location.href = '/login'; // Example redirect

@@ -30,7 +30,7 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       await axios.post('http://localhost:8081/api/admin/invitations', {
         email,
         role

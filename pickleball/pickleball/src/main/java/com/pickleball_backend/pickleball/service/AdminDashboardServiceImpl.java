@@ -391,8 +391,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("booking");
-                String userName = "";
-                if (b.getMember() != null && b.getMember().getUser() != null && b.getMember().getUser().getName() != null) {
+                String userName = "Unknown User";
+                if (b.getMember() != null && b.getMember().getUser() != null && b.getMember().getUser().getName() != null && !b.getMember().getUser().getName().trim().isEmpty()) {
                     userName = b.getMember().getUser().getName();
                 }
                 dto.setUser(userName);
@@ -420,10 +420,11 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("cancellation");
-                String userName = "";
+                String userName = "Unknown User";
                 if (cr.getBooking() != null && cr.getBooking().getMember() != null &&
                     cr.getBooking().getMember().getUser() != null &&
-                    cr.getBooking().getMember().getUser().getName() != null) {
+                    cr.getBooking().getMember().getUser().getName() != null && 
+                    !cr.getBooking().getMember().getUser().getName().trim().isEmpty()) {
                     userName = cr.getBooking().getMember().getUser().getName();
                 }
                 dto.setUser(userName);
@@ -451,7 +452,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("user");
-                dto.setUser(u.getName() != null ? u.getName() : "");
+                dto.setUser(u.getName() != null && !u.getName().trim().isEmpty() ? u.getName() : "Unknown User");
                 dto.setDetail("created an account");
                 dto.setTimestamp(u.getCreatedAt());
                 dto.setIcon("\uD83D\uDC64"); // 👤
@@ -463,8 +464,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("review");
-                String reviewer = "";
-                if (f.getUser() != null && f.getUser().getName() != null) {
+                String reviewer = "Unknown User";
+                if (f.getUser() != null && f.getUser().getName() != null && !f.getUser().getName().trim().isEmpty()) {
                     reviewer = f.getUser().getName();
                 }
                 dto.setUser(reviewer);

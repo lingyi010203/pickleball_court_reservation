@@ -128,7 +128,7 @@ const PendingRequestsTab = () => {
   const fetchPendingRequests = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const response = await axios.get('http://localhost:8081/api/admin/pending-type-changes', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -151,7 +151,7 @@ const PendingRequestsTab = () => {
 
   const handleApprove = async (userId, requestedType) => {
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       await axios.put(
         `http://localhost:8081/api/admin/approve-user-type/${userId}`,
         null,
@@ -200,7 +200,7 @@ const PendingRequestsTab = () => {
     }
 
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       await axios.put(
         `http://localhost:8081/api/admin/reject-user-type/${rejectingUserId}`,
         null,
@@ -564,7 +564,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
 
       // 修改参数结构以匹配后端控制器
       const params = {
@@ -698,7 +698,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
   const handleDeleteUser = async () => {
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       await axios.delete(`http://localhost:8081/api/admin/users/${userToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -744,7 +744,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
   const handleBatchStatusChange = async (status) => {
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       await axios.put('http://localhost:8081/api/admin/users/batch-status', {
         userIds: selectedUsers,
         status

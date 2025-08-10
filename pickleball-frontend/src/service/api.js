@@ -10,7 +10,8 @@ api.interceptors.request.use(config => {
   const isAdminRoute = config.url?.startsWith('/admin/');
   
   // Use admin token for admin routes, regular token for other routes
-  const token = isAdminRoute ? UserService.getAdminToken() : UserService.getToken();
+  // For admin routes, try admin token first, then fall back to regular token
+  const token = isAdminRoute ? (UserService.getAdminToken() || UserService.getToken()) : UserService.getToken();
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -26,10 +27,14 @@ api.interceptors.response.use(
       const isAdminRoute = error.config?.url?.startsWith('/admin/');
       if (isAdminRoute) {
         UserService.adminLogout();
-        window.location.href = '/login';
+        // Use React Router navigation instead of window.location.href
+        // This will be handled by the component that receives the error
+        console.log('Admin authentication failed - redirecting to login');
       } else {
         UserService.logout();
-        window.location.href = '/login';
+        // Use React Router navigation instead of window.location.href
+        // This will be handled by the component that receives the error
+        console.log('User authentication failed - redirecting to login');
       }
     }
     return Promise.reject(error);

@@ -47,7 +47,8 @@ const REPORT_CONFIG = {
 };
 
 const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
-  usePageTheme('admin'); // 设置页面类型为admin
+  // 移除usePageTheme调用，避免不必要的主题切换
+  // usePageTheme('admin'); // 设置页面类型为admin
   // State
   const [reportType, setReportType] = useState('revenue');
   const [exportFormat, setExportFormat] = useState('pdf');
@@ -224,7 +225,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
     setDataLoading(true);
     setError(null); // 清除之前的错误
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const response = await axios.get(`http://localhost:8081/api/admin/reports/${reportType}`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {

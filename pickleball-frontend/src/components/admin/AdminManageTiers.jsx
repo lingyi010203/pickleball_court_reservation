@@ -72,7 +72,7 @@ const AdminManageTiers = () => {
     try {
       setLoading(true);
       setError('');
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const response = await axios.get('http://localhost:8081/api/admin/tiers', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -231,7 +231,7 @@ const AdminManageTiers = () => {
 
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
 
       if (currentTier) {
         await axios.put(`http://localhost:8081/api/admin/tiers/${currentTier.id}`, formData, {
@@ -289,7 +289,7 @@ const AdminManageTiers = () => {
   const confirmAction = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const { action, tierId } = confirmDialog;
 
       if (action === 'delete') {
@@ -835,7 +835,7 @@ const VoucherManagementTab = () => {
     try {
       setLoading(true);
       setError('');
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const response = await axios.get('http://localhost:8081/api/admin/vouchers', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -857,7 +857,7 @@ const VoucherManagementTab = () => {
 
   const fetchTiers = async () => {
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const response = await axios.get('http://localhost:8081/api/admin/tiers', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -967,7 +967,7 @@ const VoucherManagementTab = () => {
 
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
 
       // 准备提交的数据，处理expiry date
       const submitData = {
@@ -1040,7 +1040,7 @@ const VoucherManagementTab = () => {
   const confirmAction = async () => {
     try {
       setLoading(true);
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
       const { action, voucherId } = confirmDialog;
 
       if (action === 'delete') {

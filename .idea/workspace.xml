@@ -4,58 +4,21 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c3ded6e-9290-4208-bf86-f2c4e1aa2374" name="Changes" comment="CourtAvailabilityPage.jsx ament">
+    <list default="true" id="0c3ded6e-9290-4208-bf86-f2c4e1aa2374" name="Changes" comment="static page design done">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/check_court_image_table.sql" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/App.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminDashboard.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminInviteForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminInviteForm.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminLogin.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageBookings.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageBookings.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageCourts.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageCourts.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageTiers.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageTiers.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageUsers.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminManageUsers.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminModerationDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminModerationDashboard.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminSettings.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminSettings.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminUserForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/AdminUserForm.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ConfirmationDialog.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ConfirmationDialog.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ModernBookingDetailsDialog.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ModernBookingDetailsDialog.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ReportChart.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ReportChart.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ReportGenerator.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/admin/ReportGenerator.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/class/BrowseClassPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/class/BrowseClassPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/class/ClassSessionCreateForm.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/class/ClassSessionCreateForm.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/class/EditClassSessionDialog.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/class/EditClassSessionDialog.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/coach/CoachScheduleManagement.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/coach/CoachScheduleManagement.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/coach/StudentManagementSystem.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/coach/StudentManagementSystem.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Footer.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Footer.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/common/MobileDrawer.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/common/MobileDrawer.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Navbar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/common/Navbar.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtAvailabilityPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtAvailabilityPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtCard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtCard.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtDetails.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtDetails.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtListPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtListPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/court/CourtPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/event/EventPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/event/EventPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/event/FriendlyMatchPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/event/FriendlyMatchPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/ProfileOverview.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/ProfileOverview.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/ProfilePage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/components/profile/ProfilePage.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/context/AuthContext.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/context/AuthContext.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/context/ThemeContext.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/context/ThemeContext.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/pages/ForgotPasswordPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/pages/ForgotPasswordPage.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/pages/LoginPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/pages/LoginPage.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/pages/RegisterPage.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/pages/RegisterPage.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pickleball-frontend/src/service/api.js" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball-frontend/src/service/api.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/config/SecurityConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/AdminController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/CourtPublicController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/CourtPublicController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/EventController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/EventController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/ProfileController.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/controller/ProfileController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/AdminRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/repository/AdminRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/security/JwtAuthFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/security/JwtAuthFilter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/security/JwtService.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/security/JwtService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminService.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/pickleball/pickleball/src/main/java/com/pickleball_backend/pickleball/service/AdminDashboardServiceImpl.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -357,7 +320,23 @@
       <option name="project" value="LOCAL" />
       <updated>1753781450293</updated>
     </task>
-    <option name="localTasksCounter" value="29" />
+    <task id="LOCAL-00029" summary="static page design done">
+      <option name="closed" value="true" />
+      <created>1754796120126</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1754796120126</updated>
+    </task>
+    <task id="LOCAL-00030" summary="static page design done">
+      <option name="closed" value="true" />
+      <created>1754796150978</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1754796150978</updated>
+    </task>
+    <option name="localTasksCounter" value="31" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -400,7 +379,8 @@
     <MESSAGE value="admin setting, dark mode done" />
     <MESSAGE value="report generation done" />
     <MESSAGE value="profile" />
-    <option name="LAST_COMMIT_MESSAGE" value="profile" />
+    <MESSAGE value="static page design done" />
+    <option name="LAST_COMMIT_MESSAGE" value="static page design done" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

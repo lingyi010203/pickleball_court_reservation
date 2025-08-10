@@ -28,7 +28,8 @@ ChartJS.register(
 );
 
 const ReportChart = ({ type, data, title, useBrandColors = true }) => {
-  usePageTheme('admin'); // 设置页面类型为admin
+  // 移除usePageTheme调用，避免不必要的主题切换
+  // usePageTheme('admin'); // 设置页面类型为admin
   // 调试信息
   console.log('ReportChart props:', { type, data, title, useBrandColors });
   console.log('Chart components available:', { Bar, Line, Pie });

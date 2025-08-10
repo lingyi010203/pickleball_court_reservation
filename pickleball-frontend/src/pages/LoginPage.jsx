@@ -87,12 +87,14 @@ const LoginPage = () => {
             password: credentials.password
           });
           
-          if (adminResponse.data.token) {
-            // Store admin credentials using UserService
-            UserService.adminLogin(adminResponse.data.token, credentials.usernameOrEmail);
-            navigate('/admin/dashboard');
-            return;
-          }
+                  if (adminResponse.data.token) {
+          // Store admin credentials using UserService
+          UserService.adminLogin(adminResponse.data.token, credentials.usernameOrEmail);
+          // Also set the token in AuthContext for consistency
+          login(adminResponse.data.token, true); // true indicates this is an admin token
+          navigate('/admin/dashboard');
+          return;
+        }
         } catch (adminErr) {
           // Both user and admin login failed
           setError('Invalid credentials. Please try again.');

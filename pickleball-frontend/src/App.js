@@ -65,7 +65,30 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AdminProtectedRoute = ({ children }) => {
-  return UserService.isAdminLoggedIn() ? children : <Navigate to="/login" replace />;
+  const { authToken, currentUser } = useAuth();
+  
+  // Check multiple ways admin could be logged in:
+  // 1. UserService admin token (for admin-specific login)
+  // 2. AuthContext token with admin role/userType
+  // 3. Check if currentUser exists and has admin role
+  const isAdminLoggedIn = UserService.isAdminLoggedIn() || 
+    (authToken && currentUser && (
+      currentUser.userType === 'Admin' || 
+      currentUser.userType === 'ADMIN' || 
+      currentUser.role === 'Admin' || 
+      currentUser.role === 'ADMIN'
+    ));
+  
+  console.log('AdminProtectedRoute check:', {
+    userServiceAdmin: UserService.isAdminLoggedIn(),
+    authToken: !!authToken,
+    currentUser: !!currentUser,
+    userType: currentUser?.userType,
+    role: currentUser?.role,
+    isAdminLoggedIn
+  });
+  
+  return isAdminLoggedIn ? children : <Navigate to="/login" replace />;
 };
 
 function AdminDashboardLayout() {

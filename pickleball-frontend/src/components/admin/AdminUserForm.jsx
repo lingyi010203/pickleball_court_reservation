@@ -72,7 +72,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
     setError('');
 
     try {
-      const token = UserService.getAdminToken();
+      const token = UserService.getAdminToken() || UserService.getToken();
 
       if (user) {
         // 更新用户
