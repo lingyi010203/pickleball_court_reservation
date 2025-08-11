@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Paper, Typography, Grid, FormControl, InputLabel, Select, MenuItem, TextField,
-  FormControlLabel, Checkbox, Button, Box, CircularProgress, IconButton, Divider
+  FormControlLabel, Checkbox, Button, Box, CircularProgress, IconButton, Divider,
+  Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
 import {
   BarChart as BarChartIcon, EventNote as EventNoteIcon, People as PeopleIcon,
@@ -14,24 +15,23 @@ import {
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import ReportChart from './ReportChart';
+import SimplePDFExporter from './SimplePDFExporter';
 import { usePageTheme } from '../../hooks/usePageTheme';
 
-// 配置
+// 配置 - 简化版本
 const REPORT_CONFIG = {
   types: [
-    { value: 'revenue', label: 'Revenue Report', icon: <AttachMoneyIcon />, description: 'Detailed revenue analysis and financial metrics' },
+    { value: 'monthly_revenue', label: 'Monthly Revenue Analysis', icon: <AttachMoneyIcon />, description: 'Comprehensive monthly revenue analysis excluding cancelled bookings' },
+    { value: 'peak_hour_revenue', label: 'Peak Hour Revenue Analysis', icon: <AnalyticsIcon />, description: 'Revenue analysis by peak hours and time slots' },
+    { value: 'total_revenue', label: 'Total Revenue Overview', icon: <BusinessIcon />, description: 'Complete revenue overview with growth metrics' },
+    { value: 'growth_rate', label: 'Growth Rate Analysis', icon: <InsertChartIcon />, description: 'Revenue growth rate and trend analysis' },
+    { value: 'venue_comparison', label: 'Court Performance Comparison', icon: <BarChartIcon />, description: 'Revenue comparison across different courts' },
+    { value: 'venue_utilization', label: 'Court Utilization Report', icon: <BusinessIcon />, description: 'Comprehensive court utilization analysis and metrics' },
+    { value: 'venue_ranking', label: 'Court Utilization Ranking', icon: <BarChartIcon />, description: 'Court performance ranking based on utilization rates' },
+    { value: 'peak_off_peak', label: 'Peak/Off-Peak Period Analysis', icon: <AnalyticsIcon />, description: 'Analysis of peak and off-peak utilization patterns' },
+    { value: 'venue_type_preference', label: 'Court Type Preference', icon: <PieChartIcon />, description: 'User preferences and booking patterns by court type' },
     { value: 'booking', label: 'Booking Analytics', icon: <EventNoteIcon />, description: 'Booking patterns, trends, and performance analysis' },
     { value: 'user', label: 'User Activity Report', icon: <PeopleIcon />, description: 'User engagement, growth, and activity patterns' }
-  ],
-  formats: [
-    { value: 'pdf', label: 'PDF (Formal)', icon: <PictureAsPdfIcon />, color: '#e53e3e' },
-    { value: 'excel', label: 'Excel (Analytical)', icon: <TableChartIcon />, color: '#38a169' },
-    { value: 'csv', label: 'CSV (Raw Data)', icon: <GridOnIcon />, color: '#3182ce' }
-  ],
-  visualizationOptions: [
-    { value: 'bar', label: 'Bar Charts', icon: <BarChartIcon /> },
-    { value: 'line', label: 'Line Charts', icon: <InsertChartIcon /> },
-    { value: 'pie', label: 'Pie Charts', icon: <PieChartIcon /> }
   ],
   sections: [
     { name: 'summary', label: 'Executive Summary', default: true },
@@ -41,30 +41,52 @@ const REPORT_CONFIG = {
   ],
   formattingOptions: [
     { name: 'includeHeaderFooter', label: 'Header & Footer', description: 'Include company header and page numbers' },
-    { name: 'useBrandColors', label: 'Brand Colors', description: 'Use company colors in charts and tables' },
-    { name: 'includeAppendix', label: 'Data Appendix', description: 'Include raw data tables in appendix' }
+    { name: 'useBrandColors', label: 'Brand Colors', description: 'Use company colors in charts and tables' }
   ]
+};
+
+// 根据报告类型自动选择最佳图表类型
+const getOptimalChartType = (reportType) => {
+  const chartTypeMap = {
+    'monthly_revenue': 'line',
+    'peak_hour_revenue': 'bar',
+    'total_revenue': 'line',
+    'growth_rate': 'line',
+    'venue_comparison': 'bar',
+    'venue_utilization': 'bar',
+    'venue_ranking': 'bar',
+    'peak_off_peak': 'bar',
+    'venue_type_preference': 'pie',
+    'booking': 'line',
+    'user': 'line'
+  };
+  return chartTypeMap[reportType] || 'bar';
 };
 
 const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   // 移除usePageTheme调用，避免不必要的主题切换
   // usePageTheme('admin'); // 设置页面类型为admin
-  // State
-  const [reportType, setReportType] = useState('revenue');
-  const [exportFormat, setExportFormat] = useState('pdf');
-  const [visualizationType, setVisualizationType] = useState('bar');
-  const [reportSections, setReportSections] = useState(
-    REPORT_CONFIG.sections.reduce((acc, section) => {
-      acc[section.name] = section.default;
-      return acc;
-    }, {})
-  );
+  // State - 简化版本
+  const [reportType, setReportType] = useState('monthly_revenue');
+  // 移除exportFormat，只支持PDF
+  // 移除visualizationType，自动选择最佳图表
+  const [includeDetailedAnalysis, setIncludeDetailedAnalysis] = useState(false);
   const [formattingOptions, setFormattingOptions] = useState({
     includeHeaderFooter: true,
-    useBrandColors: true,
-    includeAppendix: false
+    useBrandColors: true
   });
-  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // 自动计算报告部分
+  const reportSections = {
+    summary: true,
+    trends: true,
+    breakdown: includeDetailedAnalysis,
+    insights: true
+  };
+  
+  // 自动选择最佳图表类型
+  const visualizationType = getOptimalChartType(reportType);
+
   const [error, setError] = useState(null);
   const [reportTitle, setReportTitle] = useState('');
   const [showPreview, setShowPreview] = useState(false);
@@ -77,6 +99,11 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   // 导出PDF相关
   const [isExporting, setIsExporting] = useState(false);
   const previewRef = useRef(null);
+
+  // 添加分页相关状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageBreaks, setPageBreaks] = useState([]);
 
   // 自动生成报告标题
   const generateReportTitle = () => {
@@ -121,6 +148,69 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
         converted.trends.dailyRevenue = revenueData;
       }
       
+      // 转换每月收入数据
+      if (converted.trends.monthlyRevenue) {
+        const monthlyData = {};
+        Object.entries(converted.trends.monthlyRevenue).forEach(([key, value]) => {
+          monthlyData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.monthlyRevenue = monthlyData;
+      }
+      
+      // 转换每小时收入数据
+      if (converted.trends.hourlyRevenue) {
+        const hourlyData = {};
+        Object.entries(converted.trends.hourlyRevenue).forEach(([key, value]) => {
+          hourlyData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.hourlyRevenue = hourlyData;
+      }
+      
+      // 转换时间段收入数据
+      if (converted.trends.timeSlotRevenue) {
+        const timeSlotData = {};
+        Object.entries(converted.trends.timeSlotRevenue).forEach(([key, value]) => {
+          timeSlotData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.timeSlotRevenue = timeSlotData;
+      }
+      
+      // 转换增长率数据
+      if (converted.trends.growthRates) {
+        const growthData = {};
+        Object.entries(converted.trends.growthRates).forEach(([key, value]) => {
+          growthData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.growthRates = growthData;
+      }
+      
+      // 转换场地收入数据
+      if (converted.trends.venueRevenue) {
+        const venueData = {};
+        Object.entries(converted.trends.venueRevenue).forEach(([key, value]) => {
+          venueData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.venueRevenue = venueData;
+      }
+      
+      // 转换场地预订数据
+      if (converted.trends.venueBookings) {
+        const venueBookingData = {};
+        Object.entries(converted.trends.venueBookings).forEach(([key, value]) => {
+          venueBookingData[key] = typeof value === 'object' ? value.longValue() : value;
+        });
+        converted.trends.venueBookings = venueBookingData;
+      }
+      
+      // 转换场地利用率数据
+      if (converted.trends.venueUtilization) {
+        const utilizationData = {};
+        Object.entries(converted.trends.venueUtilization).forEach(([key, value]) => {
+          utilizationData[key] = typeof value === 'object' ? value.doubleValue() : value;
+        });
+        converted.trends.venueUtilization = utilizationData;
+      }
+      
       // 转换每日预订数据
       if (converted.trends.dailyBookings) {
         const bookingData = {};
@@ -160,6 +250,39 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
           }
         });
         converted.breakdown.topRevenueDays = revenueData;
+      }
+      
+      // 转换顶级收入月
+      if (converted.breakdown.topRevenueMonths) {
+        const monthlyData = {};
+        converted.breakdown.topRevenueMonths.forEach(item => {
+          if (item.month && item.revenue) {
+            monthlyData[item.month] = typeof item.revenue === 'object' ? item.revenue.doubleValue() : item.revenue;
+          }
+        });
+        converted.breakdown.topRevenueMonths = monthlyData;
+      }
+      
+      // 转换高峰小时
+      if (converted.breakdown.peakHours) {
+        const peakData = {};
+        converted.breakdown.peakHours.forEach(item => {
+          if (item.hour && item.revenue) {
+            peakData[item.hour] = typeof item.revenue === 'object' ? item.revenue.doubleValue() : item.revenue;
+          }
+        });
+        converted.breakdown.peakHours = peakData;
+      }
+      
+      // 转换顶级场地
+      if (converted.breakdown.topVenues) {
+        const venueData = {};
+        converted.breakdown.topVenues.forEach(item => {
+          if (item.venue && item.revenue) {
+            venueData[item.venue] = typeof item.revenue === 'object' ? item.revenue.doubleValue() : item.revenue;
+          }
+        });
+        converted.breakdown.topVenues = venueData;
       }
       
       // 转换顶级预订日
@@ -226,7 +349,48 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
     setError(null); // 清除之前的错误
     try {
       const token = UserService.getAdminToken() || UserService.getToken();
-      const response = await axios.get(`http://localhost:8081/api/admin/reports/${reportType}`, {
+      
+      // 根据报告类型选择对应的API端点
+      let endpoint = '';
+      switch (reportType) {
+        case 'monthly_revenue':
+          endpoint = 'monthly-revenue';
+          break;
+        case 'peak_hour_revenue':
+          endpoint = 'peak-hour-revenue';
+          break;
+        case 'total_revenue':
+          endpoint = 'total-revenue';
+          break;
+        case 'growth_rate':
+          endpoint = 'growth-rate';
+          break;
+        case 'venue_comparison':
+          endpoint = 'venue-comparison';
+          break;
+        case 'venue_utilization':
+          endpoint = 'venue-utilization';
+          break;
+        case 'venue_ranking':
+          endpoint = 'venue-ranking';
+          break;
+        case 'peak_off_peak':
+          endpoint = 'peak-off-peak';
+          break;
+        case 'venue_type_preference':
+          endpoint = 'venue-type-preference';
+          break;
+        case 'booking':
+          endpoint = 'booking';
+          break;
+        case 'user':
+          endpoint = 'user';
+          break;
+        default:
+          endpoint = 'monthly-revenue';
+      }
+      
+      const response = await axios.get(`http://localhost:8081/api/admin/reports/${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           startDate: dateRange.start,
@@ -235,7 +399,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
       });
       // 转换数据格式
       const convertedData = convertDataForCharts(response.data);
-      console.log('User Activity Report Data:', {
+      console.log(`${reportType} Report Data:`, {
         trends: convertedData.trends,
         breakdown: convertedData.breakdown,
         summary: convertedData.summary
@@ -283,34 +447,14 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
       },
       configuration: {
         type: reportType,
-        format: exportFormat || 'pdf'
+        format: 'pdf'
       },
       content: reportData || {}
     };
   };
 
   // 生成报表
-  const handleGenerate = async () => {
-    if (!dateRange.start || !dateRange.end) {
-      setError('Please select a valid date range');
-      return;
-    }
-    if (new Date(dateRange.start) > new Date(dateRange.end)) {
-      setError('End date must be after start date');
-      return;
-    }
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const reportData = generateReportData();
-      await onGenerateReport(reportData);
-    } catch (err) {
-      setError('Report generation failed. Please try again.');
-      console.error('Report error:', err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+
 
   // 预览
   const handlePreview = () => {
@@ -322,109 +466,54 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
     fetchReportData();
   };
 
-  // 导出前端预览为PDF
-  const exportPreviewToPDF = async () => {
+  // 计算分页
+  const calculatePageBreaks = useCallback(() => {
     if (!previewRef.current) return;
     
-    setIsExporting(true);
-    try {
-      console.log('Starting PDF export...');
-      
-      // 动态导入库
-      const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
-      
-      console.log('Libraries loaded, capturing content...');
-      
-      // 捕获内容
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2, // 提高分辨率
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: 794, // A4宽度 (210mm = 794px at 96 DPI)
-        height: 1123, // A4高度 (297mm = 1123px at 96 DPI)
-        onclone: (clonedDoc) => {
-          // 确保克隆的元素保持A4样式和header/footer
-          const clonedElement = clonedDoc.querySelector('[data-preview-content]');
-          if (clonedElement) {
-            clonedElement.style.width = '794px';
-            clonedElement.style.minHeight = '1123px';
-            clonedElement.style.backgroundColor = 'white';
-            clonedElement.style.padding = '20px';
-            clonedElement.style.boxSizing = 'border-box';
-            clonedElement.style.position = 'relative';
-            
-            // 确保header和footer样式正确
-            const header = clonedElement.querySelector('[data-header]');
-            const footer = clonedElement.querySelector('[data-footer]');
-            
-            if (header) {
-              header.style.borderBottom = '2px solid #667eea';
-              header.style.paddingBottom = '16px';
-              header.style.marginBottom = '24px';
-            }
-            
-            if (footer) {
-              footer.style.borderTop = '2px solid #667eea';
-              footer.style.paddingTop = '16px';
-              footer.style.marginTop = '32px';
-              footer.style.position = 'absolute';
-              footer.style.bottom = '20px';
-              footer.style.left = '20px';
-              footer.style.right = '20px';
-            }
-          }
-        }
-      });
-      
-      console.log('Content captured, creating PDF...');
-      
-      // 创建PDF (A4尺寸)
-      const pdf = new jsPDF('p', 'mm', 'a4'); // 使用A4尺寸
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
-      // 计算图片在A4页面上的尺寸
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 20; // 留出边距
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      // 如果内容超过一页，需要分页
-      if (imgHeight > pdfHeight - 20) {
-        const pages = Math.ceil(imgHeight / (pdfHeight - 20));
-        let heightLeft = imgHeight;
-        let position = 0;
-        
-        for (let i = 0; i < pages; i++) {
-          if (i > 0) {
-            pdf.addPage();
-          }
-          
-          const pageHeight = Math.min(pdfHeight - 20, heightLeft);
-          pdf.addImage(imgData, 'JPEG', 10, 10 - position, imgWidth, imgHeight);
-          position += pageHeight;
-          heightLeft -= pageHeight;
-        }
-      } else {
-        pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
-      }
-      
-      // 生成文件名
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      const filename = `${reportType}_Report_${timestamp}.pdf`;
-      
-      console.log('PDF created, saving...');
-      pdf.save(filename);
-      
-      console.log('PDF export completed successfully');
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      alert('Failed to export PDF. Please try again.');
-    } finally {
-      setIsExporting(false);
+    const content = previewRef.current;
+    const contentHeight = content.scrollHeight;
+    
+    // A4尺寸设置 (210mm × 297mm)
+    const pageHeight = 1123; // A4高度 (297mm = 1123px at 96 DPI)
+    const headerHeight = 180; // 增加header高度预估
+    const footerHeight = 140; // 增加footer高度预估
+    const margin = 100; // 增加边距
+    const availableHeight = pageHeight - headerHeight - footerHeight - margin;
+    
+    const pages = Math.max(1, Math.ceil(contentHeight / availableHeight));
+    setTotalPages(pages);
+    
+    // 计算页面断点
+    const breaks = [];
+    for (let i = 1; i < pages; i++) {
+      breaks.push(i * availableHeight);
     }
+    setPageBreaks(breaks);
+    
+    console.log('Page calculation:', {
+      contentHeight,
+      pageHeight,
+      availableHeight,
+      pages,
+      breaks,
+      contentHeightInMM: contentHeight * 0.264583 // 转换为mm
+    });
+  }, []);
+
+  // 更新预览时重新计算分页
+  useEffect(() => {
+    if (showPreview && reportData) {
+      // 延迟计算，确保内容已渲染
+      setTimeout(calculatePageBreaks, 200);
+    }
+  }, [showPreview, reportData, calculatePageBreaks]);
+
+  // 简化的导出处理
+  const handleExport = (exporting) => {
+    setIsExporting(exporting);
   };
+
+
 
   // 渲染
   return (
@@ -474,7 +563,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
               </Typography>
               
               <Grid container spacing={2}>
-                <Grid item xs={12} md={4} sx={{ minWidth: '200px' }}>
+                <Grid item xs={12} md={6} sx={{ minWidth: '200px' }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Report Type</InputLabel>
                     <Select
@@ -494,44 +583,20 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   </FormControl>
                 </Grid>
                 
-                <Grid item xs={12} md={4} sx={{ minWidth: '200px' }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Export Format</InputLabel>
-                    <Select
-                      value={exportFormat}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                      label="Export Format"
-                    >
-                      {REPORT_CONFIG.formats.map((fmt) => (
-                        <MenuItem key={fmt.value} value={fmt.value}>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ mr: 1.5 }}>{fmt.icon}</Box>
-                            <Typography>{fmt.label}</Typography>
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                
-                <Grid item xs={12} md={4} sx={{ minWidth: '200px' }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Visualization Style</InputLabel>
-                    <Select
-                      value={visualizationType}
-                      onChange={(e) => setVisualizationType(e.target.value)}
-                      label="Visualization Style"
-                    >
-                      {REPORT_CONFIG.visualizationOptions.map((vis) => (
-                        <MenuItem key={vis.value} value={vis.value}>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ mr: 1.5 }}>{vis.icon}</Box>
-                            <Typography>{vis.label}</Typography>
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                <Grid item xs={12} md={6} sx={{ minWidth: '200px' }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={includeDetailedAnalysis}
+                        onChange={(e) => setIncludeDetailedAnalysis(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Include Detailed Analysis"
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    Adds detailed breakdown and data tables
+                  </Typography>
                 </Grid>
               </Grid>
               
@@ -586,70 +651,66 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
           <Grid item xs={12}>
             <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2d3748', mb: 2 }}>
-                Report Sections
+                Report Content
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Select which sections to include in your report
+                Your report will include: Executive Summary, Trend Analysis, and Key Insights
               </Typography>
-              <Grid container spacing={2}>
-                {REPORT_CONFIG.sections.map((section) => (
-                  <Grid item xs={12} sm={6} md={3} key={section.name}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={reportSections[section.name]}
-                          onChange={(e) => setReportSections({
-                            ...reportSections,
-                            [section.name]: e.target.checked
-                          })}
-                          color="primary"
-                        />
-                      }
-                      label={section.label}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={includeDetailedAnalysis}
+                      onChange={(e) => setIncludeDetailedAnalysis(e.target.checked)}
+                      color="primary"
                     />
-                  </Grid>
-                ))}
-              </Grid>
+                  }
+                  label="Include Detailed Analysis"
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Adds detailed breakdown and data tables
+                </Typography>
+              </Box>
             </Paper>
           </Grid>
           
-          {/* 格式化选项 */}
+          {/* 格式化选项 - 简化版本 */}
           <Grid item xs={12}>
             <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2d3748', mb: 2 }}>
-                Formatting Options
+                Report Style
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Customize the appearance and layout of your report
+                Professional formatting with company branding
               </Typography>
-              <Grid container spacing={2}>
-                {REPORT_CONFIG.formattingOptions.map((option) => (
-                  <Grid item xs={12} sm={4} key={option.name}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={formattingOptions[option.name]}
-                          onChange={(e) => setFormattingOptions({
-                            ...formattingOptions,
-                            [option.name]: e.target.checked
-                          })}
-                          color="primary"
-                        />
-                      }
-                      label={
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {option.label}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {option.description}
-                          </Typography>
-                        </Box>
-                      }
+              <Box sx={{ display: 'flex', gap: 3 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formattingOptions.includeHeaderFooter}
+                      onChange={(e) => setFormattingOptions({
+                        ...formattingOptions,
+                        includeHeaderFooter: e.target.checked
+                      })}
+                      color="primary"
                     />
-                  </Grid>
-                ))}
-              </Grid>
+                  }
+                  label="Header & Footer"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formattingOptions.useBrandColors}
+                      onChange={(e) => setFormattingOptions({
+                        ...formattingOptions,
+                        useBrandColors: e.target.checked
+                      })}
+                      color="primary"
+                    />
+                  }
+                  label="Brand Colors"
+                />
+              </Box>
             </Paper>
           </Grid>
           {/* 预览 */}
@@ -661,28 +722,31 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   mt: 2,
                   // A4尺寸设置
                   width: '210mm',
-                  minHeight: '297mm',
                   margin: '0 auto',
                   backgroundColor: 'white',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                   // 确保在屏幕上正确显示
                   '@media screen': {
                     width: '100%',
-                    maxWidth: '210mm',
-                    minHeight: 'auto'
+                    maxWidth: '210mm'
                   }
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="h6">Report Preview (A4 Size)</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    {totalPages > 1 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Page {currentPage} of {totalPages}
+                      </Typography>
+                    )}
                     <Button
                       variant="contained"
                       color="primary"
                       startIcon={<DownloadIcon />}
-                      onClick={exportPreviewToPDF}
                       disabled={isExporting || dataLoading}
                       size="small"
+                      sx={{ display: 'none' }} // Hide this button since PDF export is handled by SimplePDFExporter component
                     >
                       {isExporting ? 'Exporting...' : 'Export Preview'}
                     </Button>
@@ -706,12 +770,17 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   style={{ 
                     backgroundColor: 'white', 
                     padding: '20px',
-                    paddingBottom: '80px', // 增加底部间距，为footer留出空间
+                    paddingBottom: '160px', // 增加底部间距，为footer留出更多空间
                     // A4内容区域设置
                     width: '100%',
-                    minHeight: '250mm',
+                    minHeight: '200mm', // 增加最小高度
+                    maxHeight: '297mm', // 限制最大高度为A4高度
                     boxSizing: 'border-box',
-                    position: 'relative'
+                    position: 'relative',
+                    overflow: 'visible', // 让内容完整显示
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '12px',
+                    lineHeight: '1.4'
                   }}
                 >
                   {/* Header */}
@@ -811,33 +880,25 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 )}
                     
                     {reportSections.trends && reportData.trends && (
-                  <Box sx={{ mb: 4 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Typography variant="h6">Trend Analysis</Typography>
-                          <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <InputLabel>Chart Type</InputLabel>
-                            <Select
-                              value={visualizationType}
-                              onChange={(e) => setVisualizationType(e.target.value)}
-                              label="Chart Type"
-                            >
-                              {REPORT_CONFIG.visualizationOptions.map((option) => (
-                                <MenuItem key={option.value} value={option.value}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                    <Box sx={{ mr: 1 }}>{option.icon}</Box>
-                                    {option.label}
-                                  </Box>
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
                         </Box>
                         
                         {/* 收入趋势图表 */}
                         {reportData.trends.dailyRevenue && (
-                          <Box sx={{ mb: 3 }}>
+                          <Box sx={{ mb: 2 }}>
                             <Typography variant="subtitle1" gutterBottom>Revenue Trend</Typography>
-                            <Box sx={{ height: 250, position: 'relative' }}>
+                            <Box sx={{ 
+                              height: 200, 
+                              position: 'relative',
+                              width: '100%',
+                              overflow: 'visible',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              backgroundColor: '#fafafa'
+                            }}>
                               <ReportChart
                                 type={visualizationType}
                                 data={reportData.trends.dailyRevenue}
@@ -851,12 +912,21 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                         {/* 预订趋势图表 */}
                         {reportData.trends.dailyBookings && (
                           <Box sx={{ mb: 3 }}>
-                            <Typography variant="subtitle1" gutterBottom>Booking Trend</Typography>
-                            <Box sx={{ height: 250, position: 'relative' }}>
+                            <Typography variant="subtitle1" gutterBottom>Reservation Activity Trend</Typography>
+                            <Box sx={{ 
+                              height: 250, 
+                              position: 'relative',
+                              width: '100%',
+                              overflow: 'visible',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              backgroundColor: '#fafafa'
+                            }}>
                               <ReportChart
                                 type={visualizationType}
                                 data={reportData.trends.dailyBookings}
-                                title="Daily Booking Trend"
+                                title="Daily Reservation Activity"
                                 useBrandColors={formattingOptions.useBrandColors}
                               />
                             </Box>
@@ -878,20 +948,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                           </Box>
                         )}
                         
-                        {/* 预订按状态分布 */}
-                        {reportData.trends.bookingsByStatus && (
-                          <Box sx={{ mb: 3 }}>
-                            <Typography variant="subtitle1" gutterBottom>Bookings by Status</Typography>
-                            <Box sx={{ height: 250, position: 'relative' }}>
-                              <ReportChart
-                                type="pie"
-                                data={reportData.trends.bookingsByStatus}
-                                title="Booking Distribution by Status"
-                                useBrandColors={formattingOptions.useBrandColors}
-                              />
-                            </Box>
-                          </Box>
-                        )}
+
                         
                         {/* 用户活动指标 */}
                         {(reportData.trends.activeUsers || reportData.trends.newUsers || reportData.trends.userActivityRate) && (
@@ -910,6 +967,356 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                               />
                             </Box>
                           </Box>
+                        )}
+                        
+                        {/* 每月收入趋势图表 */}
+                        {reportData.trends.monthlyRevenue && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Monthly Revenue Trend</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type={visualizationType}
+                                data={reportData.trends.monthlyRevenue}
+                                title="Monthly Revenue Trend"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 每小时收入趋势图表 */}
+                        {reportData.trends.hourlyRevenue && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Hourly Revenue Distribution</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type={visualizationType}
+                                data={reportData.trends.hourlyRevenue}
+                                title="Hourly Revenue Distribution"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 时间段收入分布图表 */}
+                        {reportData.trends.timeSlotRevenue && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Revenue by Time Slots</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type="pie"
+                                data={reportData.trends.timeSlotRevenue}
+                                title="Revenue Distribution by Time Slots"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 增长率趋势图表 */}
+                        {reportData.trends.growthRates && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Growth Rate Analysis</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type={visualizationType}
+                                data={reportData.trends.growthRates}
+                                title="Revenue Growth Rate Trend"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 场地收入比较图表 */}
+                        {reportData.trends.venueRevenue && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Court Revenue Comparison</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type="bar"
+                                data={reportData.trends.venueRevenue}
+                                title="Revenue by Court"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 场地利用率图表 */}
+                        {reportData.trends.venueUtilization && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>Court Utilization Rate</Typography>
+                            <Box sx={{ height: 250, position: 'relative' }}>
+                              <ReportChart
+                                type="pie"
+                                data={reportData.trends.venueUtilization}
+                                title="Court Utilization Distribution"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 场地利用率报告专用图表 */}
+                        {reportType === 'venue_utilization' && reportData.trends && (
+                          <>
+                            {/* 场地利用率趋势 */}
+                            {reportData.trends.utilizationTrend && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Utilization Trend Over Time</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type={visualizationType}
+                                    data={reportData.trends.utilizationTrend}
+                                    title="Court Utilization Trend"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 场地利用率统计 */}
+                            {reportData.trends.utilizationStats && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Utilization Statistics</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.trends.utilizationStats}
+                                    title="Court Utilization Statistics"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 场地排名报告专用图表 */}
+                        {reportType === 'venue_ranking' && reportData.trends && (
+                          <>
+                            {/* 场地利用率排名 */}
+                            {reportData.trends.venueRanking && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Utilization Ranking</Typography>
+                                <Box sx={{ 
+                                  height: 300, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.trends.venueRanking}
+                                    title="Court Utilization Ranking"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 场地性能指标 */}
+                            {reportData.trends.venuePerformance && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Performance Metrics</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.trends.venuePerformance}
+                                    title="Court Performance Metrics"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 高峰/非高峰分析报告专用图表 */}
+                        {reportType === 'peak_off_peak' && reportData.trends && (
+                          <>
+                            {/* 高峰时段利用率 */}
+                            {reportData.trends.peakUtilization && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Peak Period Utilization</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type={visualizationType}
+                                    data={reportData.trends.peakUtilization}
+                                    title="Peak Period Utilization"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 非高峰时段利用率 */}
+                            {reportData.trends.offPeakUtilization && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Off-Peak Period Utilization</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type={visualizationType}
+                                    data={reportData.trends.offPeakUtilization}
+                                    title="Off-Peak Period Utilization"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 高峰vs非高峰对比 */}
+                            {reportData.trends.peakVsOffPeak && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Peak vs Off-Peak Comparison</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.trends.peakVsOffPeak}
+                                    title="Peak vs Off-Peak Utilization"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 场地类型偏好报告专用图表 */}
+                        {reportType === 'venue_type_preference' && reportData.trends && (
+                          <>
+                            {/* 场地类型偏好分布 */}
+                            {reportData.trends.venueTypePreference && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Type Preference Distribution</Typography>
+                                <Box sx={{ 
+                                  height: 300, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="pie"
+                                    data={reportData.trends.venueTypePreference}
+                                    title="Court Type Preference"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 场地类型利用率对比 */}
+                            {reportData.trends.venueTypeUtilization && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Type Utilization Comparison</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.trends.venueTypeUtilization}
+                                    title="Court Type Utilization"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 场地类型预订趋势 */}
+                            {reportData.trends.venueTypeTrend && (
+                              <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Type Booking Trend</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type={visualizationType}
+                                    data={reportData.trends.venueTypeTrend}
+                                    title="Court Type Booking Trend"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                          </>
                         )}
                       </Box>
                     )}
@@ -962,6 +1369,340 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                             </Box>
                           </Box>
                         )}
+                        
+                        {/* 顶级收入月 */}
+                        {reportData.breakdown.topRevenueMonths && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>Top Revenue Months</Typography>
+                            <Box sx={{ 
+                              height: 250, 
+                              position: 'relative',
+                              width: '100%',
+                              overflow: 'hidden',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              backgroundColor: '#fafafa'
+                            }}>
+                              <ReportChart
+                                type="bar"
+                                data={reportData.breakdown.topRevenueMonths}
+                                title="Top Revenue Months"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                            {/* 数据表格 */}
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="subtitle2" gutterBottom>Data Table</Typography>
+                              <TableContainer component={Paper} sx={{ maxHeight: 150 }}>
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Month</TableCell>
+                                      <TableCell align="right">Revenue (RM)</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {Object.entries(reportData.breakdown.topRevenueMonths).map(([month, revenue]) => (
+                                      <TableRow key={month}>
+                                        <TableCell>{month}</TableCell>
+                                        <TableCell align="right">RM {revenue.toLocaleString()}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 高峰小时 */}
+                        {reportData.breakdown.peakHours && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>Peak Revenue Hours</Typography>
+                            <Box sx={{ 
+                              height: 250, 
+                              position: 'relative',
+                              width: '100%',
+                              overflow: 'hidden',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              backgroundColor: '#fafafa'
+                            }}>
+                              <ReportChart
+                                type="bar"
+                                data={reportData.breakdown.peakHours}
+                                title="Peak Revenue Hours"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                            {/* 数据表格 */}
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="subtitle2" gutterBottom>Data Table</Typography>
+                              <TableContainer component={Paper} sx={{ maxHeight: 150 }}>
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Hour</TableCell>
+                                      <TableCell align="right">Revenue (RM)</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {Object.entries(reportData.breakdown.peakHours).map(([hour, revenue]) => (
+                                      <TableRow key={hour}>
+                                        <TableCell>{hour}</TableCell>
+                                        <TableCell align="right">RM {revenue.toLocaleString()}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 顶级场地 */}
+                        {reportData.breakdown.topVenues && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>Top Performing Courts</Typography>
+                            <Box sx={{ 
+                              height: 250, 
+                              position: 'relative',
+                              width: '100%',
+                              overflow: 'hidden',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              backgroundColor: '#fafafa'
+                            }}>
+                              <ReportChart
+                                type="bar"
+                                data={reportData.breakdown.topVenues}
+                                title="Top Performing Courts"
+                                useBrandColors={formattingOptions.useBrandColors}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* 场地利用率报告详细分析 */}
+                        {reportType === 'venue_utilization' && reportData.breakdown && (
+                          <>
+                            {/* 场地利用率详细数据 */}
+                            {reportData.breakdown.venueUtilizationDetails && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Utilization Details</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.breakdown.venueUtilizationDetails}
+                                    title="Court Utilization Details"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                                {/* 数据表格 */}
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="subtitle2" gutterBottom>Data Table</Typography>
+                                  <TableContainer component={Paper} sx={{ maxHeight: 150 }}>
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Court</TableCell>
+                                          <TableCell align="right">Utilization Rate (%)</TableCell>
+                                          <TableCell align="right">Total Hours</TableCell>
+                                          <TableCell align="right">Booked Hours</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {Object.entries(reportData.breakdown.venueUtilizationDetails).map(([venue, data]) => (
+                                          <TableRow key={venue}>
+                                            <TableCell>{venue}</TableCell>
+                                            <TableCell align="right">{data.utilizationRate}%</TableCell>
+                                            <TableCell align="right">{data.totalHours}</TableCell>
+                                            <TableCell align="right">{data.bookedHours}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 场地排名报告详细分析 */}
+                        {reportType === 'venue_ranking' && reportData.breakdown && (
+                          <>
+                            {/* 场地排名详细数据 */}
+                            {reportData.breakdown.venueRankingDetails && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Ranking Details</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.breakdown.venueRankingDetails}
+                                    title="Court Ranking Details"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                                {/* 数据表格 */}
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="subtitle2" gutterBottom>Data Table</Typography>
+                                  <TableContainer component={Paper} sx={{ maxHeight: 150 }}>
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Rank</TableCell>
+                                          <TableCell>Court</TableCell>
+                                          <TableCell align="right">Utilization Rate (%)</TableCell>
+                                          <TableCell align="right">Performance Score</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {Object.entries(reportData.breakdown.venueRankingDetails).map(([venue, data], index) => (
+                                          <TableRow key={venue}>
+                                            <TableCell>{index + 1}</TableCell>
+                                            <TableCell>{venue}</TableCell>
+                                            <TableCell align="right">{data.utilizationRate}%</TableCell>
+                                            <TableCell align="right">{data.performanceScore}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 高峰/非高峰分析报告详细分析 */}
+                        {reportType === 'peak_off_peak' && reportData.breakdown && (
+                          <>
+                            {/* 高峰时段详细数据 */}
+                            {reportData.breakdown.peakPeriodDetails && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>Peak Period Details</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.breakdown.peakPeriodDetails}
+                                    title="Peak Period Details"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                            
+                            {/* 非高峰时段详细数据 */}
+                            {reportData.breakdown.offPeakPeriodDetails && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>Off-Peak Period Details</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.breakdown.offPeakPeriodDetails}
+                                    title="Off-Peak Period Details"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* 场地类型偏好报告详细分析 */}
+                        {reportType === 'venue_type_preference' && reportData.breakdown && (
+                          <>
+                            {/* 场地类型偏好详细数据 */}
+                            {reportData.breakdown.venueTypePreferenceDetails && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>Court Type Preference Details</Typography>
+                                <Box sx={{ 
+                                  height: 250, 
+                                  position: 'relative',
+                                  width: '100%',
+                                  overflow: 'visible',
+                                  border: '1px solid #e0e0e0',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: '#fafafa'
+                                }}>
+                                  <ReportChart
+                                    type="bar"
+                                    data={reportData.breakdown.venueTypePreferenceDetails}
+                                    title="Court Type Preference Details"
+                                    useBrandColors={formattingOptions.useBrandColors}
+                                  />
+                                </Box>
+                                {/* 数据表格 */}
+                                <Box sx={{ mt: 1 }}>
+                                  <Typography variant="subtitle2" gutterBottom>Data Table</Typography>
+                                  <TableContainer component={Paper} sx={{ maxHeight: 150 }}>
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Court Type</TableCell>
+                                          <TableCell align="right">Booking Count</TableCell>
+                                          <TableCell align="right">Utilization Rate (%)</TableCell>
+                                          <TableCell align="right">Average Rating</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {Object.entries(reportData.breakdown.venueTypePreferenceDetails).map(([venueType, data]) => (
+                                          <TableRow key={venueType}>
+                                            <TableCell>{venueType}</TableCell>
+                                            <TableCell align="right">{data.bookingCount}</TableCell>
+                                            <TableCell align="right">{data.utilizationRate}%</TableCell>
+                                            <TableCell align="right">{data.averageRating}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
                       </Box>
                     )}
                     
@@ -994,26 +1735,50 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                         pb: 2,
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
                         position: 'relative',
                         width: '100%',
                         backgroundColor: 'rgba(102, 126, 234, 0.02)',
-                        borderRadius: '0 0 8px 8px'
+                        borderRadius: '0 0 8px 8px',
+                        minHeight: '60px',
+                        flexWrap: 'wrap',
+                        gap: 2
                       }}
                     >
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">
+                      <Box sx={{ flex: '1 1 200px', minWidth: 0 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
                           © {new Date().getFullYear()} {companyInfo?.name || 'Picklefy'}. All rights reserved.
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
                           {companyInfo?.website || 'www.picklefy.com'}
                         </Typography>
                       </Box>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Page 1 of 1
+                      <Box sx={{ 
+                        flex: '0 0 auto', 
+                        textAlign: 'right',
+                        minWidth: '200px', // 增加最小宽度
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        overflow: 'visible', // 确保内容不被截断
+                        wordBreak: 'keep-all'
+                      }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          textOverflow: 'clip',
+                          wordBreak: 'keep-all',
+                          fontSize: '11px'
+                        }}>
+                          Page 1 of {totalPages}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          textOverflow: 'clip',
+                          wordBreak: 'keep-all',
+                          fontSize: '11px'
+                        }}>
                           Report ID: {reportType.toUpperCase()}-{new Date().getTime().toString().slice(-6)}
                         </Typography>
                       </Box>
@@ -1027,7 +1792,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
           <Grid item xs={12}>
             <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', bgcolor: 'grey.50' }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2d3748', mb: 2, textAlign: 'center' }}>
-                Generate Report
+                Report Actions
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} sx={{ minWidth: '200px' }}>
@@ -1036,7 +1801,7 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                     variant="outlined"
                     size="large"
                     onClick={handlePreview}
-                    disabled={dataLoading || !reportData}
+                    disabled={dataLoading}
                     startIcon={<VisibilityIcon />}
                     sx={{
                       py: 1.5,
@@ -1055,29 +1820,12 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6} sx={{ minWidth: '200px' }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    size="large"
-                    onClick={handleGenerate}
-                    disabled={isGenerating || dataLoading || !reportData}
-                    startIcon={isGenerating ? <CircularProgress size={24} /> : <FileDownloadIcon />}
-                    sx={{
-                      py: 1.5,
-                      fontWeight: 600,
-                      fontSize: '0.95rem',
-                      letterSpacing: '0.5px',
-                      borderRadius: 1.5,
-                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-                      background: 'linear-gradient(90deg, #667eea, #764ba2)',
-                      '&:hover': {
-                        boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
-                        background: 'linear-gradient(90deg, #5c6bc0, #6a45a2)'
-                      }
-                    }}
-                  >
-                    {isGenerating ? 'Generating...' : 'Generate Report'}
-                  </Button>
+                  <SimplePDFExporter
+                    elementRef={previewRef}
+                    reportType={reportType}
+                    isExporting={isExporting}
+                    onExport={handleExport}
+                  />
                 </Grid>
               </Grid>
               

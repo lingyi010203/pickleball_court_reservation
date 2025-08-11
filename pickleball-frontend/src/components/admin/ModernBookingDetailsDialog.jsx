@@ -13,6 +13,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getStatusChip } from './statusConfig';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 const formatDate = (date) => {
   if (!date) return '-';
@@ -53,6 +54,7 @@ const ModernBookingDetailsDialog = ({
   cancellationRequest = null,
   isAdmin = false,
 }) => {
+  const { t } = useLanguage();
   usePageTheme('admin'); // 设置页面类型为admin
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [shareMenuAnchor, setShareMenuAnchor] = useState(null);
@@ -86,7 +88,7 @@ const ModernBookingDetailsDialog = ({
     
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(shareText).then(() => {
-        showSnackbar('Booking details copied to clipboard! 📋', 'success');
+        showSnackbar(t('admin.bookingDetailsCopiedToClipboard'), 'success');
       }).catch(() => {
         // 如果剪贴板API失败，使用传统方法
         const textArea = document.createElement('textarea');
@@ -95,7 +97,7 @@ const ModernBookingDetailsDialog = ({
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        showSnackbar('Booking details copied to clipboard! 📋', 'success');
+        showSnackbar(t('admin.bookingDetailsCopiedToClipboard'), 'success');
       });
     } else {
       // 传统方法
@@ -105,7 +107,7 @@ const ModernBookingDetailsDialog = ({
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      showSnackbar('Booking details copied to clipboard! 📋', 'success');
+      showSnackbar(t('admin.bookingDetailsCopiedToClipboard'), 'success');
     }
     handleShareMenuClose();
   };
@@ -152,7 +154,7 @@ const ModernBookingDetailsDialog = ({
       // 回退到预订日期
       return {
         date: formatDate(safeBooking.bookingDate),
-        timeRange: 'No slot info',
+        timeRange: t('admin.noSlotInfo'),
         duration: '-',
         isMultiSlot: false
       };
@@ -172,13 +174,13 @@ const ModernBookingDetailsDialog = ({
       }}
     >
       <DialogTitle sx={{ fontWeight: 700, fontSize: 22, pb: 1, background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-        {isAdmin ? 'Booking Details (Admin View)' : 'My Booking Details'}
+        {isAdmin ? t('admin.bookingDetailsAdminView') : t('admin.myBookingDetails')}
       </DialogTitle>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
         {/* 预订信息 */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-            Booking Info
+            {t('admin.bookingInfo')}
           </Typography>
           <Box sx={{ position: 'relative', mb: 2 }}>
             {/* ID 和 Status */}
@@ -195,11 +197,11 @@ const ModernBookingDetailsDialog = ({
             {isAdmin && (
               <Box sx={{ mt: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-                  Admin Information
+                  {t('admin.adminInformation')}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Booking Date</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('admin.bookingDate')}</Typography>
                     <Typography variant="body1" fontWeight={500}>
                       {formatDate(safeBooking.bookingDate)}
                     </Typography>
@@ -228,7 +230,7 @@ const ModernBookingDetailsDialog = ({
             {timeInfo.isMultiSlot && timeInfo.allSlots && timeInfo.allSlots.length > 1 && (
               <Box sx={{ mt: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
-                  All Time Slots:
+                  {t('admin.allTimeSlots')}
                 </Typography>
                 {timeInfo.allSlots.map((slot, index) => (
                   <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
@@ -240,7 +242,7 @@ const ModernBookingDetailsDialog = ({
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
               <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                Court:
+                {t('admin.court')}:
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
                 {safeBooking.courtName || '-'}
@@ -255,21 +257,21 @@ const ModernBookingDetailsDialog = ({
             {/* Duration, Total, Payment */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mt: 1 }}>
               <Box>
-                <Typography variant="caption" color="text.secondary">Duration</Typography>
+                <Typography variant="caption" color="text.secondary">{t('admin.duration')}</Typography>
                 <Typography variant="body1" fontWeight={500}>
                   {timeInfo.duration}
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Total Amount</Typography>
+                <Typography variant="caption" color="text.secondary">{t('admin.totalAmount')}</Typography>
                 <Typography variant="body1" fontWeight={500}>
                   {safeBooking.totalAmount != null ? `RM ${safeBooking.totalAmount.toFixed(2)}` : '-'}
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Payment Method</Typography>
+                <Typography variant="caption" color="text.secondary">{t('admin.paymentMethod')}</Typography>
                 <Typography variant="body1" fontWeight={500}>
-                  {safeBooking.paymentMethod === 'WALLET' ? 'Wallet' : (safeBooking.paymentMethod || '-')}
+                  {safeBooking.paymentMethod === 'WALLET' ? t('admin.wallet') : (safeBooking.paymentMethod || '-')}
                 </Typography>
               </Box>
             </Box>
@@ -279,7 +281,7 @@ const ModernBookingDetailsDialog = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mt: 1 }}>
                 {safeBooking.paymentType && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Payment Type</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('admin.paymentType')}</Typography>
                     <Typography variant="body1" fontWeight={500}>
                       {safeBooking.paymentType}
                     </Typography>
@@ -287,7 +289,7 @@ const ModernBookingDetailsDialog = ({
                 )}
                 {safeBooking.paymentStatus && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Payment Status</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('admin.paymentStatus')}</Typography>
                     <Typography variant="body1" fontWeight={500}>
                       {safeBooking.paymentStatus}
                     </Typography>
@@ -295,7 +297,7 @@ const ModernBookingDetailsDialog = ({
                 )}
                 {isAdmin && safeBooking.paymentId && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Payment ID</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('admin.paymentId')}</Typography>
                     <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
                       {safeBooking.paymentId}
                     </Typography>
@@ -303,7 +305,7 @@ const ModernBookingDetailsDialog = ({
                 )}
                 {isAdmin && safeBooking.transactionId && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary">Transaction ID</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('admin.transactionId')}</Typography>
                     <Typography variant="body1" fontWeight={500} sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
                       {safeBooking.transactionId}
                     </Typography>
@@ -319,12 +321,12 @@ const ModernBookingDetailsDialog = ({
         {(safeBooking.purpose || safeBooking.numberOfPlayers || safeBooking.numPaddles || safeBooking.buyBallSet) && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Booking Details
+              {t('admin.bookingDetails')}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
               {safeBooking.purpose && (
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Purpose</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('admin.purpose')}</Typography>
                   <Typography variant="body1" fontWeight={500}>
                     {safeBooking.purpose}
                   </Typography>
@@ -332,7 +334,7 @@ const ModernBookingDetailsDialog = ({
               )}
               {safeBooking.numberOfPlayers && (
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Number of Players</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('admin.numberOfPlayers')}</Typography>
                   <Typography variant="body1" fontWeight={500}>
                     {safeBooking.numberOfPlayers}
                   </Typography>
@@ -340,7 +342,7 @@ const ModernBookingDetailsDialog = ({
               )}
               {safeBooking.numPaddles > 0 && (
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Paddles Rented</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('admin.paddlesRented')}</Typography>
                   <Typography variant="body1" fontWeight={500}>
                     {safeBooking.numPaddles} (RM{safeBooking.numPaddles * 5})
                   </Typography>
@@ -348,7 +350,7 @@ const ModernBookingDetailsDialog = ({
               )}
               {safeBooking.buyBallSet && (
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Ball Set</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('admin.ballSet')}</Typography>
                   <Typography variant="body1" fontWeight={500}>
                     Yes (RM12)
                   </Typography>
@@ -362,12 +364,12 @@ const ModernBookingDetailsDialog = ({
         {!isAdmin && (safeBooking.numPaddles > 0 || safeBooking.buyBallSet) && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Cost Breakdown
+              {t('admin.costBreakdown')}
             </Typography>
             <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Court Rental ({timeInfo.duration})
+                  {t('admin.courtRental')} ({timeInfo.duration})
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
                   RM {(safeBooking.totalAmount - (safeBooking.numPaddles * 5) - (safeBooking.buyBallSet ? 12 : 0)).toFixed(2)}
@@ -376,7 +378,7 @@ const ModernBookingDetailsDialog = ({
               {safeBooking.numPaddles > 0 && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Paddles ({safeBooking.numPaddles} × RM5)
+                    {t('admin.paddles')} ({safeBooking.numPaddles} × RM5)
                   </Typography>
                   <Typography variant="body2" fontWeight={500}>
                     RM {(safeBooking.numPaddles * 5).toFixed(2)}
@@ -386,7 +388,7 @@ const ModernBookingDetailsDialog = ({
               {safeBooking.buyBallSet && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Ball Set
+                    {t('admin.ballSet')}
                   </Typography>
                   <Typography variant="body2" fontWeight={500}>
                     RM 12.00
@@ -396,7 +398,7 @@ const ModernBookingDetailsDialog = ({
               <Divider sx={{ my: 1 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body1" fontWeight={600}>
-                  Total
+                  {t('admin.total')}
                 </Typography>
                 <Typography variant="body1" fontWeight={600} color="primary">
                   RM {safeBooking.totalAmount?.toFixed(2) || '0.00'}
@@ -410,7 +412,7 @@ const ModernBookingDetailsDialog = ({
         {isAdmin && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Member Information
+              {t('admin.memberInformation')}
           </Typography>
             <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -422,14 +424,14 @@ const ModernBookingDetailsDialog = ({
                 {safeBooking.memberName || 'N/A'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                    Member ID: {safeBooking.memberId || 'N/A'}
+                    {t('admin.memberId')}: {safeBooking.memberId || 'N/A'}
                   </Typography>
                 </Box>
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Phone
+                    {t('admin.phone')}
                   </Typography>
                   <Typography variant="body2" fontWeight={500}>
                     {safeBooking.memberPhone || 'N/A'}
@@ -437,7 +439,7 @@ const ModernBookingDetailsDialog = ({
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Email
+                    {t('admin.email')}
               </Typography>
                   <Typography variant="body2" fontWeight={500}>
                     {safeBooking.memberEmail || 'N/A'}
@@ -452,7 +454,7 @@ const ModernBookingDetailsDialog = ({
         {safeCancellation.reason && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Cancellation Reason
+              {t('admin.cancellationReason')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {safeCancellation.reason}
@@ -464,32 +466,32 @@ const ModernBookingDetailsDialog = ({
         {!isAdmin && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Booking Notes
+              {t('admin.bookingNotes')}
             </Typography>
             <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2, border: '1px solid #bbdefb' }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                • Please arrive 10 minutes before your booking time ({timeInfo.timeRange})
+                • {t('admin.pleaseArrive10MinutesBefore')} ({timeInfo.timeRange})
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                • Bring your own water bottle and comfortable sports attire
-              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  • {t('admin.bringYourOwnWaterBottle')}
+                </Typography>
               {safeBooking.numPaddles > 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  • {safeBooking.numPaddles} paddle{safeBooking.numPaddles > 1 ? 's' : ''} will be available at the court reception
+                  • {safeBooking.numPaddles} {t('admin.paddlesWillBeAvailable')}
                 </Typography>
               )}
               {safeBooking.buyBallSet && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  • Ball set will be provided at the court
+                  • {t('admin.ballSetWillBeProvided')}
                 </Typography>
               )}
               {safeBooking.numberOfPlayers && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  • Booking is for {safeBooking.numberOfPlayers} player{safeBooking.numberOfPlayers > 1 ? 's' : ''}
+                  • {t('admin.bookingIsForPlayers').replace('player(s)', `${safeBooking.numberOfPlayers} player${safeBooking.numberOfPlayers > 1 ? 's' : ''}`)}
                 </Typography>
               )}
               <Typography variant="body2" color="text.secondary">
-                • For any issues, please contact our support team
+                • {t('admin.forAnyIssuesContactSupport')}
               </Typography>
             </Box>
           </Box>
@@ -498,7 +500,7 @@ const ModernBookingDetailsDialog = ({
         {isAdmin && safeCancellation.adminRemark && (
           <Box>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Admin Remark
+              {t('admin.adminRemark')}
             </Typography>
             {editableRemark ? (
               <TextField
@@ -507,7 +509,7 @@ const ModernBookingDetailsDialog = ({
                 minRows={2}
                 value={adminRemark}
                 onChange={e => onAdminRemarkChange(e.target.value)}
-                placeholder="Enter admin remark..."
+                placeholder={t('admin.enterAdminRemark')}
                 disabled={loading}
               />
             ) : (
@@ -523,7 +525,7 @@ const ModernBookingDetailsDialog = ({
         {!isAdmin && safeBooking.status === 'CONFIRMED' && (
           <Box sx={{ mb: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
-              Quick Actions
+              {t('admin.quickActions')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Button
@@ -555,10 +557,10 @@ const ModernBookingDetailsDialog = ({
                   
                   // 打开Google Calendar
                   window.open(calendarUrl, '_blank');
-                  showSnackbar('Calendar event created! 📅', 'success');
+                  showSnackbar(t('admin.calendarEventCreated'), 'success');
                 }}
               >
-                Add to Calendar
+                {t('admin.addToCalendar')}
               </Button>
               <Button
                 size="small"
@@ -567,7 +569,7 @@ const ModernBookingDetailsDialog = ({
                 startIcon={<ShareIcon />}
                 onClick={handleShareMenuOpen}
               >
-                Share
+                {t('admin.share')}
               </Button>
             </Box>
           </Box>
@@ -576,7 +578,7 @@ const ModernBookingDetailsDialog = ({
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
         {loading && <CircularProgress size={24} sx={{ mr: 2 }} />}
         <Button onClick={onClose} color="primary" variant="outlined">
-          Close
+          {t('admin.close')}
         </Button>
         </Box>
       </DialogActions>
@@ -599,13 +601,13 @@ const ModernBookingDetailsDialog = ({
           <ListItemIcon>
             <WhatsAppIcon sx={{ color: '#25D366' }} />
           </ListItemIcon>
-          <ListItemText primary="Share via WhatsApp" />
+          <ListItemText primary={t('admin.shareViaWhatsApp')} />
         </MenuItem>
         <MenuItem onClick={copyToClipboard}>
           <ListItemIcon>
             <ContentCopyIcon />
           </ListItemIcon>
-          <ListItemText primary="Copy to Clipboard" />
+          <ListItemText primary={t('admin.copyToClipboard')} />
         </MenuItem>
       </Menu>
       

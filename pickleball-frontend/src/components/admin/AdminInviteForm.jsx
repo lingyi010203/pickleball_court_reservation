@@ -3,21 +3,23 @@ import { Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextFie
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import { usePageTheme } from '../../hooks/usePageTheme';
-
-const roleOptions = [
-  { value: 'User', label: 'User' },
-  { value: 'Coach', label: 'Coach' },
-  { value: 'EventOrganizer', label: 'Event Organizer' },
-  { value: 'Admin', label: 'Admin' }
-];
+import { useLanguage } from '../../context/LanguageContext';
 
 const AdminInviteForm = ({ open, onClose, onSuccess }) => {
   usePageTheme('admin'); // 设置页面类型为admin
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('User');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const roleOptions = [
+    { value: 'User', label: t('admin.user') },
+    { value: 'Coach', label: t('admin.coach') },
+    { value: 'EventOrganizer', label: t('admin.eventOrganizer') },
+    { value: 'Admin', label: t('admin.admin') }
+  ];
 
   useEffect(() => {
     if (!open) {
@@ -37,12 +39,12 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSuccess('Invitation sent successfully!');
+      setSuccess(t('admin.invitationSentSuccessfully'));
       setEmail('');
       setRole('User');
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send invitation');
+      setError(err.response?.data?.message || t('admin.failedToSendInvitation'));
     } finally {
       setLoading(false);
     }
@@ -58,14 +60,14 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
         }
       }}
     >
-      <DialogTitle sx={{ fontWeight: 700, color: 'primary.main', pb: 1 }}>Send Registration Invitation</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700, color: 'primary.main', pb: 1 }}>{t('admin.sendRegistrationInvitation')}</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           <TextField
             fullWidth
-            label="Recipient Email"
+            label={t('admin.recipientEmail')}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -74,11 +76,11 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
             sx={{ borderRadius: 2 }}
           />
           <FormControl fullWidth margin="normal">
-            <InputLabel>Role</InputLabel>
+            <InputLabel>{t('admin.role')}</InputLabel>
             <Select
               value={role}
               onChange={e => setRole(e.target.value)}
-              label="Role"
+              label={t('admin.role')}
               required
               sx={{ borderRadius: 2 }}
             >
@@ -101,7 +103,7 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
             minWidth: 120
           }}
         >
-          Cancel
+          {t('admin.cancel')}
         </Button>
         <Button
           onClick={handleSubmit}
@@ -119,7 +121,7 @@ const AdminInviteForm = ({ open, onClose, onSuccess }) => {
             '&:hover': { backgroundColor: 'primary.dark', boxShadow: 4 }
           }}
         >
-          {loading ? 'Sending...' : 'Send Invitation'}
+          {loading ? t('admin.sending') : t('admin.sendInvitation')}
         </Button>
       </DialogActions>
     </Dialog>
