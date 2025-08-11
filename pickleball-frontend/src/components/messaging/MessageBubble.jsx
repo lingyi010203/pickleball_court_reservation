@@ -2,11 +2,12 @@
 import React from 'react';
 import { ListItem, Box, Typography, Avatar, Tooltip } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
+import { useAuth } from '../../context/AuthContext';
 
 const MessageBubble = ({ message }) => {
   const theme = useTheme();
-  const currentUser = JSON.parse(localStorage.getItem('currentUser')) || {};
-  const currentUsername = currentUser.username || '';
+  const { currentUser } = useAuth();
+  const currentUsername = currentUser?.username || '';
   const isOwn = currentUsername.toLowerCase() === (message.senderUsername || '').toLowerCase();
   
   const formatTimestamp = (timestamp) => {
@@ -38,21 +39,23 @@ const MessageBubble = ({ message }) => {
           src={message.senderProfileImage}
           sx={{ 
             mr: 1.5, 
-            width: 40, 
-            height: 40, 
+            width: 36, 
+            height: 36, 
             boxShadow: theme.shadows[1],
             border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
           }}
-        />
+        >
+          {(message.senderUsername || 'U').substring(0, 2).toUpperCase()}
+        </Avatar>
       )}
       
       <Box
         sx={{
           background: isOwn
-            ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.dark, 0.9)})`
+            ? `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.9)}, ${alpha(theme.palette.primary.main, 0.8)})`
             : theme.palette.mode === 'dark'
-              ? alpha(theme.palette.grey[800], 0.8)
-              : alpha(theme.palette.grey[50], 0.95),
+              ? alpha(theme.palette.grey[700], 0.8)
+              : alpha(theme.palette.grey[100], 0.95),
           color: isOwn ? theme.palette.common.white : theme.palette.text.primary,
           p: 2,
           borderRadius: '18px',
@@ -67,8 +70,8 @@ const MessageBubble = ({ message }) => {
           position: 'relative',
           transition: 'transform 0.2s, box-shadow 0.2s',
           '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: theme.shadows[3]
+            transform: 'translateY(-1px)',
+            boxShadow: theme.shadows[2]
           }
         }}
       >
@@ -95,9 +98,10 @@ const MessageBubble = ({ message }) => {
         
         {message.content && (
           <Typography variant="body1" sx={{ 
-            fontSize: '1.05rem', 
-            lineHeight: 1.6,
-            whiteSpace: 'pre-wrap'
+            fontSize: '0.95rem', 
+            lineHeight: 1.5,
+            whiteSpace: 'pre-wrap',
+            fontWeight: 400
           }}>
             {message.content}
           </Typography>
@@ -107,7 +111,7 @@ const MessageBubble = ({ message }) => {
           display: 'flex',
           justifyContent: 'flex-end',
           alignItems: 'center',
-          mt: 1.5,
+          mt: 1,
           gap: 0.5
         }}>
           <Tooltip title={new Date(message.timestamp).toLocaleString()} arrow>
@@ -115,7 +119,8 @@ const MessageBubble = ({ message }) => {
               variant="caption"
               sx={{
                 color: isOwn ? alpha(theme.palette.common.white, 0.7) : theme.palette.text.secondary,
-                fontSize: '0.75rem'
+                fontSize: '0.7rem',
+                fontWeight: 400
               }}
             >
               {formatTimestamp(message.timestamp)}
@@ -132,8 +137,24 @@ const MessageBubble = ({ message }) => {
                     ? theme.palette.info.light
                     : alpha(theme.palette.common.white, 0.5),
                 fontWeight: 'bold',
-                fontSize: '1.1em',
-                ml: 0.5
+                fontSize: '1em',
+                ml: 0.5,
+                transition: 'color 0.3s ease',
+                animation: message.read ? 'pulse 1s ease-in-out' : 'none',
+                '@keyframes pulse': {
+                  '0%': {
+                    transform: 'scale(1)',
+                    opacity: 0.7
+                  },
+                  '50%': {
+                    transform: 'scale(1.2)',
+                    opacity: 1
+                  },
+                  '100%': {
+                    transform: 'scale(1)',
+                    opacity: 0.7
+                  }
+                }
               }}
             >
               {message.read ? '✓✓' : message.delivered ? '✓' : ''}
@@ -144,15 +165,17 @@ const MessageBubble = ({ message }) => {
       
       {isOwn && (
         <Avatar
-          src={currentUser.profileImage}
+          src={currentUser?.profileImage}
           sx={{ 
             ml: 1.5, 
-            width: 40, 
-            height: 40, 
+            width: 36, 
+            height: 36, 
             boxShadow: theme.shadows[1],
             border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
           }}
-        />
+        >
+          {(currentUser?.username || 'U').substring(0, 2).toUpperCase()}
+        </Avatar>
       )}
     </ListItem>
   );

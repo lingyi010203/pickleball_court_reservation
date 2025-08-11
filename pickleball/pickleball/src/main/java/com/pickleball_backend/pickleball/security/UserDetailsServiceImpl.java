@@ -30,6 +30,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         if ("EventOrganizer".equalsIgnoreCase(account.getUser().getUserType())) {
             authorities.add(new SimpleGrantedAuthority("ROLE_EVENTORGANIZER"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_USER")); // EventOrganizer 也應該有USER權限
         }
         if ("Admin".equalsIgnoreCase(account.getUser().getUserType())) {
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));

@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDate;
 
 @Entity
@@ -31,10 +32,12 @@ public class Booking {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "user_id")
+    @ToString.Exclude
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", nullable = false)
+    @ToString.Exclude
     private Payment payment;
 
     @Column(name = "purpose")
@@ -53,9 +56,11 @@ public class Booking {
     private Integer purposeId;
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL)
+    @ToString.Exclude
     private java.util.List<BookingSlot> bookingSlots;
 
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
+    @ToString.Exclude
     private CancellationRequest cancellationRequest;
 
     public enum status {

@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -68,9 +69,11 @@ public class Payment {
     private Double originalAmount;
 
     @OneToOne(mappedBy = "payment")
+    @ToString.Exclude
     private Booking booking;
 
     @OneToOne(mappedBy = "payment")
+    @ToString.Exclude
     private ClassSession session;
 
     @PrePersist

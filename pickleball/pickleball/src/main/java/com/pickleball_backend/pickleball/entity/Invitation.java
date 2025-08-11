@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -22,5 +23,6 @@ public class Invitation {
 
     @ManyToOne
     @JoinColumn(name = "admin_id")
+    @ToString.Exclude
     private Admin createdBy;
 }

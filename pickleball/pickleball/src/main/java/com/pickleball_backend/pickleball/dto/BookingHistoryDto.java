@@ -26,4 +26,7 @@ public class BookingHistoryDto {
     
     // 新增：用户是否已经评价过这个预订
     private Boolean hasReviewed;
+    
+    // 新增：預訂類型（COURT_BOOKING, EVENT_REGISTRATION）
+    private String bookingType = "COURT_BOOKING";
 }

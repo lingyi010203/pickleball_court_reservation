@@ -9,20 +9,12 @@ export const AuthProvider = ({ children }) => {
     const userToken = localStorage.getItem('authToken');
     const adminToken = localStorage.getItem('adminToken');
     
-    console.log('AuthContext initialization:', {
-      userToken: !!userToken,
-      adminToken: !!adminToken,
-      adminUsername: localStorage.getItem('adminUsername')
-    });
-    
     // If we have an admin token, use it
     if (adminToken) {
-      console.log('Using admin token for initialization');
       return adminToken;
     }
     
     // Otherwise use user token
-    console.log('Using user token for initialization');
     return userToken || null;
   });
   
@@ -42,13 +34,10 @@ export const AuthProvider = ({ children }) => {
 
   // Decode token and set current user on initial load and when token changes
   useEffect(() => {
-    console.log('AuthContext useEffect triggered with authToken:', !!authToken);
-    
     if (authToken) {
       try {
         // Decode JWT to get user information
         const decodedToken = jwtDecode(authToken);
-        console.log('Decoded JWT token:', decodedToken); // 調試日誌
         
         // Extract user information from token
         const role = decodedToken.role || '';
@@ -59,35 +48,22 @@ export const AuthProvider = ({ children }) => {
           id: decodedToken.userId || decodedToken.sub, // 優先使用 userId，如果沒有則使用 sub
           username: decodedToken.username || decodedToken.sub, // 優先使用 username，如果沒有則使用 sub
           email: decodedToken.email,
+          userType: decodedToken.userType || cleanRole, // 優先使用 userType，如果沒有則使用清理後的 role
           role: cleanRole,
-          userType: decodedToken.userType || cleanRole, // 優先使用 userType，如果沒有則使用 role
-          token: authToken
+          isAdmin: decodedToken.isAdmin || false
         };
         
-        console.log('Created user object:', user); // 調試日誌
         setCurrentUser(user);
+        // Save user info to localStorage for other components
         localStorage.setItem('currentUser', JSON.stringify(user));
       } catch (error) {
-        console.error('Failed to decode token:', error);
-        // Don't logout immediately on decode error, try to restore from localStorage
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-          try {
-            const parsedUser = JSON.parse(savedUser);
-            setCurrentUser(parsedUser);
-            console.log('Restored user from localStorage:', parsedUser);
-          } catch (parseError) {
-            console.error('Failed to parse saved user:', parseError);
-            logout();
-          }
-        } else {
-          console.log('No saved user found, logging out');
-          logout();
-        }
+        console.error('Error decoding token:', error);
+        setCurrentUser(null);
+        localStorage.removeItem('currentUser');
       }
     } else {
-      console.log('No authToken, setting currentUser to null');
       setCurrentUser(null);
+      localStorage.removeItem('currentUser');
     }
   }, [authToken]);
 

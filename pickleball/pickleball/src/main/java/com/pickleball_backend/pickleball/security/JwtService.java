@@ -26,10 +26,25 @@ public class JwtService {
 
     public String generateTokenWithUserId(String subject, String role, Integer userId) {
         String cleanedRole = role.toUpperCase().replace("ROLE_", "");
+        // 從 role 中提取原始的 userType（移除 ROLE_ 前綴，但保持原始大小寫）
+        String originalUserType = role.replace("ROLE_", "");
+        
+        // 將 userType 轉換為正確的格式
+        String userType;
+        if ("EVENTORGANIZER".equalsIgnoreCase(originalUserType)) {
+            userType = "EventOrganizer";
+        } else if ("COACH".equalsIgnoreCase(originalUserType)) {
+            userType = "Coach";
+        } else if ("ADMIN".equalsIgnoreCase(originalUserType)) {
+            userType = "Admin";
+        } else {
+            userType = originalUserType;
+        }
+        
         return Jwts.builder()
                 .subject(subject)
                 .claim("role", cleanedRole)
-                .claim("userType", cleanedRole) // 添加 userType 聲明
+                .claim("userType", userType) // 使用正確格式的 userType
                 .claim("userId", userId)
                 .claim("username", subject) // 添加 username 聲明
                 .issuedAt(new Date())

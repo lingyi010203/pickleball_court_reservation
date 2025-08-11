@@ -33,6 +33,7 @@ public class CourtServiceImpl implements CourtService {
     private final PaymentRepository paymentRepository;
     private final BookingSlotRepository bookingSlotRepository;
     private final FriendlyMatchService friendlyMatchService;
+    private final EventRepository eventRepository;
     @Autowired
     private VenueRepository venueRepository;
     private static final Map<String, DayOfWeek> DAY_OF_WEEK_MAP = Map.of(
@@ -607,7 +608,32 @@ public class CourtServiceImpl implements CourtService {
                 }
             }
         }
-        // 4. 过滤出未被预订的球场
+        
+        // 4. 新增：查询该日期、时间段有冲突的Event
+        Set<Integer> eventBookedCourtIds = new HashSet<>();
+        List<Event> events = eventRepository.findAll();
+        for (Event event : events) {
+            if ("CANCELLED".equalsIgnoreCase(event.getStatus())) continue;
+            if (event.getCourts() == null) continue;
+            
+            // 检查Event是否在指定日期和时间段
+            if (date.equals(event.getStartTime().toLocalDate())) {
+                java.time.LocalTime eventStart = event.getStartTime().toLocalTime();
+                java.time.LocalTime eventEnd = event.getEndTime().toLocalTime();
+                
+                // 判断时间段是否有重叠
+                if (!(end.isBefore(eventStart) || start.isAfter(eventEnd))) {
+                    for (Court eventCourt : event.getCourts()) {
+                        eventBookedCourtIds.add(eventCourt.getId());
+                    }
+                }
+            }
+        }
+        
+        // 5. 合并所有冲突的场地球场ID
+        bookedCourtIds.addAll(eventBookedCourtIds);
+        
+        // 6. 过滤出未被预订的球场
         return allCourts.stream()
                 .filter(court -> !bookedCourtIds.contains(court.getId()))
                 .collect(Collectors.toList());

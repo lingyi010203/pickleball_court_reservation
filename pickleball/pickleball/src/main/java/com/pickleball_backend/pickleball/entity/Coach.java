@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -17,6 +18,7 @@ public class Coach {
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 
     @Column(name = "experience_year")
@@ -28,5 +30,6 @@ public class Coach {
         joinColumns = @JoinColumn(name = "coach_id"),
         inverseJoinColumns = @JoinColumn(name = "venue_id")
     )
+    @ToString.Exclude
     private Set<Venue> venues = new HashSet<>();
 }

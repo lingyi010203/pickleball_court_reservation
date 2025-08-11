@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import { usePageTheme } from '../../hooks/usePageTheme';
 
@@ -226,14 +227,29 @@ const ReportChart = ({ type, data, title, useBrandColors = true }) => {
         borderWidth: 1,
         cornerRadius: 8,
         displayColors: true,
+        enabled: true,
+        mode: 'index',
+        intersect: false,
         callbacks: {
           label: function(context) {
             const label = context.dataset.label || '';
             const value = context.parsed.y || context.parsed;
-            return `${label}: ${value}`;
+            if (title.includes('Revenue')) {
+              return `${label}: RM ${value.toLocaleString()}`;
+            }
+            return `${label}: ${value.toLocaleString()}`;
+          },
+          afterLabel: function(context) {
+            if (type === 'pie') {
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((context.parsed / total) * 100).toFixed(1);
+              return `Percentage: ${percentage}%`;
+            }
+            return '';
           }
         }
-      }
+      },
+
     },
     scales: type !== 'pie' ? {
       x: {
@@ -308,16 +324,29 @@ const ReportChart = ({ type, data, title, useBrandColors = true }) => {
   }
 
   // 渲染对应的图表类型
-  switch (type) {
-    case 'bar':
-      return <Bar data={chartData} options={options} height={300} />;
-    case 'line':
-      return <Line data={chartData} options={options} height={300} />;
-    case 'pie':
-      return <Pie data={chartData} options={options} height={300} />;
-    default:
-      return <Bar data={chartData} options={options} height={300} />;
-  }
+  const renderChart = () => {
+    switch (type) {
+      case 'bar':
+        return <Bar key={`${title}-${type}`} data={chartData} options={options} height={300} />;
+      case 'line':
+        return <Line key={`${title}-${type}`} data={chartData} options={options} height={300} />;
+      case 'pie':
+        return <Pie key={`${title}-${type}`} data={chartData} options={options} height={300} />;
+      default:
+        return <Bar key={`${title}-${type}`} data={chartData} options={options} height={300} />;
+    }
+  };
+
+  return (
+    <div style={{ 
+      width: '100%', 
+      height: '300px', 
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {renderChart()}
+    </div>
+  );
 };
 
 export default ReportChart; 

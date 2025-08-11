@@ -67,4 +67,15 @@ public class EventRegistrationController {
             .collect(Collectors.toList());
         return ResponseEntity.ok(profiles);
     }
+
+    @PostMapping("/event/{eventId}/distribute-escrow")
+    @PreAuthorize("hasRole('EVENTORGANIZER')")
+    public ResponseEntity<?> distributeEventEscrow(@PathVariable Integer eventId) {
+        try {
+            eventRegistrationService.distributeEventEscrow(eventId);
+            return ResponseEntity.ok("Event escrow distributed successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to distribute escrow: " + e.getMessage());
+        }
+    }
 }

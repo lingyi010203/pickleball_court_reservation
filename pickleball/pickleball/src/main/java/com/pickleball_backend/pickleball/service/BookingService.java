@@ -4,6 +4,7 @@ import com.pickleball_backend.pickleball.dto.*;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.exception.ValidationException;
+import com.pickleball_backend.pickleball.exception.ConflictException;
 import com.pickleball_backend.pickleball.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,9 @@ public class BookingService {
     private final TierService tierService;
     private final ClassSessionRepository classSessionRepository;
     private final VoucherRedemptionService voucherRedemptionService; // 新增：優惠券服務
+    private final EventRegistrationRepository eventRegistrationRepository; // 新增：事件註冊倉庫
+    private final EventRepository eventRepository; // 新增：事件倉庫
+    private final MemberService memberService; // 新增：會員服務
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private static final String CANCELLED_STATUS = "CANCELLED";
@@ -91,6 +96,24 @@ public class BookingService {
                 throw new ValidationException("Selected slots are not consecutive");
             }
         }
+        
+        // 新增：檢查與Event的衝突
+        for (Slot slot : slots) {
+            // 檢查是否有Event在這個時段使用這個場地
+            List<Event> conflictingEvents = eventRepository.findByCourtsIdAndStartTimeBetweenAndStatusNot(
+                slot.getCourtId(),
+                LocalDateTime.of(slot.getDate(), slot.getStartTime()),
+                LocalDateTime.of(slot.getDate(), slot.getEndTime()),
+                "CANCELLED"
+            );
+            
+            if (!conflictingEvents.isEmpty()) {
+                Event conflictingEvent = conflictingEvents.get(0);
+                throw new ConflictException("Court is reserved for event: " + conflictingEvent.getTitle() + 
+                    " during the selected time");
+            }
+        }
+        
         // 校验全部可用
         for (Slot slot : slots) {
             if (!slot.isAvailable() || isSlotBooked(slot.getId())) {
@@ -416,7 +439,14 @@ public class BookingService {
             createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
                                   "BOOKING", booking.getId(), "Booking cancellation refund (50%)");
 
-            // 6. 更新用户统计数据（减少预订小时数）
+            // 6. 扣除積分（扣除50%的積分，與退款比例一致）
+            Member member = booking.getMember();
+            MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, booking.getTotalAmount(), 0.5);
+            
+            log.info("Deducted {} tier points and {} reward points from member {} for booking cancellation {}",
+                    deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId(), booking.getId());
+
+            // 7. 更新用户统计数据（减少预订小时数）
             User user = booking.getMember().getUser();
             double cancelledHours = booking.getBookingSlots().stream()
                     .mapToDouble(bs -> bs.getSlot().getDurationHours())
@@ -425,14 +455,14 @@ public class BookingService {
             user.setAmountSpent(Math.max(0, user.getAmountSpent() - booking.getTotalAmount()));
             userRepository.save(user);
 
-            // 7. 更新支付状态
+            // 8. 更新支付状态
             Payment payment = booking.getPayment();
             if (payment != null) {
                 payment.setStatus("REFUNDED");
                 paymentRepository.save(payment);
             }
 
-            // 8. 发送邮件通知
+            // 9. 发送邮件通知
             Court court = courtRepository.findById(slot.getCourtId())
                 .orElseThrow(() -> new ResourceNotFoundException("Court not found"));
             emailService.sendCancellationDecision(
@@ -511,8 +541,17 @@ public class BookingService {
 
                     // 檢查是否有已預訂的 BookingSlot
                     boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
+                    
+                    // 新增：檢查是否有Event衝突
+                    List<Event> conflictingEvents = eventRepository.findByCourtsIdAndStartTimeBetweenAndStatusNot(
+                        slot.getCourtId(),
+                        startDateTime,
+                        endDateTime,
+                        "CANCELLED"
+                    );
+                    boolean hasEventConflict = !conflictingEvents.isEmpty();
 
-                    return !hasActiveClassSessions && !isBooked; // 只有沒有課程預約且未預訂的時段才可用
+                    return !hasActiveClassSessions && !isBooked && !hasEventConflict; // 只有沒有課程預約、未預訂且沒有Event衝突的時段才可用
                 })
                 .map(slot -> {
                     SlotResponseDto dto = new SlotResponseDto();
@@ -614,7 +653,14 @@ public class BookingService {
             createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
                                   "BOOKING", booking.getId(), "Booking cancellation refund (50%) - Admin approved");
 
-            // 5. 更新支付状态
+            // 5. 扣除積分（扣除50%的積分，與退款比例一致）
+            Member member = booking.getMember();
+            MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, booking.getTotalAmount(), 0.5);
+            
+            log.info("Deducted {} tier points and {} reward points from member {} for admin-approved booking cancellation {}",
+                    deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId(), booking.getId());
+
+            // 6. 更新支付状态
             Payment payment = booking.getPayment();
             if (payment != null) {
                 payment.setStatus("REFUNDED");
@@ -685,6 +731,12 @@ public class BookingService {
         try {
             List<Booking> bookings = bookingRepository.findByMemberId(memberId);
             log.info("Found {} bookings for member {}", bookings.size(), memberId);
+            
+            // 獲取事件註冊記錄
+            Integer userId = memberRepository.findById(memberId).map(Member::getUser).map(User::getId).orElse(null);
+            List<EventRegistration> eventRegistrations = userId != null ? 
+                eventRegistrationRepository.findByUser_Id(userId) : List.of();
+            log.info("Found {} event registrations for member {}", eventRegistrations.size(), memberId);
 
             // 自動修正已過期的CONFIRMED預訂為COMPLETED
             LocalDateTime now = LocalDateTime.now();
@@ -717,7 +769,7 @@ public class BookingService {
                 bookings = bookingRepository.findByMemberId(memberId);
             }
 
-            return bookings.stream()
+            List<BookingHistoryDto> bookingDtos = bookings.stream()
                     .filter(booking -> status == null || booking.getStatus().equalsIgnoreCase(status))
                     .map(booking -> {
                         try {
@@ -819,6 +871,7 @@ public class BookingService {
                                                 && feedback.getBooking().getId().equals(booking.getId()));
                             }
                             dto.setHasReviewed(hasReviewed);
+                            dto.setBookingType("COURT_BOOKING"); // 標記為場地預訂
                             
                             return dto;
                         } catch (Exception e) {
@@ -836,10 +889,106 @@ public class BookingService {
                                     dto.setCourtId(firstSlot.getCourtId());
                                 }
                             }
+                            dto.setBookingType("COURT_BOOKING"); // 標記為場地預訂
                             return dto;
                         }
                     })
                     .collect(Collectors.toList());
+            
+            // 將事件註冊記錄轉換為 BookingHistoryDto 格式
+            List<BookingHistoryDto> eventDtos = eventRegistrations.stream()
+                .map(eventReg -> {
+                    try {
+                        BookingHistoryDto dto = new BookingHistoryDto();
+                        dto.setId(eventReg.getRegistrationId()); // 使用 registrationId 作為 ID
+                        dto.setCourtId(null); // 事件沒有 courtId
+                        dto.setCourtName(eventReg.getEvent().getTitle()); // 使用事件標題作為 courtName
+                        dto.setLocation(eventReg.getEvent().getLocation()); // 使用事件地點
+                        dto.setDate(eventReg.getEvent().getStartTime().toLocalDate()); // 使用事件開始日期
+                        dto.setStartTime(eventReg.getEvent().getStartTime().toLocalTime()); // 使用事件開始時間
+                        dto.setEndTime(eventReg.getEvent().getEndTime() != null ? 
+                            eventReg.getEvent().getEndTime().toLocalTime() : 
+                            eventReg.getEvent().getStartTime().plusHours(2).toLocalTime()); // 使用事件結束時間或默認2小時
+                        dto.setAmount(eventReg.getFeeAmount() != null ? eventReg.getFeeAmount() : 0.0);
+                        
+                        // 根據事件時間和註冊狀態計算顯示狀態
+                        String displayStatus = eventReg.getStatus();
+                        if ("REGISTERED".equals(eventReg.getStatus())) {
+                            LocalDateTime eventStartTime = eventReg.getEvent().getStartTime();
+                            LocalDateTime eventEndTime = eventReg.getEvent().getEndTime();
+                            LocalDateTime currentTime = LocalDateTime.now();
+                            
+                            // 檢查事件時間是否為 null
+                            if (eventStartTime == null) {
+                                log.warn("Event {} has null start time, defaulting to UPCOMING", eventReg.getEvent().getTitle());
+                                displayStatus = "UPCOMING";
+                            } else {
+                                // 添加詳細的調試日誌
+                                log.info("=== Event Status Calculation Debug ===");
+                                log.info("Event: {}", eventReg.getEvent().getTitle());
+                                log.info("Event Start Time: {}", eventStartTime);
+                                log.info("Event End Time: {}", eventEndTime);
+                                log.info("Current Time: {}", currentTime);
+                                log.info("Is current time after end time? {}", eventEndTime != null && currentTime.isAfter(eventEndTime));
+                                log.info("Is current time before start time? {}", eventStartTime != null && currentTime.isBefore(eventStartTime));
+                                log.info("Is current time between start and end? {}", 
+                                    eventStartTime != null && eventEndTime != null && 
+                                    currentTime.isAfter(eventStartTime) && currentTime.isBefore(eventEndTime));
+                                
+                                if (eventEndTime != null && currentTime.isAfter(eventEndTime)) {
+                                    displayStatus = "COMPLETED";
+                                    log.info("Result: Event marked as COMPLETED");
+                                } else if (eventStartTime != null && currentTime.isBefore(eventStartTime)) {
+                                    displayStatus = "UPCOMING";
+                                    log.info("Result: Event marked as UPCOMING");
+                                } else if (eventStartTime != null && eventEndTime != null && 
+                                         currentTime.isAfter(eventStartTime) && currentTime.isBefore(eventEndTime)) {
+                                    displayStatus = "ONGOING";
+                                    log.info("Result: Event marked as ONGOING");
+                                } else {
+                                    // 如果無法確定狀態，默認為 UPCOMING
+                                    displayStatus = "UPCOMING";
+                                    log.info("Result: Event status unclear, defaulting to UPCOMING");
+                                }
+                                log.info("Final display status: {}", displayStatus);
+                                log.info("=== End Debug ===");
+                            }
+                        }
+                        
+                        dto.setStatus(displayStatus);
+                        dto.setCreatedAt(eventReg.getRegistrationDate());
+                        dto.setPurpose("Event Registration"); // 標記為事件註冊
+                        dto.setNumberOfPlayers(1); // 事件註冊通常是個人
+                        dto.setDurationHours(2); // 默認事件時長
+                        dto.setNumPaddles(0); // 事件通常不包含設備
+                        dto.setBuyBallSet(false);
+                        dto.setHasReviewed(false); // 事件註冊不包含評價
+                        dto.setBookingType("EVENT"); // 新增：標記為事件類型
+                        
+                        return dto;
+                    } catch (Exception e) {
+                        log.error("Error processing event registration {}: {}", eventReg.getRegistrationId(), e.getMessage());
+                        // 返回一個基本的 DTO
+                        BookingHistoryDto dto = new BookingHistoryDto();
+                        dto.setId(eventReg.getRegistrationId());
+                        dto.setStatus(eventReg.getStatus());
+                        dto.setAmount(eventReg.getFeeAmount() != null ? eventReg.getFeeAmount() : 0.0);
+                        dto.setCreatedAt(eventReg.getRegistrationDate());
+                        dto.setBookingType("EVENT");
+                        return dto;
+                    }
+                })
+                .collect(Collectors.toList());
+            
+            // 合併場地預訂和事件註冊記錄，按創建時間排序
+            List<BookingHistoryDto> allBookings = new ArrayList<>();
+            allBookings.addAll(bookingDtos);
+            allBookings.addAll(eventDtos);
+            
+            // 按創建時間降序排序
+            allBookings.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+            
+            return allBookings;
         } catch (Exception e) {
             log.error("Error in getBookingHistory for member {}: {}", memberId, e.getMessage(), e);
             throw new RuntimeException("Failed to load booking history", e);

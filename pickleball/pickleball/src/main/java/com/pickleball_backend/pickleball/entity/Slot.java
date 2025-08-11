@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -30,6 +31,7 @@ public class Slot {
     private boolean isAvailable;
 
     @OneToMany(mappedBy = "slot", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private List<BookingSlot> bookingSlots;
 
     @Column(name = "status")

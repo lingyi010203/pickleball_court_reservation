@@ -628,9 +628,6 @@ export default function EventEditPage() {
                   </Card>
                   
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    <Button variant="contained" color="error" onClick={handleDelete} disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
-                      Delete Event
-                    </Button>
                     <Button variant="contained" type="submit" disabled={submitting} sx={{ px: 4, borderRadius: 2 }}>
                       {submitting ? 'Updating Event...' : 'Update Event'}
                     </Button>

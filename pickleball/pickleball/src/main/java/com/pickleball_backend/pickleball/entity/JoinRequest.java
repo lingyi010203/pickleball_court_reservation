@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,10 +31,12 @@ public class JoinRequest {
 
     @ManyToOne
     @JoinColumn(name = "member_id")
+    @ToString.Exclude
     private Member member;
 
     @ManyToOne
     @JoinColumn(name = "match_id", nullable = false)
+    @ToString.Exclude
     private FriendlyMatch friendlyMatch;
 
     public enum Status {

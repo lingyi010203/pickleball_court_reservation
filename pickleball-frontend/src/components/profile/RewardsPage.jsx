@@ -19,7 +19,7 @@ import {
 import ActiveVouchers from './ActiveVouchers';
 import RedeemHistory from './RedeemHistory';
 import RedeemVoucherPage from './RedeemVoucherPage';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 import Diamond from '@mui/icons-material/Diamond';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -84,7 +84,7 @@ const RewardsPage = () => {
     try {
       const token = UserService.getToken();
       if (!token) return;
-      const dashboardResponse = await axios.get('http://localhost:8081/api/member/dashboard', {
+      const dashboardResponse = await api.get('/member/dashboard', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDashboardData(dashboardResponse.data);
@@ -120,7 +120,7 @@ const RewardsPage = () => {
   const fetchTierInfo = async () => {
     try {
       const token = UserService.getToken();
-      const response = await axios.get('http://localhost:8081/api/member/debug/tier-info', {
+              const response = await api.get('/member/debug/tier-info', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTierInfo(response.data);
@@ -135,7 +135,7 @@ const RewardsPage = () => {
       try {
         const token = UserService.getToken();
         if (!token) return;
-        const profileResponse = await axios.get('http://localhost:8081/api/profile', {
+        const profileResponse = await api.get('/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUserData(profileResponse.data);

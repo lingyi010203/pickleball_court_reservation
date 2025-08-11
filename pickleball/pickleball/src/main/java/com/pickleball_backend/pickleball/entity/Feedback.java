@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,10 +31,12 @@ public class Feedback {
 
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
+    @ToString.Exclude
     private User user;
 
     @ManyToOne
     @JoinColumn(name = "booking_id", referencedColumnName = "id")
+    @ToString.Exclude
     private Booking booking; // 新增：关联到具体的预订
 
     private Integer classSessionId; // 新增：关联到具体的课程

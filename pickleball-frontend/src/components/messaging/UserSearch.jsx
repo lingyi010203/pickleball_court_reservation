@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, TextField, Button, List, ListItem, 
-  ListItemAvatar, Avatar, ListItemText, Typography, useTheme, alpha 
+  ListItemAvatar, Avatar, ListItemText, Typography, useTheme, alpha, Badge 
 } from '@mui/material';
 import { Alert } from '@mui/material';
 import friendService from '../../service/FriendService';
 import UserService from '../../service/UserService';
+import { useAuth } from '../../context/AuthContext';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 
 export default function UserSearch() {
   const theme = useTheme();
@@ -16,9 +18,7 @@ export default function UserSearch() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [friends, setFriends] = useState([]);
-
-  // Get current user's username from localStorage
-  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const { currentUser } = useAuth();
   const currentUsername = currentUser?.username;
 
   useEffect(() => {
@@ -87,8 +87,37 @@ export default function UserSearch() {
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', mb: 2 }}>
+    <Box sx={{ 
+      flex: 1, 
+      display: 'flex', 
+      flexDirection: 'column',
+      p: 3
+    }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography 
+          variant="h5" 
+          sx={{ 
+            fontWeight: 600, 
+            color: theme.palette.text.primary,
+            mb: 2,
+            fontSize: '1.3rem'
+          }}
+        >
+          Find People
+        </Typography>
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: theme.palette.text.secondary,
+            mb: 3,
+            fontSize: '0.85rem'
+          }}
+        >
+          Search for other players to connect with and start messaging.
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', mb: 3 }}>
         <TextField
           fullWidth
           label="Search users"
@@ -97,18 +126,24 @@ export default function UserSearch() {
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           disabled={loading}
           sx={{
-            bgcolor: theme.palette.background.paper,
+            bgcolor: theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.background.paper, 0.8)
+              : alpha(theme.palette.background.paper, 0.6),
             borderRadius: 2,
             boxShadow: theme.shadows[1],
-            mr: 1
+            mr: 1,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2
+            }
           }}
         />
         <Button
           variant="contained"
           sx={{
-            borderRadius: '50%',
-            minWidth: 48,
-            height: 48,
+            borderRadius: 2,
+            minWidth: 80,
+            height: 56,
+            fontSize: '0.85rem',
             background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
             boxShadow: theme.shadows[2],
             '&:hover': {
@@ -118,69 +153,140 @@ export default function UserSearch() {
           onClick={handleSearch}
           disabled={!query.trim() || loading}
         >
-          {loading ? '...' : 'Go'}
+          {loading ? '...' : 'Search'}
         </Button>
       </Box>
+      
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>{success}</Alert>}
       
-      {loading && <Typography>Searching...</Typography>}
+      {loading && (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+            Searching...
+          </Typography>
+        </Box>
+      )}
       
       {results.length > 0 && (
-        <List>
-          {results.map(user => {
-            const isOwn = user.username === currentUsername;
-            const isFriend = friends.some(f => f.username === user.username);
-            return (
-              <ListItem
-                key={user.id}
-                sx={{
-                  borderRadius: 2,
-                  mb: 1,
-                  transition: 'background 0.2s',
-                  '&:hover': {
-                    background: alpha(theme.palette.primary.main, 0.08)
-                  }
-                }}
-              >
-                <ListItemAvatar>
-                  <Avatar src={user.profileImage} sx={{ boxShadow: theme.shadows[2] }} />
-                </ListItemAvatar>
-                <ListItemText
-                  primary={<Typography sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{user.name}</Typography>}
-                  secondary={<Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{`@${user.username}`}</Typography>}
-                />
-                <Button
-                  variant="contained"
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: 2, 
+              color: theme.palette.text.primary,
+              fontWeight: 600,
+              fontSize: '1.1rem'
+            }}
+          >
+            Search Results
+          </Typography>
+          <List sx={{ p: 0 }}>
+            {results.map((user, index) => {
+              const isOwn = user.username === currentUsername;
+              const isFriend = friends.some(f => f.username === user.username);
+              return (
+                <ListItem
+                  key={user.id}
                   sx={{
-                    borderRadius: 3,
-                    fontWeight: 600,
-                    minWidth: 110,
-                    ml: 1,
-                    background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
-                    color: isOwn || isFriend ? theme.palette.text.disabled : theme.palette.common.white,
-                    boxShadow: theme.shadows[1],
+                    borderRadius: 2,
+                    mb: 1,
+                    transition: 'background 0.2s',
+                    background: theme.palette.mode === 'dark'
+                      ? alpha(theme.palette.background.paper, 0.8)
+                      : alpha(theme.palette.background.paper, 0.6),
                     '&:hover': {
-                      background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`
+                      background: alpha(theme.palette.primary.main, 0.08)
                     }
                   }}
-                  disabled={loading || isFriend || isOwn}
-                  onClick={() => !isOwn && handleAddFriend(user.username)}
                 >
-                  {isOwn
-                    ? "Own"
-                    : isFriend
-                      ? "Friend"
-                      : (loading ? '...' : 'Add')}
-                </Button>
-              </ListItem>
-            );
-          })}
-        </List>
+                  <ListItemAvatar sx={{ minWidth: 48 }}>
+                    <Badge
+                      overlap="circular"
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      badgeContent={
+                        <FiberManualRecordIcon 
+                          sx={{ 
+                            fontSize: 12, 
+                            color: theme.palette.success.main 
+                          }} 
+                        />
+                      }
+                    >
+                      <Avatar 
+                        src={user.profileImage} 
+                        sx={{ 
+                          width: 40, 
+                          height: 40,
+                          boxShadow: theme.shadows[2]
+                        }}
+                      >
+                        {(user.name || user.username || 'U').substring(0, 2).toUpperCase()}
+                      </Avatar>
+                    </Badge>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 600, 
+                          color: theme.palette.text.primary,
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        {user.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: theme.palette.text.secondary,
+                          fontSize: '0.7rem'
+                        }}
+                      >
+                        {`@${user.username}`}
+                      </Typography>
+                    }
+                  />
+                  <Button
+                    variant="contained"
+                    sx={{
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      minWidth: 110,
+                      ml: 1,
+                      fontSize: '0.8rem',
+                      background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+                      color: isOwn || isFriend ? theme.palette.text.disabled : theme.palette.common.white,
+                      boxShadow: theme.shadows[1],
+                      '&:hover': {
+                        background: isOwn || isFriend ? theme.palette.grey[300] : `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`
+                      }
+                    }}
+                    disabled={loading || isFriend || isOwn}
+                    onClick={() => !isOwn && handleAddFriend(user.username)}
+                  >
+                    {isOwn
+                      ? "Own"
+                      : isFriend
+                        ? "Friend"
+                        : (loading ? '...' : 'Add')}
+                  </Button>
+                </ListItem>
+              );
+            })}
+          </List>
+        </Box>
       )}
       
       {!loading && results.length === 0 && query && (
-        <Typography>No users found</Typography>
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+            No users found
+          </Typography>
+        </Box>
       )}
     </Box>
   );

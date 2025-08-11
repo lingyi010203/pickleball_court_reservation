@@ -86,11 +86,12 @@ const CourtService = {
    */
   getBookedDates: async (venueId, startDate, endDate, state) => {
     try {
-      const params = { venueId, startDate };
+      const params = {};
+      if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
-      if (state) params.state = state;
       
       const response = await api.get(`/admin/venues/public/${venueId}/booked-dates`, { params });
+      console.log('API Response for booked dates:', response.data); // Debug log
       return response.data;
     } catch (error) {
       console.error('[CourtService] Error in getBookedDates:', error);

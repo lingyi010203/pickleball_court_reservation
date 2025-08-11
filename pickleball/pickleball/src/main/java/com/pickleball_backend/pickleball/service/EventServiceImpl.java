@@ -10,6 +10,8 @@ import com.pickleball_backend.pickleball.entity.User;
 import com.pickleball_backend.pickleball.entity.UserAccount;
 import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.entity.Venue;
+import com.pickleball_backend.pickleball.entity.Booking;
+import com.pickleball_backend.pickleball.exception.ConflictException;
 import com.pickleball_backend.pickleball.repository.EventOrganizerRepository;
 import com.pickleball_backend.pickleball.repository.EventRepository;
 import com.pickleball_backend.pickleball.repository.EventRegistrationRepository;
@@ -17,6 +19,7 @@ import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.repository.UserRepository;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.VenueRepository;
+import com.pickleball_backend.pickleball.repository.BookingRepository;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.service.VenueService;
 import org.slf4j.Logger;
@@ -27,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -66,6 +70,10 @@ public class EventServiceImpl implements EventService {
     private VenueRepository venueRepository;
     @Autowired
     private VenueService venueService;
+    
+    // 新增：添加BookingRepository依賴
+    @Autowired
+    private BookingRepository bookingRepository;
 
     @Override
     public Event createEvent(EventCreateDto eventDto, String organizerUsername) {
@@ -98,6 +106,7 @@ public class EventServiceImpl implements EventService {
         event.setFeeAmount(eventDto.getFeeAmount());
         event.setLocation(eventDto.getLocation()); // 新增：設置事件地點
         event.setOrganizerId(organizer.getUser().getId());
+        
         // [全場地自動分配]：當自動分配時，會直接分配所有可用場地給活動，不再根據人數裁剪，也不檢查總容量是否足夠。
         Set<Court> courts;
         if ((eventDto.getCourtIds() == null || eventDto.getCourtIds().isEmpty()) && eventDto.getVenueId() != null && eventDto.getCapacity() != null) {
@@ -114,6 +123,21 @@ public class EventServiceImpl implements EventService {
         } else {
             courts = new java.util.HashSet<>();
         }
+        
+        // 新增：檢查每個場地是否有與現有預訂的衝突
+        for (Court court : courts) {
+            boolean hasConflict = bookingRepository.existsActiveBookingForCourtAndTime(
+                court.getId(),
+                eventDto.getStartTime().toLocalDate(),
+                eventDto.getStartTime().toLocalTime(),
+                eventDto.getEndTime().toLocalTime()
+            );
+            
+            if (hasConflict) {
+                throw new ConflictException("Court " + court.getName() + " has existing bookings during the event time");
+            }
+        }
+        
         event.setCourts(courts);
         // capacity = courts.size() * 8 (每場8人)
         if (eventDto.getCapacity() != null) {

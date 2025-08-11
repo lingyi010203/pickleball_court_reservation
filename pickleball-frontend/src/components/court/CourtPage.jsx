@@ -102,7 +102,23 @@ const CourtPage = () => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            // 重新获取数据
+            const loadCourts = async () => {
+              try {
+                const courtsData = await CourtService.getAllCourts();
+                setCourts(courtsData);
+                setFilteredCourts(courtsData);
+              } catch (err) {
+                setError(err.message || 'Failed to load courts');
+              } finally {
+                setLoading(false);
+              }
+            };
+            loadCourts();
+          }}
           sx={{ mt: 2 }}
         >
           Try Again

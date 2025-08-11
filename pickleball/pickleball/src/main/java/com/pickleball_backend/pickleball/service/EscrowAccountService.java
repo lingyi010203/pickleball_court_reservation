@@ -6,6 +6,7 @@ import com.pickleball_backend.pickleball.entity.WalletTransaction;
 import com.pickleball_backend.pickleball.entity.Member;
 import com.pickleball_backend.pickleball.entity.User;
 import com.pickleball_backend.pickleball.entity.ClassSession;
+import com.pickleball_backend.pickleball.entity.Event;
 import com.pickleball_backend.pickleball.repository.WalletRepository;
 import com.pickleball_backend.pickleball.repository.PaymentRepository;
 import com.pickleball_backend.pickleball.repository.WalletTransactionRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -29,6 +31,7 @@ public class EscrowAccountService {
     private final PaymentRepository paymentRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final MemberRepository memberRepository;
+    private final MemberService memberService;
 
     /**
      * 用戶報名課程時，將錢存入託管狀態
@@ -178,6 +181,15 @@ public class EscrowAccountService {
         userWallet.setBalance(userWallet.getBalance() + amount);
         walletRepository.save(userWallet);
 
+        // 扣除積分（全額扣除，因為課程取消通常是全額退款）
+        Member member = memberRepository.findByUserId(user.getId());
+        if (member != null) {
+            MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, amount, 1.0);
+            
+            log.info("Deducted {} tier points and {} reward points from member {} for class session escrow refund",
+                    deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId());
+        }
+
         // 創建退款記錄
         Payment refund = new Payment();
         refund.setAmount(amount);
@@ -221,5 +233,119 @@ public class EscrowAccountService {
                 .stream()
                 .mapToDouble(Payment::getAmount)
                 .sum();
+    }
+
+    /**
+     * 用戶報名活動時，將錢存入託管狀態
+     */
+    @Transactional
+    public void depositToEscrowForEvent(User user, double amount, Event event) {
+        // 從用戶錢包扣款
+        Wallet userWallet = walletRepository.findByMemberId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User wallet not found"));
+
+        if (userWallet.getBalance() < amount) {
+            throw new ValidationException("Insufficient wallet balance");
+        }
+
+        userWallet.setBalance(userWallet.getBalance() - amount);
+        walletRepository.save(userWallet);
+
+        // 創建託管支付記錄
+        Payment payment = new Payment();
+        payment.setAmount(amount);
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setPaymentMethod("WALLET");
+        payment.setStatus("ESCROWED"); // 託管狀態
+        payment.setPaymentType("EVENT_ESCROW");
+        payment.setTransactionId("EVENT_" + event.getId() + "_" + user.getId()); // 關聯活動和用戶
+        payment.setGroupBookingId("ESCROW_EVENT_" + event.getId() + "_" + user.getId()); // 添加 groupBookingId
+        paymentRepository.save(payment);
+
+        log.info("Deposited RM{} to escrow for event {} by user {}", 
+                amount, event.getId(), user.getId());
+    }
+
+    /**
+     * 活動結束時自動分帳：90% 給組織者，10% 給平台
+     */
+    @Transactional
+    public void distributeEventEscrow(Event event) {
+        List<Payment> escrowPayments = paymentRepository.findByPaymentTypeAndStatus("EVENT_ESCROW", "ESCROWED")
+                .stream()
+                .filter(payment -> payment.getGroupBookingId() != null && 
+                        payment.getGroupBookingId().contains("ESCROW_EVENT_" + event.getId()))
+                .collect(Collectors.toList());
+
+        for (Payment payment : escrowPayments) {
+            double totalAmount = payment.getAmount();
+            double platformFee = totalAmount * 0.1; // 10% 平台分成
+            double organizerRevenue = totalAmount - platformFee; // 90% 給組織者
+
+            // 更新支付狀態為已完成
+            payment.setStatus("COMPLETED");
+            paymentRepository.save(payment);
+
+            // 創建平台收入記錄
+            Payment platformPayment = new Payment();
+            platformPayment.setAmount(platformFee);
+            platformPayment.setPaymentDate(LocalDateTime.now());
+            platformPayment.setPaymentMethod("ESCROW_DISTRIBUTION");
+            platformPayment.setStatus("COMPLETED");
+            platformPayment.setPaymentType("PLATFORM_FEE");
+            platformPayment.setTransactionId("PLATFORM_FEE_" + event.getId() + "_" + payment.getId());
+            platformPayment.setGroupBookingId("EVENT_" + event.getId());
+            paymentRepository.save(platformPayment);
+
+            // 創建組織者收入記錄
+            Payment organizerPayment = new Payment();
+            organizerPayment.setAmount(organizerRevenue);
+            organizerPayment.setPaymentDate(LocalDateTime.now());
+            organizerPayment.setPaymentMethod("ESCROW_DISTRIBUTION");
+            organizerPayment.setStatus("COMPLETED");
+            organizerPayment.setPaymentType("EVENT_ORGANIZER_INCOME");
+            organizerPayment.setTransactionId("ORGANIZER_INCOME_" + event.getId() + "_" + payment.getId());
+            organizerPayment.setGroupBookingId("EVENT_" + event.getId());
+            paymentRepository.save(organizerPayment);
+
+            log.info("Distributed RM{} from escrow for event {}: Platform RM{}, Organizer RM{}", 
+                    totalAmount, event.getId(), platformFee, organizerRevenue);
+        }
+    }
+
+    /**
+     * 活動取消時退款給用戶
+     */
+    @Transactional
+    public void refundEventEscrow(User user, double amount, Event event) {
+        // 退款到用戶錢包
+        Wallet userWallet = walletRepository.findByMemberId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User wallet not found"));
+
+        userWallet.setBalance(userWallet.getBalance() + amount);
+        walletRepository.save(userWallet);
+
+        // 扣除積分（全額扣除，因為活動取消通常是全額退款）
+        Member member = memberRepository.findByUserId(user.getId());
+        if (member != null) {
+            MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, amount, 1.0);
+            
+            log.info("Deducted {} tier points and {} reward points from member {} for event refund",
+                    deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId());
+        }
+
+        // 創建退款記錄
+        Payment refund = new Payment();
+        refund.setAmount(amount);
+        refund.setRefundDate(LocalDateTime.now());
+        refund.setPaymentMethod("ESCROW_REFUND");
+        refund.setStatus("REFUNDED");
+        refund.setPaymentType("EVENT_ESCROW_REFUND");
+        refund.setTransactionId("REFUND_EVENT_" + event.getId() + "_" + user.getId());
+        refund.setGroupBookingId("REFUND_EVENT_" + event.getId() + "_" + user.getId());
+        paymentRepository.save(refund);
+
+        log.info("Refunded RM{} from event escrow to user {} for cancelled event {}", 
+                amount, user.getId(), event.getId());
     }
 } 

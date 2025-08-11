@@ -88,7 +88,20 @@ const CourtListPage = () => {
     setGroupedVenues(groupCourtsByVenue(result));
   }, [courts, searchTerm, statusFilter, locationFilter]);
 
-  const handleRetry = () => window.location.reload();
+  const handleRetry = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const courtsData = await CourtService.getAllCourts();
+      setCourts(courtsData);
+      setFilteredCourts(courtsData);
+      setGroupedVenues(groupCourtsByVenue(courtsData));
+    } catch (err) {
+      setError(err.message || 'Failed to load courts');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const uniqueLocations = [...new Set(courts.map(court => court.location))];
 

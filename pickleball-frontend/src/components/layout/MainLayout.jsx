@@ -1,5 +1,6 @@
 import Navbar from '../common/Navbar';
 import FooterComponent from '../common/Footer';
+import FloatingMessageButton from '../common/FloatingMessageButton';
 import { Box, Container } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 
@@ -21,6 +22,7 @@ const MainLayout = () => {
         </Container>
       </Box>
       <FooterComponent />
+      <FloatingMessageButton />
     </>
   );
 };

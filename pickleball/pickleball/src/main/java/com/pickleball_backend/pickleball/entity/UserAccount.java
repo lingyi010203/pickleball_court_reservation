@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,6 +35,7 @@ public class UserAccount {
     // FIXED RELATIONSHIP: Changed to OneToOne
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 
     public boolean isLocked() {

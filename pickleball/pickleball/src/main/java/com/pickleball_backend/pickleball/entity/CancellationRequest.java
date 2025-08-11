@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,10 +16,12 @@ public class CancellationRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
+    @ToString.Exclude
     private Booking booking;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
+    @ToString.Exclude
     private ClassSession session;
 
     private String reason;

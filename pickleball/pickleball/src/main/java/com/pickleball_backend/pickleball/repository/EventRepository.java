@@ -60,7 +60,23 @@ public interface EventRepository extends JpaRepository<Event, Integer> {
     List<Event> findByVenue_Id(Integer venueId);
 
     @Query("SELECT DISTINCT DATE(e.startTime) FROM Event e WHERE e.venue.id = :venueId AND e.startTime BETWEEN :start AND :end")
-List<LocalDate> findEventDatesByVenueIdAndDateRange(@Param("venueId") Integer venueId,
-                                                    @Param("start") LocalDate start,
-                                                    @Param("end") LocalDate end);
+    List<LocalDate> findEventDatesByVenueIdAndDateRange(@Param("venueId") Integer venueId,
+                                                        @Param("start") LocalDate start,
+                                                        @Param("end") LocalDate end);
+
+    // Find event dates by court venue
+    @Query("SELECT DISTINCT DATE(e.startTime) FROM Event e JOIN e.courts c WHERE c.venue.id = :venueId AND e.startTime BETWEEN :start AND :end")
+    List<LocalDate> findEventDatesByCourtVenueIdAndDateRange(@Param("venueId") Integer venueId,
+                                                             @Param("start") LocalDate start,
+                                                             @Param("end") LocalDate end);
+    
+    // 新增：檢查特定場地在指定時間段內是否有Event衝突
+    @Query("SELECT e FROM Event e JOIN e.courts c WHERE c.id = :courtId " +
+           "AND e.status NOT IN ('CANCELLED', 'COMPLETED') " +
+           "AND ((e.startTime < :endTime AND e.endTime > :startTime))")
+    List<Event> findByCourtsIdAndStartTimeBetweenAndStatusNot(
+            @Param("courtId") Integer courtId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("status") String status);
 }

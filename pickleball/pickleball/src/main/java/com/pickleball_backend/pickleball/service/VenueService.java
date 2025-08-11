@@ -6,6 +6,7 @@ import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.repository.VenueRepository;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.SlotRepository;
+import com.pickleball_backend.pickleball.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
@@ -22,6 +23,8 @@ public class VenueService {
     private CourtRepository courtRepository;
     @Autowired
     private SlotRepository slotRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
 
     public Venue createVenue(VenueDto venueDto) {
         // 若需要檢查重複場地，請根據現有欄位自行實作，否則直接建立
@@ -53,7 +56,14 @@ public class VenueService {
             boolean hasAvailable = slots.stream().anyMatch(slot ->
                 !slot.getStartTime().isAfter(endTime) && !slot.getEndTime().isBefore(startTime)
             );
-            if (hasAvailable) {
+            
+            // 新增：檢查是否有與現有預訂的衝突
+            boolean hasBookingConflict = bookingRepository.existsActiveBookingForCourtAndTime(
+                court.getId(), date, startTime, endTime
+            );
+            
+            // 只有沒有slot衝突且沒有預訂衝突的場地才可用
+            if (hasAvailable && !hasBookingConflict) {
                 availableCourts.add(court);
             }
         }

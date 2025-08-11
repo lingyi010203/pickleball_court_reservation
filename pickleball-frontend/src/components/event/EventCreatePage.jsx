@@ -43,19 +43,22 @@ import {
   CalendarToday,
   Public,
   Lock,
-  Error
+  Error,
+  Schedule,
+  ArrowBack
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import EventService from '../../service/EventService';
 import CourtService from '../../service/CourtService';
 import VenueService from '../../service/VenueService';
+import EventOrganizerService from '../../service/EventOrganizerService';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
-const EventCreatePage = () => {
+const EventCreatePage = ({ embedded = false }) => {
   // Removed profile and loading state
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -90,6 +93,12 @@ const EventCreatePage = () => {
   const [filteredVenues, setFilteredVenues] = useState([]);
   const [venueMaxCapacity, setVenueMaxCapacity] = useState(0);
 
+  // 新增：time slot相關state
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [allSlots, setAllSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedTimeRange, setSelectedTimeRange] = useState({ start: null, end: null });
+
   const categories = [
     'Tournament',
     'Social Play',
@@ -107,12 +116,14 @@ const EventCreatePage = () => {
     'Advanced Play'
   ];
 
-
-
   // 在組件內部
   const [bookedDates, setBookedDates] = useState([]);
   // 強化禁用邏輯：bookedDates 轉成 dayjs 字串陣列，shouldDisableDate 嚴格比對
-  const bookedDateSet = useMemo(() => new Set(bookedDates.map(d => dayjs(d).format('YYYY-MM-DD'))), [bookedDates]);
+  const bookedDateSet = useMemo(() => {
+    const set = new Set(bookedDates.map(d => dayjs(d).format('YYYY-MM-DD')));
+    console.log('BookedDateSet updated:', Array.from(set), 'from bookedDates:', bookedDates);
+    return set;
+  }, [bookedDates]);
   const today = useMemo(() => dayjs(), []);
   const minDate = useMemo(() => today.add(3, 'month'), [today]);
   // 1. Stepper 狀態
@@ -150,6 +161,247 @@ const EventCreatePage = () => {
   const handleStateChange = (e) => {
     setSelectedState(e.target.value);
     setVenueId('');
+  };
+
+  // 新增：獲取可用時段
+  const fetchAvailableSlots = async (date) => {
+    if (!venueId || !date) return;
+    
+    try {
+      setLoadingSlots(true);
+      console.log('=== fetchAvailableSlots ===');
+      console.log('Venue ID:', venueId, 'Date:', date);
+
+      // 使用新的EventOrganizerService獲取該venue下所有court的可用時段
+      const venueSlots = await EventOrganizerService.getVenueAvailableSlots(venueId, date);
+      console.log('Venue available slots:', venueSlots);
+      
+      // 過濾出指定日期的可用時段
+      let filtered = venueSlots.filter(slot => slot.date === date);
+      
+      // 如果是今天，過濾掉2小時內的時段
+      if (dayjs(date).isSame(dayjs(), 'day')) {
+        const nowPlus2h = dayjs().add(2, 'hour');
+        filtered = filtered.filter(slot => {
+          const slotDateTime = dayjs(`${slot.date} ${slot.startTime}`, 'YYYY-MM-DD HH:mm');
+          return slotDateTime.isAfter(nowPlus2h);
+        });
+      }
+      
+      console.log('Final filtered slots:', filtered);
+      setAvailableSlots(filtered);
+      setAllSlots(venueSlots);
+    } catch (error) {
+      console.error('Failed to fetch available slots:', error);
+      setError('Failed to load available time slots');
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // 新增：檢查時間段是否在選中範圍內
+  const isTimeSlotInRange = (slotTime) => {
+    if (selectedTimeRange.start === null || selectedTimeRange.end === null) {
+      return false;
+    }
+    return slotTime >= selectedTimeRange.start && slotTime <= selectedTimeRange.end;
+  };
+
+  // 新增：渲染time slots
+  const renderTimeSlots = () => {
+    if (!formData.date || !venueId) return null;
+
+    const venueCourts = courts.filter(c => c.venue && c.venue.id === Number(venueId));
+    if (venueCourts.length === 0) return null;
+
+    // 使用第一個court的營業時間作為參考
+    const court = venueCourts[0];
+    
+    // 獲取營業時間範圍
+    const getHourRange = () => {
+      let open = 8, close = 22;
+      if (court && court.openingTime && court.closingTime) {
+        open = parseInt(court.openingTime.split(':')[0], 10);
+        close = parseInt(court.closingTime.split(':')[0], 10);
+        if (isNaN(open)) open = 8;
+        if (isNaN(close)) close = 22;
+      }
+      return { open, close };
+    };
+
+    const { open, close } = getHourRange();
+    const hourSlots = [];
+    for (let h = open; h < close; h++) {
+      const start = (h < 10 ? '0' : '') + h + ':00';
+      const end = (h + 1 < 10 ? '0' : '') + (h + 1) + ':00';
+      hourSlots.push({ start, end });
+    }
+
+    console.log('Available slots for rendering:', availableSlots);
+    // 修正：確保使用正確的字段名稱和格式
+    const availableSlotSet = new Set(availableSlots.map(s => {
+      const startTime = typeof s.startTime === 'string' ? s.startTime : s.startTime;
+      const endTime = typeof s.endTime === 'string' ? s.endTime : s.endTime;
+      return startTime + '-' + endTime;
+    }));
+    console.log('Available slot set:', Array.from(availableSlotSet));
+
+    // 新增：處理時間段選擇（移到函數內部）
+    const handleTimeSlotClick = (clickedSlot) => {
+      if (!availableSlotSet.has(clickedSlot.start + '-' + clickedSlot.end)) {
+        return; // 如果時段不可用，不處理
+      }
+
+      const clickedTime = clickedSlot.start;
+      
+      // 如果沒有選中的時間範圍，開始新的選擇
+      if (selectedTimeRange.start === null) {
+        setSelectedTimeRange({ start: clickedTime, end: clickedTime });
+        setFormData({
+          ...formData,
+          time: clickedTime,
+          endTime: clickedSlot.end
+        });
+        return;
+      }
+
+      // 如果點擊的是已經選中的單個時間段，清除選擇
+      if (clickedTime === selectedTimeRange.start && selectedTimeRange.start === selectedTimeRange.end) {
+        setSelectedTimeRange({ start: null, end: null });
+        setFormData({
+          ...formData,
+          time: '',
+          endTime: ''
+        });
+        return;
+      }
+
+      // 確定新的時間範圍
+      let newStart, newEnd;
+      
+      if (clickedTime < selectedTimeRange.start) {
+        // 點擊的時間早於當前開始時間，擴展到左邊
+        newStart = clickedTime;
+        newEnd = selectedTimeRange.end;
+      } else if (clickedTime > selectedTimeRange.end) {
+        // 點擊的時間晚於當前結束時間，擴展到右邊
+        newStart = selectedTimeRange.start;
+        newEnd = clickedTime;
+      } else {
+        // 點擊的時間在當前範圍內，調整為從開始到點擊時間
+        newStart = selectedTimeRange.start;
+        newEnd = clickedTime;
+      }
+
+      // 檢查範圍內的所有時間段是否都可用
+      const rangeSlots = hourSlots.filter(slot => 
+        slot.start >= newStart && slot.start <= newEnd
+      );
+      
+      const allAvailable = rangeSlots.every(slot => 
+        availableSlotSet.has(slot.start + '-' + slot.end)
+      );
+
+      if (allAvailable) {
+        setSelectedTimeRange({ start: newStart, end: newEnd });
+        
+        // 找到結束時間對應的slot
+        const endSlot = hourSlots.find(slot => slot.start === newEnd);
+        const endTime = endSlot ? endSlot.end : newEnd;
+        
+        setFormData({
+          ...formData,
+          time: newStart,
+          endTime: endTime
+        });
+      }
+    };
+
+    return (
+      <Card sx={{ mb: 3, borderRadius: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Schedule sx={{ mr: 1, color: 'text.secondary' }} />
+            <Typography variant="h6" fontWeight="bold">
+              Available Time Slots - {dayjs(formData.date).format('dddd, MMMM D, YYYY')}
+            </Typography>
+            {selectedTimeRange.start && (
+              <Typography variant="body2" color="primary" sx={{ ml: 2 }}>
+                Selected: {selectedTimeRange.start} - {selectedTimeRange.end}
+              </Typography>
+            )}
+          </Box>
+
+          {loadingSlots ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Grid container spacing={1.5}>
+              {hourSlots.length > 0 ? (
+                hourSlots.map((slot, idx) => {
+                  const key = slot.start + '-' + slot.end;
+                  const isAvailable = availableSlotSet.has(key);
+                  const isInRange = isTimeSlotInRange(slot.start);
+                  const isSelected = formData.time === slot.start;
+                  
+                  return (
+                    <Grid item xs={4} sm={3} md={2} key={key}>
+                      <Button
+                        fullWidth
+                        variant={isInRange ? "contained" : "outlined"}
+                        onClick={() => handleTimeSlotClick(slot)}
+                        disabled={!isAvailable}
+                        sx={{
+                          py: 1.5,
+                          borderRadius: '12px',
+                          fontWeight: 600,
+                          ...(isInRange ? {
+                            background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                            color: 'white',
+                            boxShadow: '0 4px 8px rgba(37, 117, 252, 0.3)'
+                          } : {}),
+                          ...(!isAvailable ? {
+                            borderColor: '#aaa',
+                            color: '#aaa',
+                            background: '#f5f5f5',
+                            opacity: 0.7
+                          } : {})
+                        }}
+                      >
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" fontWeight="medium">
+                            {slot.start}
+                          </Typography>
+                          {!isAvailable && (
+                            <Typography variant="caption" color="error" sx={{ display: 'block' }}>
+                              BOOKED
+                            </Typography>
+                          )}
+                        </Box>
+                      </Button>
+                    </Grid>
+                  );
+                })
+              ) : (
+                <Grid item xs={12}>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    py: 4,
+                    color: 'text.secondary'
+                  }}>
+                    <Schedule sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }} />
+                    <Typography variant="body1">
+                      No available time slots for this date
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </CardContent>
+      </Card>
+    );
   };
 
   // 2. 取得所有 state
@@ -261,16 +513,64 @@ const EventCreatePage = () => {
 
   useEffect(() => {
     if (venueId && selectedState) {
-      // 傳 state 參數給後端（如後端支援）
-      CourtService.getBookedDates(venueId, minDate.format('YYYY-MM-DD'), undefined, selectedState)
+      // 使用EventOrganizerService獲取已預訂日期
+      EventOrganizerService.getVenueBookedDates(venueId, minDate.format('YYYY-MM-DD'), undefined, selectedState)
         .then(dates => {
+          console.log('Booked dates received:', dates); // Debug log
           setBookedDates(dates);
         })
-        .catch(() => setBookedDates([]));
+        .catch((error) => {
+          console.error('Error fetching booked dates:', error);
+          setBookedDates([]);
+        });
     } else {
       setBookedDates([]);
     }
   }, [venueId, minDate, selectedState]);
+
+  // 新增：當日期改變時獲取可用時段
+  useEffect(() => {
+    if (formData.date && venueId) {
+      // 重置時間範圍選擇
+      setSelectedTimeRange({ start: null, end: null });
+      
+      // 調試：檢查slot數據
+      EventOrganizerService.debugSlots(venueId, formData.date)
+        .then(debugInfo => {
+          console.log('=== DEBUG SLOTS INFO ===');
+          console.log(debugInfo);
+          console.log('=== END DEBUG ===');
+          
+          // 檢查是否需要生成slots
+          const needsSlots = debugInfo.courts.some(court => court.totalSlots === 0);
+          if (needsSlots) {
+            console.log('No slots found for this date, generating slots...');
+            return EventOrganizerService.generateSlots(venueId, formData.date);
+          }
+        })
+        .then(generateResult => {
+          if (generateResult) {
+            console.log('Slots generated:', generateResult);
+            // 重新獲取可用時段
+            fetchAvailableSlots(formData.date);
+          } else {
+            // 直接獲取可用時段
+            fetchAvailableSlots(formData.date);
+          }
+        })
+        .catch(error => {
+          console.error('Debug/generate slots error:', error);
+          // 即使出錯也嘗試獲取可用時段
+          fetchAvailableSlots(formData.date);
+        });
+    }
+  }, [formData.date, venueId]);
+
+  // Check if selected date is booked
+  const isSelectedDateBooked = useMemo(() => {
+    if (!formData.date || bookedDates.length === 0) return false;
+    return bookedDateSet.has(formData.date);
+  }, [formData.date, bookedDateSet]);
 
   const handleInputChange = (field) => (event) => {
     if (field === 'price') {
@@ -327,12 +627,7 @@ const EventCreatePage = () => {
     e.preventDefault?.();
     setSubmitting(true);
     setError('');
-    // Price validation
-    if (formData.price !== '' && parseFloat(formData.price) < 0) {
-      setPriceError('Price cannot be negative');
-      setSubmitting(false);
-      return;
-    }
+    
     try {
       const eventData = {
         title: formData.title,
@@ -341,16 +636,16 @@ const EventCreatePage = () => {
         eventType: formData.eventType,
         capacity: parseInt(formData.capacity, 10),
         schedule: JSON.stringify(scheduleArray),
-        feeAmount: formData.price ? parseFloat(formData.price) : 0,
+        feeAmount: formData.price ? parseFloat(formData.price) : 0, // 參與者付費金額
         status: formData.status || 'PUBLISHED',
-        location: venuesByState.find(v => v.id === venueId)?.location || '', // 新增：從選中的 venue 獲取 location
+        location: venuesByState.find(v => v.id === venueId)?.location || '',
         courtIds: courtIds,
         venueId: venueId || null,
         sendNotification: formData.sendNotification
       };
+      
       await EventService.createEvent(eventData);
-      setShowSuccess(true); // 顯示成功訊息
-      // 不要自動跳頁
+      setShowSuccess(true);
     } catch (err) {
       let errorMsg = "Failed to create event.";
       if (err.response?.data) {
@@ -369,7 +664,8 @@ const EventCreatePage = () => {
   // Only check currentUser role for access
   const isEventOrganizer = currentUser?.role === 'EVENTORGANIZER' || 
                           currentUser?.role === 'EventOrganizer' || 
-                          currentUser?.userType === 'EventOrganizer';
+                          currentUser?.userType === 'EventOrganizer' ||
+                          currentUser?.userType === 'EVENTORGANIZER';
   
   if (!isEventOrganizer) {
     return (
@@ -408,7 +704,7 @@ const EventCreatePage = () => {
             </Typography>
             <Button
               variant="contained"
-              onClick={() => navigate('/events')}
+              onClick={() => navigate('/event-organizer')}
               sx={{
                 background: 'linear-gradient(45deg, #667eea, #764ba2)',
                 borderRadius: 2,
@@ -431,26 +727,50 @@ const EventCreatePage = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', py: 4 }}>
-        <Container maxWidth="md">
-          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+      <Box sx={{ 
+        minHeight: embedded ? 'auto' : '100vh', 
+        background: embedded ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        py: embedded ? 0 : 4,
+        display: 'flex',
+        justifyContent: embedded ? 'center' : 'flex-end'
+      }}>
+        <Container maxWidth={embedded ? 'md' : 'sm'} sx={{ mx: embedded ? 'auto' : 'initial', ml: embedded ? 'auto' : 'auto', mr: embedded ? 'auto' : { xs: 0, md: 4 } }}>
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
             {steps.map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
           </Stepper>
-          <Paper elevation={24} sx={{ p: 4, borderRadius: 4, background: 'rgba(255,255,255,0.95)' }}>
+          <Paper elevation={embedded ? 6 : 20} sx={{ p: 3, borderRadius: 3, background: 'rgba(255,255,255,0.95)' }}>
+            {/* Back to Event Button */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/event-organizer')}
+                startIcon={<ArrowBack />}
+                sx={{
+                  color: '#667eea',
+                  borderColor: '#667eea',
+                  '&:hover': {
+                    borderColor: '#5a6fd8',
+                    backgroundColor: 'rgba(102, 126, 234, 0.04)'
+                  }
+                }}
+              >
+                Back to Event
+              </Button>
+            </Box>
             {showSuccess ? (
               <Box textAlign="center" py={6}>
                 <Typography variant="h5" color="success.main" gutterBottom>
                   Event created successfully!
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  Your event has been created and is now live.
+                  Your event has been created and is now live. Participants will pay the registration fee when they sign up.
                 </Typography>
                 {formData.sendNotification && (
                   <Alert severity="info" sx={{ mb: 3 }}>
                     📧 Email notifications have been sent to all registered users.
                   </Alert>
                 )}
-                <Button variant="contained" color="primary" onClick={() => navigate('/events')}>
+                <Button variant="contained" color="primary" onClick={() => navigate('/event-organizer')}>
                   Go to Event List
                 </Button>
               </Box>
@@ -487,7 +807,7 @@ const EventCreatePage = () => {
                         {categories.map(category => <MenuItem key={category} value={category}>{category}</MenuItem>)}
                       </Select>
                     </FormControl>
-                    <TextField label="Price" type="number" fullWidth value={formData.price} onChange={handleInputChange('price')} sx={{ mb: 2 }} />
+                    <TextField label="Participant Registration Fee ($)" type="number" fullWidth value={formData.price} onChange={handleInputChange('price')} sx={{ mb: 2 }} />
                     {/* 賽程、說明、日期、時間、容量等欄位照原本保留 */}
                     <Box sx={{ mb: 2 }}>
                       <Grid container spacing={2} alignItems="center">
@@ -528,17 +848,26 @@ const EventCreatePage = () => {
                     <DatePicker
                       label="Date"
                       value={formData.date ? dayjs(formData.date) : null}
-                      onChange={date => setFormData({ ...formData, date: date ? date.format('YYYY-MM-DD') : '' })}
+                      onChange={date => {
+                        const newDate = date ? date.format('YYYY-MM-DD') : '';
+                        console.log('Date selected:', newDate, 'Booked dates:', bookedDateSet);
+                        setFormData({ ...formData, date: newDate, time: '', endTime: '' });
+                      }}
                       minDate={minDate}
                       shouldDisableDate={date => {
                         const formatted = date.format('YYYY-MM-DD');
-                        // console.log('Checking date:', formatted, 'booked:', bookedDateSet);
-                        return bookedDateSet.has(formatted);
+                        const isBooked = bookedDateSet.has(formatted);
+                        console.log('Checking date:', formatted, 'isBooked:', isBooked, 'bookedDateSet:', Array.from(bookedDateSet));
+                        return isBooked;
                       }}
                       renderInput={params => (
                         <TextField {...params} fullWidth sx={{ mb: 2 }} />
                       )}
                     />
+                    
+                    {/* 新增：顯示time slots */}
+                    {renderTimeSlots()}
+                    
                     <TextField label="Start Time" type="time" fullWidth value={formData.time} onChange={handleInputChange('time')} sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} />
                     <TextField label="End Time" type="time" fullWidth value={formData.endTime} onChange={handleInputChange('endTime')} sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} />
                     {venueId && (
@@ -548,6 +877,15 @@ const EventCreatePage = () => {
                         </Alert>
                       </Box>
                     )}
+                    
+                    {isSelectedDateBooked && (
+                      <Box sx={{ mt: 2, mb: 2 }}>
+                        <Alert severity="error">
+                          ⚠️ This date is already booked for this venue. Please select a different date.
+                        </Alert>
+                      </Box>
+                    )}
+                    
                     <TextField
                       label="Capacity"
                       type="number"
@@ -571,7 +909,16 @@ const EventCreatePage = () => {
                     />
                     <Box mt={2} display="flex" gap={2}>
                       <Button onClick={handleBack}>Back</Button>
-                      <Button variant="contained" onClick={handleNext} disabled={!(formData.title && formData.eventType && formData.date && formData.time && formData.endTime && formData.capacity && formData.capacity <= venueMaxCapacity && venueMaxCapacity > 0)}>Next</Button>
+                      <Button 
+                        variant="contained" 
+                        onClick={handleNext} 
+                        disabled={
+                          !(formData.title && formData.eventType && formData.date && formData.time && formData.endTime && formData.capacity && formData.capacity <= venueMaxCapacity && venueMaxCapacity > 0) ||
+                          isSelectedDateBooked
+                        }
+                      >
+                        Next
+                      </Button>
                     </Box>
                   </Box>
                 )}
@@ -584,7 +931,7 @@ const EventCreatePage = () => {
                       <li>Location: {venuesByState.find(v => v.id === venueId)?.location}</li>
                       <li>Event Name: {formData.title}</li>
                       <li>Type: {formData.eventType}</li>
-                      <li>Price: {formData.price}</li>
+                      <li>Participant Fee: ${formData.price || 0}</li>
                       <li>Schedule: {JSON.stringify(scheduleArray)}</li>
                       <li>Description: {formData.description}</li>
                       <li>Date: {formData.date}</li>
@@ -594,6 +941,27 @@ const EventCreatePage = () => {
                     </ul>
                     
                     <Box sx={{ mt: 3, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 2, fontWeight: 'bold' }}>
+                        💡 Payment Model: You create events for free. Participants pay the registration fee when they sign up.
+                      </Typography>
+                      
+                      {formData.price > 0 && (
+                        <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                            📊 Revenue Breakdown (per participant):
+                          </Typography>
+                          <Typography variant="body2">
+                            • Participant pays: ${formData.price}
+                          </Typography>
+                          <Typography variant="body2">
+                            • Platform fee: ${(formData.price * 0.1).toFixed(2)} (10% of ${formData.price})
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                            • You receive: ${(formData.price - (formData.price * 0.1)).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      )}
+                      
                       <FormControlLabel
                         control={
                           <Checkbox

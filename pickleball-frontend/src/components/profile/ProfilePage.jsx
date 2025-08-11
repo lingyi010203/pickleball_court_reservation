@@ -179,20 +179,15 @@ const ProfilePage = ({ editMode = false }) => {
   // Photo handlers
   const handlePhotoUpdate = async (file) => {
     try {
-      const token = UserService.getToken();
       const formData = new FormData();
       formData.append('profileImage', file);
 
-      const response = await axios.post(
-        'http://localhost:8081/api/profile/photo',
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
+      // eslint-disable-next-line no-undef
+      const response = await api.post('/profile/photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
         }
-      );
+      });
 
       const filename = response.data;
       UserService.setProfileImage(filename);
@@ -218,11 +213,8 @@ const ProfilePage = ({ editMode = false }) => {
 
   const handleRemovePhoto = async () => {
     try {
-      const token = UserService.getToken();
-
-      await axios.delete('http://localhost:8081/api/profile/photo', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // eslint-disable-next-line no-undef
+      await api.delete('/profile/photo');
 
       UserService.setProfileImage(null);
 
@@ -299,7 +291,40 @@ const ProfilePage = ({ editMode = false }) => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            setError('');
+            setLoading(true);
+            // 重新获取数据
+            const fetchProfile = async () => {
+              try {
+                const token = UserService.getToken();
+                if (!token) {
+                  navigate('/login');
+                  return;
+                }
+
+                const response = await api.get('/profile');
+
+                const enhancedProfile = {
+                  ...response.data,
+                  accountStatus: response.data.requestedUserType ? 'PENDING' : 'ACTIVE'
+                };
+
+                UserService.setProfileImage(response.data.profileImage);
+                setProfile(enhancedProfile);
+              } catch (err) {
+                if (err.response?.status === 401) {
+                  UserService.logout();
+                  navigate('/login');
+                } else {
+                  setError('Failed to load profile data. Please try again later.');
+                }
+              } finally {
+                setLoading(false);
+              }
+            };
+            fetchProfile();
+          }}
         >
           Reload Page
         </Button>

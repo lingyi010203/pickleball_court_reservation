@@ -62,7 +62,7 @@ import api from '../../service/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, useMediaQuery } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { cancelJoin } from '../../service/FriendlyMatchService';
+import FriendlyMatchService from '../../service/FriendlyMatchService';
 import MessageService from '../../service/MessageService';
 
 function formatTime(dt) {
@@ -576,7 +576,7 @@ const FriendlyMatchPage = () => {
     
     try {
       console.log('Calling cancelJoin with:', { requestId: myRequest.id, memberId: currentUser.id }); // Debug log
-      await cancelJoin(myRequest.id, currentUser.id);
+      await FriendlyMatchService.cancelJoin(myRequest.id, currentUser.id);
       
       setJoinStatus('not_joined');
       setJoinSuccess('You have cancelled your join!');

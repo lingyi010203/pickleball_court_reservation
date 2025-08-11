@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { getWalletBalance, getWalletDetails, getWalletTransactions } from '../../service/WalletService';
 
 import UserService from '../../service/UserService';
-import axios from 'axios';
+// import axios from 'axios'; // Removed - not used
 
 const WalletPage = () => {
   const navigate = useNavigate();

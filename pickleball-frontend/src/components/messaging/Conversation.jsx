@@ -7,11 +7,15 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import MessageBubble from './MessageBubble';
 import messageService from '../../service/MessageService';
 import { useSocket } from '../../context/SocketContext';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { useTheme, alpha } from '@mui/material/styles';
+import { useAuth } from '../../context/AuthContext';
+// Removed status dot icon
 
 export default function Conversation({ otherUser, onBack }) {
   const theme = useTheme();
@@ -19,23 +23,53 @@ export default function Conversation({ otherUser, onBack }) {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  // Removed online/offline status tracking
   const { stompClient } = useSocket();
+  const { currentUser } = useAuth();
 
-  // Get current user
-  const currentUser = JSON.parse(localStorage.getItem('currentUser')) || {};
   const fileInputRef = useRef(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Enhanced emoji list with categories
+  const emojiCategories = {
+    'Smileys': ['😊', '😂', '😎', '🤔', '😢', '😡', '😍', '🥰', '😘', '😋', '🤗', '🤫', '🤐', '😴', '😪', '😵'],
+    'Gestures': ['👍', '👎', '👋', '💪', '🙏', '✌️', '🤞', '👌', '🤟', '🤘', '👊', '🤝', '👏', '🙌', '🤲', '👐'],
+    'Sports': ['🎾', '🏆', '🎯', '⚽', '🏀', '🎸', '🎵', '🎶', '🎤', '🎧', '🎮', '🎲', '🎪', '🎨', '🎭', '🎬'],
+    'Nature': ['🌺', '🌸', '🌼', '🌻', '🌹', '🌷', '🌱', '🌲', '🌳', '🌴', '🌵', '🌾', '🌿', '☘️', '🍀', '🌍'],
+    'Food': ['🍕', '🍔', '🍟', '🌭', '🍿', '🍩', '🍪', '🍰', '🍦', '🍧', '🍨', '🍭', '🍬', '🍫', '🍪', '🥤'],
+    'Objects': ['💻', '📱', '📷', '🎥', '📺', '📻', '🔋', '💡', '🔑', '🎁', '🎈', '🎉', '🎊', '🎋', '🎍', '🎎']
+  };
+
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('Smileys');
+
+  const handleEmojiClick = (emoji) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  console.log('Conversation component rendered with otherUser:', otherUser);
 
   // Fetch message history
   useEffect(() => {
     const fetchMessages = async () => {
       try {
+        setError(null);
+        setLoading(true);
+        
         if (!otherUser?.username) {
+          console.log('No username found for otherUser:', otherUser);
           setLoading(false);
           return;
         }
 
+        console.log('Fetching messages for user:', otherUser.username);
         const data = await messageService.getConversation(otherUser.username);
+        console.log('Fetched messages:', data);
 
         // Enhance message data
         const enhancedMessages = data.map(msg => ({
@@ -53,6 +87,7 @@ export default function Conversation({ otherUser, onBack }) {
         setMessages(enhancedMessages);
       } catch (error) {
         console.error('Failed to fetch messages', error);
+        setError('Failed to load messages. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -60,6 +95,31 @@ export default function Conversation({ otherUser, onBack }) {
 
     if (otherUser) fetchMessages();
   }, [otherUser]);
+
+  // Retry function
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      const data = await messageService.getConversation(otherUser.username);
+      const enhancedMessages = data.map(msg => ({
+        ...msg,
+        senderUsername: msg.senderUsername ||
+          (msg.sender?.userAccount?.username || '') ||
+          (msg.sender?.username || ''),
+        senderProfileImage: msg.senderProfileImage ||
+          (msg.sender?.profileImage || '') ||
+          (msg.sender?.userAccount?.profileImage || ''),
+        imageUrl: msg.imageUrl ? msg.imageUrl : null
+      }));
+      setMessages(enhancedMessages);
+      setError(null);
+    } catch (error) {
+      console.error('Retry failed:', error);
+      setError('Failed to load messages. Please try again.');
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -97,8 +157,8 @@ export default function Conversation({ otherUser, onBack }) {
         // Only add relevant messages - check if this message is part of the current conversation
         const isFromOtherUser = enhancedMessage.senderUsername === otherUser.username;
         const isToOtherUser = enhancedMessage.recipientUsername === otherUser.username;
-        const isFromCurrentUser = enhancedMessage.senderUsername === currentUser.username;
-        const isToCurrentUser = enhancedMessage.recipientUsername === currentUser.username;
+        const isFromCurrentUser = enhancedMessage.senderUsername === currentUser?.username;
+        const isToCurrentUser = enhancedMessage.recipientUsername === currentUser?.username;
 
         if ((isFromOtherUser && isToCurrentUser) || (isFromCurrentUser && isToOtherUser)) {
           console.log('Adding message to conversation:', enhancedMessage);
@@ -108,7 +168,7 @@ export default function Conversation({ otherUser, onBack }) {
     );
 
     return () => subscription.unsubscribe();
-  }, [stompClient, otherUser]);
+  }, [stompClient, otherUser, currentUser]);
 
   // Scroll to bottom and mark delivered
   useEffect(() => {
@@ -137,8 +197,45 @@ export default function Conversation({ otherUser, onBack }) {
 
   // Scroll to bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+    }, 150); // 增加延迟确保DOM完全更新
   };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && shouldAutoScroll) {
+      scrollToBottom();
+    }
+  }, [messages, shouldAutoScroll]);
+
+  // Scroll to bottom when component mounts or otherUser changes
+  useEffect(() => {
+    if (otherUser && messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [otherUser]);
+
+  // Handle scroll events to detect manual scrolling
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
+      setShouldAutoScroll(isAtBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Send text message
   const handleSend = async () => {
@@ -148,29 +245,32 @@ export default function Conversation({ otherUser, onBack }) {
 
     // Create message object
     const messageDto = {
-      senderUsername: currentUser.username,
+      senderUsername: currentUser?.username,
       recipientUsername: otherUser.username,
       content: messageContent
     };
 
-    // Optimistic UI update
+    // Optimistic UI update - immediately show the message
     const tempId = Date.now();
-    setMessages(prev => [
-      ...prev,
-      {
-        ...messageDto,
-        id: tempId,
-        timestamp: new Date().toISOString(),
-        delivered: true,
-        read: false,
-        senderProfileImage: currentUser.profileImage
-      }
-    ]);
+    const newMessageObj = {
+      ...messageDto,
+      id: tempId,
+      timestamp: new Date().toISOString(),
+      delivered: true,
+      read: false,
+      senderProfileImage: currentUser?.profileImage
+    };
 
+    // Clear input first for better UX
     setNewMessage('');
-    scrollToBottom();
+    
+    // Force scroll to bottom when user sends a message
+    setShouldAutoScroll(true);
+    
+    // Add message to list
+    setMessages(prev => [...prev, newMessageObj]);
 
-    // Send via WebSocket
+    // Send via WebSocket immediately
     if (stompClient && stompClient.connected) {
       stompClient.publish({
         destination: '/app/chat.send',
@@ -181,6 +281,8 @@ export default function Conversation({ otherUser, onBack }) {
     // Persist to backend
     try {
       const savedMessage = await messageService.sendMessage(otherUser.username, messageContent);
+      console.log('Message sent successfully:', savedMessage);
+      
       // 發送成功後重新獲取訊息以確保顯示正確
       setTimeout(async () => {
         try {
@@ -189,10 +291,13 @@ export default function Conversation({ otherUser, onBack }) {
         } catch (error) {
           console.error('Failed to refresh messages:', error);
         }
-      }, 100);
+      }, 200);
     } catch (error) {
       console.error('Failed to store message', error);
+      // 如果发送失败，移除临时消息
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      // 恢复输入内容
+      setNewMessage(messageContent);
     }
   };
 
@@ -201,19 +306,30 @@ export default function Conversation({ otherUser, onBack }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (JPG, PNG, GIF)');
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Please select a valid image file (JPG, PNG, GIF, WebP)');
       return;
     }
 
+    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size exceeds 5MB limit');
+      alert('Image size exceeds 5MB limit. Please select a smaller image.');
       return;
     }
 
     try {
       setUploading(true);
+
+      // Show preview before upload
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const previewUrl = event.target.result;
+        // You can add a preview modal here if needed
+        console.log('Image preview:', previewUrl);
+      };
+      reader.readAsDataURL(file);
 
       // Upload image
       const imageUrl = await messageService.uploadImage(file);
@@ -222,7 +338,7 @@ export default function Conversation({ otherUser, onBack }) {
       handleSendImage(imageUrl);
     } catch (err) {
       console.error('Image upload failed', err);
-      alert(`Image upload failed: ${err.message}`);
+      alert(`Image upload failed: ${err.message || 'Please try again'}`);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploading(false);
@@ -232,30 +348,31 @@ export default function Conversation({ otherUser, onBack }) {
   // Send image message
   const handleSendImage = async (imageUrl) => {
     const messageDto = {
-      senderUsername: currentUser.username,
+      senderUsername: currentUser?.username,
       recipientUsername: otherUser.username,
       content: '',
       imageUrl
     };
 
-    // Optimistic UI update
+    // Optimistic UI update - immediately show the image message
     const tempId = Date.now();
-    setMessages(prev => [
-      ...prev,
-      {
-        ...messageDto,
-        id: tempId,
-        timestamp: new Date().toISOString(),
-        delivered: true,
-        read: false,
-        senderProfileImage: currentUser.profileImage,
-        type: 'image'
-      }
-    ]);
+    const newImageMessage = {
+      ...messageDto,
+      id: tempId,
+      timestamp: new Date().toISOString(),
+      delivered: true,
+      read: false,
+      senderProfileImage: currentUser?.profileImage,
+      type: 'image'
+    };
 
-    scrollToBottom();
+    // Add message to list immediately
+    setMessages(prev => [...prev, newImageMessage]);
 
-    // Send via WebSocket
+    // Force scroll to bottom when user sends an image
+    setShouldAutoScroll(true);
+
+    // Send via WebSocket immediately
     if (stompClient && stompClient.connected) {
       stompClient.publish({
         destination: '/app/chat.send',
@@ -269,8 +386,20 @@ export default function Conversation({ otherUser, onBack }) {
     // Persist to backend
     try {
       await messageService.sendMessage(otherUser.username, '', imageUrl);
+      console.log('Image message sent successfully');
+      
+      // 發送成功後重新獲取訊息以確保顯示正確
+      setTimeout(async () => {
+        try {
+          const data = await messageService.getConversation(otherUser.username);
+          setMessages(data);
+        } catch (error) {
+          console.error('Failed to refresh messages:', error);
+        }
+      }, 200);
     } catch (error) {
       console.error('Failed to store image message', error);
+      // 如果发送失败，移除临时消息
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
     }
   };
@@ -297,71 +426,129 @@ export default function Conversation({ otherUser, onBack }) {
     }
   }, [messages, otherUser, stompClient]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Ctrl+Enter or Cmd+Enter to send message
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSend();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [newMessage]); // Include newMessage in dependencies for handleSend
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showEmojiPicker && !event.target.closest('.emoji-picker-container')) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%',
+        p: 4
+      }}>
+        <CircularProgress size={40} sx={{ mb: 2 }} />
+        <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+          Loading messages...
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%',
+        p: 4
+      }}>
+        <Typography variant="body1" sx={{ color: theme.palette.error.main, mb: 2, textAlign: 'center' }}>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={handleRetry}
+          disabled={retrying}
+          sx={{ borderRadius: 2 }}
+        >
+          {retrying ? 'Retrying...' : 'Retry'}
+        </Button>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: theme.palette.background.default }}>      {/* Header */}
-      <Paper sx={{
-        p: 1.5,
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+      {/* Header */}
+      <Box sx={{
+        p: 2,
         display: 'flex',
         alignItems: 'center',
         background: theme.palette.mode === 'dark'
-          ? alpha(theme.palette.background.paper, 0.9)
-          : alpha(theme.palette.background.paper, 0.95),
+          ? alpha(theme.palette.background.paper, 0.95)
+          : alpha(theme.palette.background.paper, 0.98),
         color: theme.palette.text.primary,
-        borderRadius: 0,
-        boxShadow: theme.shadows[1],
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        boxShadow: theme.shadows[1]
       }}>
-        <IconButton
-          onClick={onBack}
-          sx={{
-            mr: 1,
-            color: theme.palette.text.secondary,
-            '&:hover': {
-              background: alpha(theme.palette.primary.main, 0.1)
-            }
-          }}
-        >
-          <ArrowBackIcon />
-        </IconButton>
-        <Avatar
-          src={otherUser.profileImage}
-          sx={{
-            width: 42,
-            height: 42,
-            boxShadow: theme.shadows[1],
-            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-            mr: 2
-          }}
-        />
+          <Avatar
+            src={otherUser.profileImage}
+            sx={{
+              width: 48,
+              height: 48,
+              boxShadow: theme.shadows[2],
+              border: `2px solid ${alpha(theme.palette.divider, 0.2)}`,
+              mr: 2
+            }}
+          >
+            {(otherUser.name || otherUser.username || 'U').substring(0, 2).toUpperCase()}
+          </Avatar>
+        
+        
         <Box sx={{ flex: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{otherUser.name}</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+            {otherUser.name}
+          </Typography>
         </Box>
-      </Paper>
+      </Box>
+
       {/* Message list */}
-      <Box sx={{
-        flex: 1,
-        overflow: 'auto',
-        p: { xs: 1, sm: 2 },
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        background: theme.palette.mode === 'dark'
-          ? `linear-gradient(${alpha(theme.palette.background.default, 0.9)}, ${alpha(theme.palette.background.default, 0.9)}),
-             url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E")`
-          : theme.palette.background.default,
-        backgroundSize: '300px 300px'
-      }}>
+      <Box 
+        ref={messagesContainerRef}
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: { xs: 1, sm: 2 },
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          background: theme.palette.mode === 'dark'
+            ? alpha(theme.palette.background.default, 0.9)
+            : alpha(theme.palette.background.default, 0.95)
+        }}
+      >
         <List sx={{ padding: 0 }}>
           {messages.map((msg) => (
             <MessageBubble
@@ -372,16 +559,16 @@ export default function Conversation({ otherUser, onBack }) {
           <div ref={messagesEndRef} />
         </List>
       </Box>
+
       {/* Input area */}
-      <Paper sx={{
-        p: 1.5,
+      <Box sx={{
+        p: 2,
         display: 'flex',
         alignItems: 'center',
-        position: 'sticky',
-        bottom: 0,
-        zIndex: 10,
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        background: theme.palette.background.paper,
+        background: theme.palette.mode === 'dark'
+          ? alpha(theme.palette.background.paper, 0.95)
+          : alpha(theme.palette.background.paper, 0.98),
         boxShadow: theme.shadows[3]
       }}>
         {uploading && (
@@ -402,10 +589,74 @@ export default function Conversation({ otherUser, onBack }) {
           </Box>
         )}
         
+        <Box sx={{ position: 'relative' }}>
+          <IconButton 
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            sx={{
+              color: theme.palette.text.secondary,
+              mr: 1,
+              '&:hover': {
+                color: theme.palette.primary.main,
+                background: alpha(theme.palette.primary.main, 0.1)
+              }
+            }}
+          >
+            <SentimentSatisfiedAltIcon />
+          </IconButton>
+          
+          {showEmojiPicker && (
+            <Box 
+              className="emoji-picker-container"
+              sx={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                borderRadius: 2,
+                p: 1,
+                display: 'flex',
+                flexDirection: 'column', // Changed to column for categories
+                gap: 0.5,
+                maxWidth: 300,
+                overflowY: 'auto', // Added overflowY for scrolling
+                boxShadow: theme.shadows[4],
+                zIndex: 1000
+              }}
+            >
+              {Object.entries(emojiCategories).map(([category, emojis]) => (
+                <Box key={category} sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.secondary, mb: 0.5 }}>
+                    {category}
+                  </Typography>
+                  {emojis.map((emoji, index) => (
+                    <IconButton
+                      key={index}
+                      onClick={() => handleEmojiClick(emoji)}
+                      sx={{
+                        fontSize: '1.2rem',
+                        p: 0.5,
+                        minWidth: 32,
+                        height: 32,
+                        flexShrink: 0,
+                        '&:hover': {
+                          background: alpha(theme.palette.primary.main, 0.1)
+                        }
+                      }}
+                    >
+                      {emoji}
+                    </IconButton>
+                  ))}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+        
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Type a message..."
+          placeholder="Type a message... (Ctrl+Enter to send)"
           value={newMessage}
           onChange={(e) => {
             console.log('Input changed:', e.target.value);
@@ -414,6 +665,7 @@ export default function Conversation({ otherUser, onBack }) {
           onKeyPress={(e) => {
             console.log('Key pressed:', e.key);
             if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
               handleSend();
             }
           }}
@@ -422,8 +674,26 @@ export default function Conversation({ otherUser, onBack }) {
           sx={{ mr: 1 }}
           multiline
           maxRows={4}
-          disabled={false}
+          disabled={uploading}
+          InputProps={{
+            sx: {
+              borderRadius: 3,
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.background.default, 0.8)
+                : alpha(theme.palette.background.default, 0.6),
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: alpha(theme.palette.divider, 0.3)
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: alpha(theme.palette.primary.main, 0.3)
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.primary.main
+              }
+            }
+          }}
         />
+        
         <IconButton 
           onClick={() => fileInputRef.current.click()}
           disabled={uploading}
@@ -469,7 +739,7 @@ export default function Conversation({ otherUser, onBack }) {
         >
           <SendIcon />
         </Button>
-      </Paper>
+      </Box>
     </Box>
   );
 }

@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -18,10 +19,12 @@ public class FriendRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
+    @ToString.Exclude
     private User sender;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id", nullable = false)
+    @ToString.Exclude
     private User receiver;
 
     @Enumerated(EnumType.STRING)

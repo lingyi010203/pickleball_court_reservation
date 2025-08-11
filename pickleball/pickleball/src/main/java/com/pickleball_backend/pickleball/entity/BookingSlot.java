@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,10 +18,12 @@ public class BookingSlot {
 
     @ManyToOne
     @JoinColumn(name = "booking_id", nullable = false)
+    @ToString.Exclude
     private Booking booking;
 
     @ManyToOne
     @JoinColumn(name = "slot_id", nullable = false)
+    @ToString.Exclude
     private Slot slot;
 
     @Column(nullable = false)

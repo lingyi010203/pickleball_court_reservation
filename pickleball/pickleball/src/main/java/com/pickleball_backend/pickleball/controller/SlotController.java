@@ -9,6 +9,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/member/slots")
@@ -45,7 +47,7 @@ public class SlotController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'EVENTORGANIZER')")
     public ResponseEntity<List<SlotResponseDto>> getAvailableSlots(
             @RequestParam Integer courtId) {
 
@@ -53,7 +55,33 @@ public class SlotController {
         return ResponseEntity.ok(slots);
     }
 
+    @GetMapping("/available-range")
+    @PreAuthorize("hasAnyRole('USER', 'EVENTORGANIZER')")
+    public ResponseEntity<List<SlotResponseDto>> getAvailableSlotsForRange(
+            @RequestParam Integer courtId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        List<SlotResponseDto> slots = slotService.getAvailableSlotsByCourtAndDateRange(courtId, startDate, endDate);
+        return ResponseEntity.ok(slots);
+    }
+
+    @GetMapping("/available/grouped")
+    @PreAuthorize("hasAnyRole('USER', 'EVENTORGANIZER')")
+    public ResponseEntity<Map<String, List<SlotResponseDto>>> getAvailableSlotsGrouped(
+            @RequestParam Integer courtId) {
+
+        List<SlotResponseDto> slots = slotService.getAvailableSlotsByCourt(courtId);
+
+        // Group slots by date
+        Map<String, List<SlotResponseDto>> groupedSlots = slots.stream()
+            .collect(Collectors.groupingBy(slot -> slot.getDate().toString()));
+
+        return ResponseEntity.ok(groupedSlots);
+    }
+
     @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('USER', 'EVENTORGANIZER')")
     public ResponseEntity<List<SlotResponseDto>> getAllSlots(
             @RequestParam Integer courtId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

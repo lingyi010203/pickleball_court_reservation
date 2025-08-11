@@ -132,7 +132,7 @@ const StudentManagementSystem = () => {
       let sessionsWithRegs = [];
       // 用 recurringGroupId 查詢所有 session 及報名名單
       if (first.recurringGroupId) {
-        sessionsWithRegs = await ClassSessionService.getRecurringClassFullDetails(first.recurringGroupId);
+        sessionsWithRegs = await ClassSessionService.getRecurringGroupDetails(first.recurringGroupId);
       } else {
         // 單堂課 fallback
         sessionsWithRegs = [

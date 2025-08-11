@@ -14,7 +14,10 @@ public class HelpdeskQuery {
 
     private String username;
     private String question;
+    
+    @Column(columnDefinition = "TEXT")
     private String aiResponse;
+    
     private boolean escalated;
     private LocalDateTime timestamp = LocalDateTime.now();
 

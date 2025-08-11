@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -49,10 +50,12 @@ public class FriendlyMatch {
 
     @ManyToOne
     @JoinColumn(name = "organizer_id")
+    @ToString.Exclude
     private Member organizer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id")
+    @ToString.Exclude
     private Booking booking; // 對應已預約的場地
 
     // 是否為邀請型（由 booking 產生的 invitation）
@@ -64,6 +67,7 @@ public class FriendlyMatch {
     private String invitationType = "FRIENDLY_MATCH_INVITE";
 
     @OneToMany(mappedBy = "friendlyMatch", cascade = CascadeType.ALL)
+    @ToString.Exclude
     private List<JoinRequest> joinRequests;
 
     public void setIsInvitation(boolean isInvitation) {

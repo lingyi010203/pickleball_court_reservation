@@ -14,6 +14,8 @@ const HelpdeskPage = () => {
   const [error, setError] = useState('');
   const [file, setFile] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [currentTopic, setCurrentTopic] = useState(null);
   const [showEscalateForm, setShowEscalateForm] = useState(false);
   const [escalateMessage, setEscalateMessage] = useState('');
@@ -21,12 +23,38 @@ const HelpdeskPage = () => {
 
   // Scroll to bottom on new messages
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior: "smooth",
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+    }, 150);
   };
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0 && shouldAutoScroll) {
+      scrollToBottom();
+    }
+  }, [messages, shouldAutoScroll]);
+
+  // Handle scroll events to detect manual scrolling
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
+      setShouldAutoScroll(isAtBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -49,8 +77,13 @@ const HelpdeskPage = () => {
       timestamp: new Date().toISOString()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Clear input first for better UX
     setInputMessage('');
+    
+    // Force scroll to bottom when user sends a message
+    setShouldAutoScroll(true);
+    
+    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setError('');
 
@@ -622,7 +655,7 @@ const HelpdeskPage = () => {
         <p style={styles.headerSubtitle}>Ask me anything about bookings, memberships, payments, or general inquiries!</p>
       </div>
 
-      <div style={styles.messages}>
+      <div style={styles.messages} ref={messagesContainerRef}>
         {messages.length === 0 && (
           <div style={styles.welcomeMessage}>
             <div style={{ ...styles.message, ...styles.aiMessage }}>
@@ -640,7 +673,7 @@ const HelpdeskPage = () => {
                 </div>
               </div>
               <div style={styles.messageContent}>
-                <p style={{ fontWeight: 500, marginBottom: '0.5rem' }}>👋 Hello! I'm your AI assistant. I can help you with:</p>
+                <p style={{ fontWeight: 500, marginBottom: '0.5rem' }}>👋 Hello! I'm your Groq AI assistant. I can help you with:</p>
                 <ul style={styles.messageList}>
                   <li style={styles.messageListItem}>📅 Court bookings and reservations</li>
                   <li style={styles.messageListItem}>💳 Membership information and benefits</li>
@@ -661,7 +694,11 @@ const HelpdeskPage = () => {
             ...styles.message,
             ...(message.sender === 'user' ? styles.userMessage : styles.aiMessage)
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-end',
+              flexDirection: message.sender === 'user' ? 'row-reverse' : 'row'
+            }}>
               {message.sender === 'ai' ? (
                 <div style={{ 
                   background: alpha(theme.palette.primary.main, 0.1), 
@@ -679,7 +716,7 @@ const HelpdeskPage = () => {
                   background: alpha(theme.palette.primary.main, 0.2), 
                   borderRadius: '50%', 
                   padding: '0.5rem',
-                  marginRight: '0.75rem',
+                  marginLeft: '0.75rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'

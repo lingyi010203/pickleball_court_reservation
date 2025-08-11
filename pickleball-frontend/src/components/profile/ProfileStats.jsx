@@ -53,18 +53,21 @@ const ProfileStats = ({ profile }) => {
     },
     {
       title: "Booking Hours",
-      value: Number(getStatValue(profile, 'bookingHours', 0)).toFixed(1),
+      value: (() => {
+        const hours = Number(getStatValue(profile, 'bookingHours', 0));
+        return hours % 1 === 0 ? hours.toString() : hours.toFixed(1);
+      })(),
       icon: <SportsTennis fontSize="small" />,
       color: theme.palette.success.main,
       bgColor: alpha(theme.palette.success.main, 0.1)
     },
-    {
+   /* {
       title: "Sumos Joined",
       value: getStatValue(profile, 'sumosJoined', 0),
       icon: <LocalOffer fontSize="small" />,
       color: theme.palette.warning.main,
       bgColor: alpha(theme.palette.warning.main, 0.1)
-    },
+    },*/
     {
       title: "Amount Spent",
       value: formatCurrency(getStatValue(profile, 'amountSpent', 0)),

@@ -22,7 +22,7 @@ import {
   Schedule as ActiveIcon,
   Warning as ExpiredIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 
 const RedeemHistory = () => {
@@ -35,7 +35,7 @@ const RedeemHistory = () => {
     const fetchHistory = async () => {
       try {
         const token = UserService.getToken();
-        const response = await axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
+        const response = await api.get('/voucher-redemption/my-redemptions', {
           headers: { 
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

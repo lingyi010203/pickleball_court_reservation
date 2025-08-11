@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -60,9 +61,11 @@ public class User {
     private double amountSpent;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private Member member;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @ToString.Exclude
     private UserAccount userAccount;
 
     public String getProfileImage() {
@@ -72,12 +75,15 @@ public class User {
 
 
     @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private List<Message> sentMessages;
 
     @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private List<Message> receivedMessages;
 
     @OneToMany(mappedBy = "coach", cascade = CascadeType.ALL)
     @JsonIgnore // 或 @JsonBackReference
+    @ToString.Exclude
     private List<ClassSession> coachSessions;
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,6 @@ public class Venue {
 
     @OneToMany(mappedBy = "venue", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
-    private List<Court> courts = new ArrayList<>();
-}
+    @ToString.Exclude
+    private List<Court> courts = new ArrayList<>();}
 

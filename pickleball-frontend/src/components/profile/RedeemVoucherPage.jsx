@@ -4,7 +4,7 @@ import {
   CircularProgress, Alert, Grow, useTheme, alpha
 } from '@mui/material';
 import { ConfirmationNumber as VoucherIcon } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 import { formatVoucherExpiryDate } from '../../utils/dateUtils';
 
@@ -55,10 +55,10 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
 
         // Fetch dashboard data and user's redemption history in parallel
         const [dashboardResponse, redemptionHistoryResponse] = await Promise.all([
-          axios.get('http://localhost:8081/api/member/dashboard', {
+          api.get('/member/dashboard', {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
+          api.get('/voucher-redemption/my-redemptions', {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
@@ -154,8 +154,8 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
       const token = UserService.getToken();
       if (!token) return;
 
-      const response = await axios.post(
-        `http://localhost:8081/api/voucher-redemption/redeem/${voucher.id}`,
+      const response = await api.post(
+        `/voucher-redemption/redeem/${voucher.id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -167,10 +167,10 @@ const RedeemVoucherPage = ({ onSuccess, onError }) => {
         
         // Refresh voucher data with redemption history
         const [dashboardResponse, redemptionHistoryResponse] = await Promise.all([
-          axios.get('http://localhost:8081/api/member/dashboard', {
+          api.get('/member/dashboard', {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          axios.get('http://localhost:8081/api/voucher-redemption/my-redemptions', {
+          api.get('/voucher-redemption/my-redemptions', {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);

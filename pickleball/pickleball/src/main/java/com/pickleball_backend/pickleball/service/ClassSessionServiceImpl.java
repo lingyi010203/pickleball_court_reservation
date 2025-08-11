@@ -41,6 +41,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     private final EscrowAccountService escrowAccountService;
     private final WalletTransactionRepository walletTransactionRepository;
     private final MembershipTierRepository membershipTierRepository;
+    private final MemberService memberService;
     private static final Logger logger = LoggerFactory.getLogger(ClassSessionServiceImpl.class);
 
 
@@ -452,7 +453,13 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         wallet.setBalance(wallet.getBalance() + amount);
         walletRepository.save(wallet);
 
-        // 2. 创建退款记录
+        // 2. 扣除積分（全額扣除，因為課程取消通常是全額退款）
+        MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, amount, 1.0);
+        
+        logger.info("Deducted {} tier points and {} reward points from member {} for class session refund",
+                deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId());
+
+        // 3. 创建退款记录
         Payment refund = new Payment();
         refund.setAmount(amount);
         refund.setRefundDate(LocalDateTime.now());

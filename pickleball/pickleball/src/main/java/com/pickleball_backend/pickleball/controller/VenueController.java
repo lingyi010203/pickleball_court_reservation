@@ -174,16 +174,27 @@ public class VenueController {
         LocalDate start = startDate != null ? LocalDate.parse(startDate) : LocalDate.now();
         LocalDate end = endDate != null ? LocalDate.parse(endDate) : start.plusYears(1);
 
+        System.out.println("=== Debug: getBookedDatesPublic ===");
+        System.out.println("VenueId: " + venueId);
+        System.out.println("Start: " + start);
+        System.out.println("End: " + end);
+
         // 1. 查詢已被 booking 的日期
         List<LocalDate> bookedDates = bookingSlotRepository.findBookedDatesByVenueIdAndDateRange(venueId, start, end);
+        System.out.println("Booked dates: " + bookedDates);
 
-        // 2. 查詢該 venue 下所有 event 的日期
+        // 2. 查詢該 venue 下所有 event 的日期（直接關聯）
         List<LocalDate> eventDates = eventRepository.findEventDatesByVenueIdAndDateRange(venueId, start, end);
+        System.out.println("Event dates (direct): " + eventDates);
 
-        // 3. 合併去重
+        // 3. 查詢該 venue 下所有 court 的 event 日期
+        List<LocalDate> courtEventDates = eventRepository.findEventDatesByCourtVenueIdAndDateRange(venueId, start, end);
+
+        // 4. 合併去重
         Set<String> allDates = new HashSet<>();
         bookedDates.forEach(d -> allDates.add(d.toString()));
         eventDates.forEach(d -> allDates.add(d.toString()));
+        courtEventDates.forEach(d -> allDates.add(d.toString()));
 
         return ResponseEntity.ok(new ArrayList<>(allDates));
     }
@@ -200,13 +211,21 @@ public class VenueController {
         // 1. 查詢已被 booking 的日期
         List<LocalDate> bookedDates = bookingSlotRepository.findBookedDatesByVenueIdAndDateRange(venueId, start, end);
 
-        // 2. 查詢該 venue 下所有 event 的日期
+        // 2. 查詢該 venue 下所有 event 的日期（直接關聯）
         List<LocalDate> eventDates = eventRepository.findEventDatesByVenueIdAndDateRange(venueId, start, end);
 
-        // 3. 合併去重
+        // 3. 查詢該 venue 下所有 court 的 event 日期
+        List<LocalDate> courtEventDates = eventRepository.findEventDatesByCourtVenueIdAndDateRange(venueId, start, end);
+        System.out.println("Event dates (via courts): " + courtEventDates);
+
+        // 4. 合併去重
         Set<String> allDates = new HashSet<>();
         bookedDates.forEach(d -> allDates.add(d.toString()));
         eventDates.forEach(d -> allDates.add(d.toString()));
+        courtEventDates.forEach(d -> allDates.add(d.toString()));
+
+        System.out.println("Final all dates: " + allDates);
+        System.out.println("=== End Debug ===");
 
         return ResponseEntity.ok(new ArrayList<>(allDates));
     }

@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 @Entity
 @Data
@@ -13,6 +14,7 @@ public class Admin {
     @OneToOne(fetch = FetchType.EAGER)
     @MapsId  // Automatically sets ID from user ID
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 
     @Column(name = "position")

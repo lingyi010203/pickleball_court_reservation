@@ -12,7 +12,8 @@ import {
   IconButton,
   Skeleton,
   useTheme,
-  Tooltip
+  Tooltip,
+  alpha
 } from '@mui/material';
 import {
   SportsTennis as CourtsIcon,
@@ -96,7 +97,7 @@ function Navbar() {
 
   const navigateTo = useCallback((path, id) => {
     // 检查是否是私有页面（需要登录）
-    const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(id);
+    const isPrivateItem = ['messages', 'create-event', 'admin', 'coaching'].includes(id);
     
     if (!isLoggedIn && isPrivateItem) {
       // 未登录用户点击私有页面时重定向到登录页面
@@ -137,9 +138,6 @@ function Navbar() {
 
     // 需要登录才能访问的页面
     const privateItems = [
-      { id: 'book', label: 'Book', icon: <BookIcon />, path: '/book' },
-      { id: 'deals', label: 'Deals', icon: <DealsIcon />, path: '/deals' },
-      { id: 'helpdesk', label: 'Help', icon: <HelpIcon />, path: '/helpdesk' },
       { id: 'coaching', label: 'Coaching', icon: <BookIcon />, path: '/coaching/browse' },
     ];
 
@@ -187,7 +185,7 @@ function Navbar() {
     <>
       {items.map((item) => {
         // 检查是否是私有页面（需要登录）
-        const isPrivateItem = ['book', 'deals', 'helpdesk', 'messages', 'create-event', 'admin', 'coaching'].includes(item.id);
+        const isPrivateItem = ['messages', 'create-event', 'admin', 'coaching'].includes(item.id);
         
         const button = (
           <Button
@@ -371,54 +369,75 @@ function Navbar() {
 
               </>
             ) : (
-              <Box
-                onClick={handleOpenMenu}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    backgroundColor: theme.palette.action.hover,
-                    borderRadius: '4px'
-                  },
-                  p: 1,
-                  transition: 'background-color 0.3s ease',
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                    transition: 'transform 0.1s ease'
-                  }
-                }}
-                role="button"
-                aria-label="User menu"
-                tabIndex={0}
-                onKeyPress={(e) => e.key === 'Enter' && handleOpenMenu(e)}
-              >
-                {profileImage === undefined ? (
-                  <Skeleton variant="circular" width={40} height={40} />
-                ) : (
-                  <Avatar
-                    src={profileImage ? `${API_URL}/uploads/${profileImage}?ts=${Date.now()}` : null}
-                    onError={e => {
-                      e.target.onerror = null;
-                      e.target.src = null;
-                    }}
+              <>
+                {/* Help Button */}
+                <Tooltip title="Help & Support" placement="bottom">
+                  <Button
+                    onClick={() => navigate('/helpdesk')}
                     sx={{
-                      width: 40,
-                      height: 40,
-                      bgcolor: theme.palette.primary.main,
-                      fontSize: '1.2rem',
-                      fontWeight: 'bold'
+                      mx: 1,
+                      color: theme.palette.text.primary,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.875rem',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      }
                     }}
                   >
-                    {!profileImage && getUsernameInitial()}
-                  </Avatar>
-                )}
-                {!isMobile && (
-                  <Typography variant="body1" sx={{ fontWeight: 500, ml: 1 }}>
-                    {username ? `Hi, ${username}` : 'Profile'}
-                  </Typography>
-                )}
-              </Box>
+                    HELP
+                  </Button>
+                </Tooltip>
+                
+                <Box
+                  onClick={handleOpenMenu}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: theme.palette.action.hover,
+                      borderRadius: '4px'
+                    },
+                    p: 1,
+                    transition: 'background-color 0.3s ease',
+                    '&:active': {
+                      transform: 'scale(0.95)',
+                      transition: 'transform 0.1s ease'
+                    }
+                  }}
+                  role="button"
+                  aria-label="User menu"
+                  tabIndex={0}
+                  onKeyPress={(e) => e.key === 'Enter' && handleOpenMenu(e)}
+                >
+                  {profileImage === undefined ? (
+                    <Skeleton variant="circular" width={40} height={40} />
+                  ) : (
+                    <Avatar
+                      src={profileImage ? `${API_URL}/uploads/${profileImage}?ts=${Date.now()}` : null}
+                      onError={e => {
+                        e.target.onerror = null;
+                        e.target.src = null;
+                      }}
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        bgcolor: theme.palette.primary.main,
+                        fontSize: '1.2rem',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      {!profileImage && getUsernameInitial()}
+                    </Avatar>
+                  )}
+                  {!isMobile && (
+                    <Typography variant="body1" sx={{ fontWeight: 500, ml: 1 }}>
+                      {username ? `Hi, ${username}` : 'Profile'}
+                    </Typography>
+                  )}
+                </Box>
+              </>
             )}
           </Box>
         </Toolbar>

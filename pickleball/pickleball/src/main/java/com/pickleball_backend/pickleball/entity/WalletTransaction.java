@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -53,6 +54,7 @@ public class WalletTransaction {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wallet_id", insertable = false, updatable = false)
+    @ToString.Exclude
     private Wallet wallet;
 
     @PrePersist

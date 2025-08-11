@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -23,11 +24,13 @@ public class ClassRegistration {
     @ManyToOne
     @JoinColumn(name = "session_id")
     @JsonIgnore
+    @ToString.Exclude
     private ClassSession classSession;
 
     @ManyToOne
     @JoinColumn(name = "member_id")
     @JsonIgnoreProperties({"registrations", "vouchers", "wallet", "organizedMatches", "joinRequests"})
+    @ToString.Exclude
     private Member member;
 
     @Column(name = "registration_date")
@@ -41,6 +44,7 @@ public class ClassRegistration {
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "payment_id")
+    @ToString.Exclude
     private Payment payment;
 
     @Column(name = "coach_comment", columnDefinition = "TEXT")

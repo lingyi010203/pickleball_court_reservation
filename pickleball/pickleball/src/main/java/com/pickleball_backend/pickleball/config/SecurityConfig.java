@@ -68,7 +68,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
                         
                         // 允许公开访问球场图片
-                        .requestMatchers("/api/admin/courts/public/**").permitAll()
                         
                         // Public court access for unauthenticated users
                         .requestMatchers(HttpMethod.GET, "/api/courts").permitAll()
@@ -91,6 +90,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/friendly-matches/open").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/friendly-matches/all").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/friendly-matches/invitations").permitAll()
+
+                        // Public venue access for unauthenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/venues").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/venues/bystate").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/venues/check-availability").permitAll()
                         // Tier Management Endpoints
                         .requestMatchers(HttpMethod.POST, "/api/admin/tiers").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/admin/*/vouchers").hasAuthority("ROLE_ADMIN")
@@ -130,10 +134,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/member/tiers").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/member/dashboard").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/member/tiers").hasAuthority("ROLE_USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/courts").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/courts/{id}").hasRole("USER")
-                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available/grouped").hasRole("USER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/courts").hasAnyRole("USER", "EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/courts/{id}").hasAnyRole("USER", "EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available").hasAnyRole("USER", "ADMIN","EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available/grouped").hasAnyRole("USER", "EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/slots/available-range").hasAnyRole("USER", "EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.GET, "/api/member/slots/all").hasAnyRole("USER", "EVENTORGANIZER")
                         .requestMatchers(HttpMethod.GET, "/api/member/redeem-history").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/user/reviewable-items").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/feedback").permitAll()
@@ -144,12 +150,25 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/feedback/**").hasRole("USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/feedback/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/auth/verify").permitAll()
+
+                        // Admin public endpoints (must come before general admin rule)
+                        .requestMatchers("/api/admin/courts/public/**").permitAll()
+                        .requestMatchers("/api/admin/venues/public/**").permitAll()
+
                         // General Admin Access
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/coach/recurring-sessions").hasAuthority("ROLE_COACH")
                         .requestMatchers(HttpMethod.POST, "/api/coach/courses/**").hasAuthority("ROLE_COACH")
                         .requestMatchers("/api/coach/**").hasAuthority("ROLE_COACH")
+
+                        // Event Organizer Endpoints
+                        .requestMatchers("/api/event-organizer/**").hasRole("EVENTORGANIZER")
+                        .requestMatchers("/api/events/organizer/**").hasRole("EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.POST, "/api/events").hasRole("EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.PUT, "/api/events/**").hasRole("EVENTORGANIZER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasRole("EVENTORGANIZER")
+                        .requestMatchers("/api/event-registration/**").hasAnyRole("USER", "EVENTORGANIZER")
 
                         // User Endpoints
                         .requestMatchers("/api/profile").authenticated()

@@ -19,6 +19,7 @@ import com.pickleball_backend.pickleball.repository.AdminRepository;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -57,6 +58,7 @@ import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     private final BookingSlotRepository bookingSlotRepository;
@@ -74,6 +76,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final FeedbackRepository feedbackRepository;
     private final AdminRepository adminRepository;
     private final ChartService chartService;
+    private final MemberService memberService;
 
     @Override
     public List<AdminUserDto> getAllUsers() {
@@ -189,7 +192,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
                               "BOOKING", booking.getId(), "Booking cancellation refund (50%) - Admin cancelled");
 
-        // 5. 更新用户统计数据（减少预订小时数）
+        // 5. 扣除積分（扣除50%的積分，與退款比例一致）
+        Member member = booking.getMember();
+        MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(member, booking.getTotalAmount(), 0.5);
+        
+        log.info("Deducted {} tier points and {} reward points from member {} for admin cancellation {}",
+                deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), member.getId(), booking.getId());
+
+        // 6. 更新用户统计数据（减少预订小时数）
         User user = booking.getMember().getUser();
         double cancelledHours = booking.getBookingSlots().stream()
                 .mapToDouble(bs -> bs.getSlot().getDurationHours())

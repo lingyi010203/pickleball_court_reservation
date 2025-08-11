@@ -39,9 +39,7 @@ import {
   LocationOn,
   People,
   AttachMoney,
-  Close,
-  Favorite,
-  FavoriteBorder
+  Close
 } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import FriendlyMatchPage from './FriendlyMatchPage';
@@ -52,7 +50,6 @@ const EventPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [favorites, setFavorites] = useState(new Set());
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState(false);
@@ -96,7 +93,7 @@ const EventPage = () => {
     setError(null);
     try {
       console.log('Fetching events for page:', pageNum);
-      const eventList = await EventService.getUpcomingEvents(pageNum - 1, 3); // 每頁顯示3個事件
+      const eventList = await EventService.getUpcomingEvents(pageNum - 1, 8); // 每頁顯示8個事件
       console.log('Received event list:', eventList);
       console.log('Total pages:', eventList.totalPages);
       console.log('Total elements:', eventList.totalElements);
@@ -114,7 +111,7 @@ const EventPage = () => {
 
   const fetchVenues = async () => {
     try {
-      const res = await api.get('/api/venues');
+      const res = await api.get('/venues');
       setVenues(res.data);
     } catch (err) {
       console.error('Failed to fetch venues:', err);
@@ -166,16 +163,6 @@ const EventPage = () => {
   const handleCloseDialog = () => {
     setSelectedEvent(null);
     setIsRegistered(false);
-  };
-
-  const toggleFavorite = (eventId) => {
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(eventId)) {
-      newFavorites.delete(eventId);
-    } else {
-      newFavorites.add(eventId);
-    }
-    setFavorites(newFavorites);
   };
 
   const getCategoryColor = (category) => {
@@ -386,23 +373,14 @@ const EventPage = () => {
                   image={event.image}
                   alt={event.title}
                 />
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Chip
-                      label={event.category}
-                      color={getCategoryColor(event.category)}
-                      size="small"
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={e => {
-                        e.stopPropagation();
-                        toggleFavorite(event.id);
-                      }}
-                    >
-                      {favorites.has(event.id) ? <Favorite color="error" /> : <FavoriteBorder />}
-                    </IconButton>
-                  </Box>
+                                 <CardContent sx={{ flexGrow: 1 }}>
+                   <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', mb: 1 }}>
+                     <Chip
+                       label={event.category}
+                       color={getCategoryColor(event.category)}
+                       size="small"
+                     />
+                   </Box>
 
                   <Typography variant="h6" component="h2" gutterBottom>
                     {event.title}

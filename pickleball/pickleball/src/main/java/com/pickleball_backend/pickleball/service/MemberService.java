@@ -241,10 +241,12 @@ public class MemberService {
         // Store old tier for comparison
         String oldTierName = member.getTier() != null ? member.getTier().getTierName() : "NONE";
         
+        // Add points to both tier points and reward points
         member.setTierPointBalance(member.getTierPointBalance() + points);
+        member.setRewardPointBalance(member.getRewardPointBalance() + points);
         memberRepository.save(member);
 
-        // Automatic tier upgrade check
+        // Automatic tier upgrade check (based on tier points)
         tierService.recalculateMemberTier(member);
         
         // Refresh member data to get updated tier
@@ -255,8 +257,51 @@ public class MemberService {
         if (!oldTierName.equals(newTierName)) {
             // Assuming log is available, otherwise remove this line
             // log.info("Automatic tier upgrade: {} -> {} (Points: {} -> {})", 
-            //         oldTierName, newTierName, member.getPointBalance() - points, member.getPointBalance());
+            //         oldTierName, newTierName, member.getTierPointBalance() - points, member.getTierPointBalance());
         }
+    }
+
+    /**
+     * 扣除積分（用於退款處理）
+     * @param member 會員
+     * @param amount 退款金額
+     * @param refundPercentage 退款比例（0.0-1.0）
+     * @return 實際扣除的積分數量
+     */
+    @Transactional
+    public PointDeductionResult deductPointsForRefund(Member member, double amount, double refundPercentage) {
+        int originalPointsEarned = (int) Math.round(amount); // 原始獲得的積分
+        int pointsToDeduct = (int) Math.round(originalPointsEarned * refundPercentage); // 按比例扣除積分
+        
+        // 確保不會扣除超過用戶擁有的積分
+        int currentTierPoints = member.getTierPointBalance();
+        int currentRewardPoints = member.getRewardPointBalance();
+        
+        int tierPointsToDeduct = Math.min(pointsToDeduct, currentTierPoints);
+        int rewardPointsToDeduct = Math.min(pointsToDeduct, currentRewardPoints);
+        
+        member.setTierPointBalance(Math.max(0, currentTierPoints - tierPointsToDeduct));
+        member.setRewardPointBalance(Math.max(0, currentRewardPoints - rewardPointsToDeduct));
+        memberRepository.save(member);
+        
+        return new PointDeductionResult(tierPointsToDeduct, rewardPointsToDeduct);
+    }
+
+    /**
+     * 積分扣除結果
+     */
+    public static class PointDeductionResult {
+        private final int tierPointsDeducted;
+        private final int rewardPointsDeducted;
+        
+        public PointDeductionResult(int tierPointsDeducted, int rewardPointsDeducted) {
+            this.tierPointsDeducted = tierPointsDeducted;
+            this.rewardPointsDeducted = rewardPointsDeducted;
+        }
+        
+        public int getTierPointsDeducted() { return tierPointsDeducted; }
+        public int getRewardPointsDeducted() { return rewardPointsDeducted; }
+        public int getTotalPointsDeducted() { return tierPointsDeducted + rewardPointsDeducted; }
     }
 
     public List<TierDto> getAllAvailableTiers() {

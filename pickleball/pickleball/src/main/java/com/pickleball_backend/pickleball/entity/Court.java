@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
@@ -58,6 +59,7 @@ public class Court {
     @ManyToOne
     @JoinColumn(name = "venue_id")
     @JsonIgnoreProperties("courts")  // 只忽略 courts，讓 venue 的基本信息能傳遞
+    @ToString.Exclude
     private Venue venue;
 
     @OneToMany(mappedBy = "court", cascade = CascadeType.ALL)

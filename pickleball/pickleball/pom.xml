@@ -61,7 +61,7 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
-
+		<!-- Removed Spring AI starter: using custom AiChatService instead -->
 		<dependency>
 			<groupId>javax.annotation</groupId>
 			<artifactId>javax.annotation-api</artifactId>
@@ -135,6 +135,9 @@
 		</dependency>
 	</dependencies>
 
+
+
+
 	<build>
 		<plugins>
 			<plugin>
@@ -163,5 +166,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

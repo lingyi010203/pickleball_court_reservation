@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,22 +46,27 @@ public class ClassSession {
     @ManyToOne
     @JoinColumn(name = "coach_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @ToString.Exclude
     private User coach;
 
     @ManyToOne
     @JoinColumn(name = "court_id")
     @JsonIgnoreProperties("sessions") // 只忽略 sessions，讓 venue 信息能傳遞
+    @ToString.Exclude
     private Court court;
 
     @ManyToOne
     @JoinColumn(name = "player_id")
+    @ToString.Exclude
     private User player;
 
     @OneToOne
     @JoinColumn(name = "payment_id") // 這個欄位名要和你的資料庫一致
+    @ToString.Exclude
     private Payment payment;
 
     @OneToOne(mappedBy = "session", cascade = CascadeType.ALL)
+    @ToString.Exclude
     private CancellationRequest cancellationRequest;
 
     // 新增欄位
@@ -97,10 +103,12 @@ public class ClassSession {
 
     @ManyToOne
     @JoinColumn(name = "venue_id")
+    @ToString.Exclude
     private Venue venue;
 
     // 新增：報名關聯
     @OneToMany(mappedBy = "classSession")
+    @ToString.Exclude
     private List<ClassRegistration> registrations;
 
     // Replacement class: reference to the original cancelled session

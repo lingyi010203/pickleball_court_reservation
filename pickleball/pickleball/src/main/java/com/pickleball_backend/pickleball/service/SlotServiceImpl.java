@@ -4,13 +4,16 @@ import com.pickleball_backend.pickleball.dto.SlotDto;
 import com.pickleball_backend.pickleball.dto.SlotResponseDto;
 import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.entity.Slot;
-
+import com.pickleball_backend.pickleball.entity.Event;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.exception.ValidationException;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.SlotRepository;
 import com.pickleball_backend.pickleball.repository.ClassSessionRepository;
 import com.pickleball_backend.pickleball.repository.BookingSlotRepository; // 新增：檢查預訂狀態
+import com.pickleball_backend.pickleball.repository.EventRepository; // 新增：檢查Event衝突
+import com.pickleball_backend.pickleball.repository.VenueRepository; // 新增：用於查詢場館
+import lombok.extern.slf4j.Slf4j;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,12 +29,15 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SlotServiceImpl implements SlotService {
 
     private final SlotRepository slotRepository;
     private final CourtRepository courtRepository;
     private final ClassSessionRepository classSessionRepository;
     private final BookingSlotRepository bookingSlotRepository; // 新增：檢查預訂狀態
+    private final EventRepository eventRepository; // 新增：檢查Event衝突
+    private final VenueRepository venueRepository; // 新增：用於查詢場館
 
     @Override
     public List<SlotResponseDto> getSlots(List<Integer> courtIds, LocalDate startDate, LocalDate endDate) {
@@ -88,7 +94,7 @@ public class SlotServiceImpl implements SlotService {
     @Transactional
     public void createSlots(List<SlotDto> slotDtos) {
         System.out.println("==> createSlots called with " + slotDtos.size() + " slots");
-        
+
         slotDtos.forEach(dto -> {
             if (dto.getStartTime() == null) {
                 throw new ValidationException("Start time is required for slot creation");
@@ -111,13 +117,13 @@ public class SlotServiceImpl implements SlotService {
             }
 
             Slot savedSlot = slotRepository.save(slot);
-            System.out.println("==> Created slot: ID=" + savedSlot.getId() + 
-                ", Date=" + savedSlot.getDate() + 
-                ", Time=" + savedSlot.getStartTime() + "-" + savedSlot.getEndTime() + 
-                ", Status=" + savedSlot.getStatus() + 
+            System.out.println("==> Created slot: ID=" + savedSlot.getId() +
+                ", Date=" + savedSlot.getDate() +
+                ", Time=" + savedSlot.getStartTime() + "-" + savedSlot.getEndTime() +
+                ", Status=" + savedSlot.getStatus() +
                 ", Available=" + savedSlot.isAvailable());
         });
-        
+
         System.out.println("==> All slots created successfully");
     }
 
@@ -154,18 +160,18 @@ public class SlotServiceImpl implements SlotService {
                     ", Status: " + slot.getStatus());
             }
         }
-        
+
         // 显示SPECIAL_CIRCUMSTANCE slots
         List<Slot> specialSlots = allSlots.stream()
             .filter(slot -> "SPECIAL_CIRCUMSTANCE".equals(slot.getStatus()))
             .collect(Collectors.toList());
-        
+
         if (!specialSlots.isEmpty()) {
             System.out.println("SPECIAL_CIRCUMSTANCE slots found:");
             for (Slot slot : specialSlots) {
-                System.out.println("  - Slot ID: " + slot.getId() + 
-                    ", Date: " + slot.getDate() + 
-                    ", Time: " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                System.out.println("  - Slot ID: " + slot.getId() +
+                    ", Date: " + slot.getDate() +
+                    ", Time: " + slot.getStartTime() + "-" + slot.getEndTime() +
                     ", Status: " + slot.getStatus() + " (Booked but outside new operating days)");
             }
         }
@@ -181,11 +187,11 @@ public class SlotServiceImpl implements SlotService {
         System.out.println("=== Filtering slots ===");
         System.out.println("Total slots to filter: " + slots.size());
         System.out.println("Class sessions found: " + filteredSessions.size());
-        
+
         List<SlotResponseDto> availableSlots = slots.stream().filter(slot -> {
             LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
             LocalDateTime slotEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
-            
+
             // 只要有任何 class session 時間重疊，該 slot 就不能預約
             boolean overlap = filteredSessions.stream().anyMatch(s ->
                 slotStart.isBefore(s.getEndTime()) && slotEnd.isAfter(s.getStartTime())
@@ -200,13 +206,26 @@ public class SlotServiceImpl implements SlotService {
             if (isBooked) {
                 System.out.println("Slot " + slot.getId() + " is booked");
             }
+
+            // 新增：檢查是否有Event衝突
+            List<Event> conflictingEvents = eventRepository.findByCourtsIdAndStartTimeBetweenAndStatusNot(
+                courtId,
+                slotStart,
+                slotEnd,
+                "CANCELLED"
+            );
+            boolean hasEventConflict = !conflictingEvents.isEmpty();
+
+            boolean isAvailable = !overlap && !isBooked && !hasEventConflict;
             
-            boolean isAvailable = !overlap && !isBooked;
+            // 調試信息
             if (isAvailable) {
                 System.out.println("Slot " + slot.getId() + " is available: " + slot.getDate() + " " + slot.getStartTime() + "-" + slot.getEndTime());
+            } else {
+                System.out.println("Slot " + slot.getId() + " is not available: overlap=" + overlap + ", isBooked=" + isBooked + ", hasEventConflict=" + hasEventConflict);
             }
-            
-            return isAvailable; // 只有沒有課程重疊且未預訂的時段才可用
+
+            return isAvailable; // 只有沒有課程重疊、未預訂且沒有Event衝突的時段才可用
         }).map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
             dto.setId(slot.getId());
@@ -220,10 +239,82 @@ public class SlotServiceImpl implements SlotService {
             dto.setCourtLocation(court.getLocation());
             return dto;
         }).collect(Collectors.toList());
-        
+
         System.out.println("=== Final result ===");
         System.out.println("Available slots: " + availableSlots.size());
         return availableSlots;
+    }
+
+    @Override
+    public List<SlotResponseDto> getAvailableSlotsByCourtAndDateRange(Integer courtId, LocalDate startDate, LocalDate endDate) {
+        log.info("Getting available slots for court {} from {} to {}", courtId, startDate, endDate);
+
+        Court court = courtRepository.findById(courtId)
+                .orElseThrow(() -> new ResourceNotFoundException("Court not found with id: " + courtId));
+
+        // 查找指定日期範圍內的所有slots，包括isAvailable=false的，然后过滤掉PENDING状态的
+        List<Slot> allSlots = slotRepository.findByCourtIdAndDateBetween(courtId, startDate, endDate);
+        log.info("Found {} total slots for court {}", allSlots.size(), courtId);
+
+        List<Slot> slots = allSlots.stream()
+            .filter(slot -> !"PENDING".equals(slot.getStatus()))
+            .collect(Collectors.toList());
+        log.info("After filtering PENDING slots: {} slots", slots.size());
+
+        // 查詢指定日期範圍內所有未取消的 class session
+        final List<com.pickleball_backend.pickleball.entity.ClassSession> filteredSessions = classSessionRepository.findByCourtIdAndStartTimeBetween(
+            courtId,
+            startDate.atStartOfDay(),
+            endDate.atTime(23, 59, 59)
+        ).stream().filter(s -> !"CANCELLED".equalsIgnoreCase(s.getStatus())).toList();
+
+        int totalSlots = slots.size();
+
+        List<SlotResponseDto> result = slots.stream().filter(slot -> {
+            LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+            LocalDateTime slotEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+
+            // 只要有任何 class session 時間重疊，該 slot 就不能預約
+            boolean overlap = filteredSessions.stream().anyMatch(s ->
+                slotStart.isBefore(s.getEndTime()) && slotEnd.isAfter(s.getStartTime())
+            );
+
+            // 檢查是否有已預訂的 BookingSlot
+            boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
+
+            // 新增：檢查是否有Event衝突
+            List<Event> conflictingEvents = eventRepository.findByCourtsIdAndStartTimeBetweenAndStatusNot(
+                courtId,
+                slotStart,
+                slotEnd,
+                "CANCELLED"
+            );
+            boolean hasEventConflict = !conflictingEvents.isEmpty();
+
+            boolean isAvailable = !overlap && !isBooked && !hasEventConflict;
+
+            if (!isAvailable) {
+                log.debug("Slot {} is not available: overlap={}, isBooked={}, hasEventConflict={}",
+                    slot.getId(), overlap, isBooked, hasEventConflict);
+            }
+
+            return isAvailable;
+        }).map(slot -> {
+            SlotResponseDto dto = new SlotResponseDto();
+            dto.setId(slot.getId());
+            dto.setCourtId(slot.getCourtId());
+            dto.setDate(slot.getDate());
+            dto.setStartTime(slot.getStartTime());
+            dto.setEndTime(slot.getEndTime());
+            dto.setStatus("AVAILABLE");
+            dto.setDurationHours(calculateDurationHours(slot));
+            dto.setCourtName(court.getName());
+            dto.setCourtLocation(court.getLocation());
+            return dto;
+        }).collect(Collectors.toList());
+
+        log.info("Court {}: {} total slots, {} available slots", courtId, totalSlots, result.size());
+        return result;
     }
 
     public List<SlotResponseDto> getAllSlotsByCourt(Integer courtId, LocalDate startDate, LocalDate endDate) {
@@ -311,6 +402,65 @@ public class SlotServiceImpl implements SlotService {
                     !slot.getEndTime().isAfter(closing);
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    @Override
+    public List<SlotResponseDto> getAvailableSlotsByVenueAndDate(Integer venueId, LocalDate date) {
+        log.info("Getting available slots for venue {} on date {}", venueId, date);
+
+        // Get all courts for the venue
+        List<Court> venueCourts = courtRepository.findByVenueId(venueId);
+        if (venueCourts.isEmpty()) {
+            log.warn("No courts found for venue {}", venueId);
+            return Collections.emptyList();
+        }
+
+        log.info("Found {} courts for venue {}", venueCourts.size(), venueId);
+
+        // Get available slots for all courts in the venue
+        List<SlotResponseDto> allSlots = new ArrayList<>();
+        for (Court court : venueCourts) {
+            log.info("Getting available slots for court {} ({})", court.getId(), court.getName());
+            List<SlotResponseDto> courtSlots = getAvailableSlotsByCourtAndDateRange(court.getId(), date, date);
+            log.info("Found {} available slots for court {}", courtSlots.size(), court.getId());
+            allSlots.addAll(courtSlots);
+        }
+
+        log.info("Total available slots for venue {} on date {}: {}", venueId, date, allSlots.size());
+        return allSlots;
+    }
+
+    @Override
+    public List<String> getBookedDatesForVenue(Integer venueId, LocalDate startDate, LocalDate endDate) {
+        try {
+            // 獲取該venue下所有court的ID
+            List<Court> venueCourts = courtRepository.findByVenueId(venueId);
+            if (venueCourts.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            List<Integer> courtIds = venueCourts.stream()
+                .map(Court::getId)
+                .collect(Collectors.toList());
+
+            // 獲取所有court的已預訂日期
+            Set<String> bookedDatesSet = new HashSet<>();
+            for (Integer courtId : courtIds) {
+                List<SlotResponseDto> courtSlots = getAllSlotsByCourt(courtId, startDate, endDate);
+                // 過濾出已預訂的時段
+                List<String> courtBookedDates = courtSlots.stream()
+                    .filter(slot -> "BOOKED".equals(slot.getStatus()))
+                    .map(slot -> slot.getDate().toString())
+                    .distinct()
+                    .collect(Collectors.toList());
+                bookedDatesSet.addAll(courtBookedDates);
+            }
+
+            return new ArrayList<>(bookedDatesSet);
+        } catch (Exception e) {
+            log.error("Error getting booked dates for venue {} from {} to {}", venueId, startDate, endDate, e);
+            return new ArrayList<>();
         }
     }
 

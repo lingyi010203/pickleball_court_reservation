@@ -16,20 +16,31 @@ public class HelpdeskService {
     private final EmailService emailService;
     private final String adminEmail;
     private final UserRepository userRepository;
+    private final AiChatService aiChatService;
 
     @Autowired
     public HelpdeskService(HelpdeskQueryRepository queryRepository,
                            EmailService emailService,
                            @Value("${app.admin.email}") String adminEmail,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           AiChatService aiChatService) {
         this.queryRepository = queryRepository;
         this.emailService = emailService;
         this.adminEmail = adminEmail;
         this.userRepository = userRepository;
+        this.aiChatService = aiChatService;
     }
 
     public HelpdeskQuery processQuery(String username, String question) {
-        String aiResponse = getFallbackResponse(question); // Use static/fallback answer
+        String aiResponse = null;
+        // Try AI first; fallback to static response when not configured or on error
+        try {
+            aiResponse = aiChatService.askSupportAssistant(username, question);
+        } catch (Exception ignored) {
+        }
+        if (aiResponse == null || aiResponse.isBlank()) {
+            aiResponse = getFallbackResponse(question);
+        }
 
         HelpdeskQuery query = new HelpdeskQuery();
         query.setUsername(username);

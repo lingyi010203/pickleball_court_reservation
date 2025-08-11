@@ -148,6 +148,11 @@ const PaymentPage = () => {
 
   const [discountedAmount, setDiscountedAmount] = useState(getInitialAmount());
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -159,10 +164,15 @@ const PaymentPage = () => {
           balance = await getWalletBalance();
         } catch (getError) {
           console.warn('Wallet not found, initializing...', getError);
-          await initializeWallet();
-          balance = await getWalletBalance();
+          try {
+            await initializeWallet();
+            balance = await getWalletBalance();
+          } catch (initError) {
+            console.error('Failed to initialize wallet:', initError);
+            balance = 0; // 設置默認餘額為 0
+          }
         }
-        setWalletBalance(balance);
+        setWalletBalance(balance || 0);
 
         // Fetch available vouchers
         try {
@@ -255,7 +265,8 @@ const PaymentPage = () => {
         // Event registration payment - 事件註冊不使用 voucher
         apiEndpoint = '/event-registration/register';
         requestData = {
-          eventId: eventDetails.id
+          eventId: eventDetails.id,
+          useWallet: paymentMethod === 'wallet'
         };
       } else {
         // Regular court booking
@@ -362,7 +373,9 @@ const PaymentPage = () => {
       const errorMessage = err.response?.data?.message || 'Payment failed. Please try again.';
 
       if (errorMessage.includes('Insufficient wallet balance')) {
-        setError('Your wallet balance is too low. Please top up and try again.');
+        setError('Your wallet balance is insufficient. Please switch to credit card payment or top up your wallet.');
+        // 自動切換到信用卡支付
+        setPaymentMethod('card');
       } else {
         setError(errorMessage);
       }
@@ -985,10 +998,13 @@ const PaymentPage = () => {
                )}
 
               {/* Insufficient Balance Warning */}
-              {paymentMethod === 'wallet' && walletBalance < discountedAmount && !isLoading && (
+              {paymentMethod === 'wallet' && (walletBalance < discountedAmount || walletBalance === 0) && !isLoading && (
                 <Alert severity="warning" sx={{ mb: 3 }}>
                   <Typography variant="body2" sx={{ mb: 1 }}>
-                    Insufficient wallet balance. You need RM{(discountedAmount - walletBalance).toFixed(2)} more.
+                    {walletBalance === 0 
+                      ? 'Your wallet is empty. Please top up your wallet or switch to credit card payment.'
+                      : `Insufficient wallet balance. You need RM${(discountedAmount - walletBalance).toFixed(2)} more.`
+                    }
                   </Typography>
                   <Button
                     variant="contained"
@@ -1022,7 +1038,7 @@ const PaymentPage = () => {
                   onClick={handlePayment}
                   disabled={
                     isProcessing ||
-                    (paymentMethod === 'wallet' && walletBalance < discountedAmount) ||
+                    (paymentMethod === 'wallet' && (walletBalance < discountedAmount || walletBalance === 0)) ||
                     isLoading ||
                     (!replacementData && !sessionGroup && !session && !eventDetails && useVoucher && !selectedVoucherId)
                   }

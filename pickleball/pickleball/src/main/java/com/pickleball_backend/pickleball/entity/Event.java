@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -56,10 +57,12 @@ public class Event {
         joinColumns = @JoinColumn(name = "event_id"),
         inverseJoinColumns = @JoinColumn(name = "court_id")
     )
+    @ToString.Exclude
     private Set<Court> courts;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "venue_id")
+    @ToString.Exclude
     private Venue venue; // optional, for full venue booking
 
 }

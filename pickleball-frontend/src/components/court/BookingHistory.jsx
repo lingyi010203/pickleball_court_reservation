@@ -32,7 +32,8 @@ import {
   RateReview as ReviewIcon,
   ArrowBack as BackIcon,
   FilterList as FilterIcon,
-  Visibility as ViewIcon
+  Visibility as ViewIcon,
+  Event as EventIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
@@ -110,6 +111,21 @@ const StatusChip = styled(Chip)(({ status, theme }) => {
       backgroundColor: COLORS.errorLight,
       color: COLORS.error,
       border: `1px solid ${COLORS.error}20`
+    },
+    UPCOMING: {
+      backgroundColor: COLORS.warningLight,
+      color: COLORS.warning,
+      border: `1px solid ${COLORS.warning}20`
+    },
+    ONGOING: {
+      backgroundColor: COLORS.primaryLight,
+      color: COLORS.primary,
+      border: `1px solid ${COLORS.primary}20`
+    },
+    REGISTERED: {
+      backgroundColor: COLORS.successLight,
+      color: COLORS.success,
+      border: `1px solid ${COLORS.success}20`
     },
     CANCELLED_DUE_TO_COURT_DELETION: {
       backgroundColor: '#fff3e0',
@@ -278,6 +294,8 @@ const BookingHistory = () => {
         durationHours: booking.durationHours || 1,
           // 评价状态
           hasReviewed: booking.hasReviewed || false,
+          // 新增：預訂類型
+          bookingType: booking.bookingType || "COURT_BOOKING",
         };
         
         console.log('Normalized booking:', normalizedBooking);
@@ -464,7 +482,15 @@ const BookingHistory = () => {
   const filteredBookings = tabValue === 'all'
     ? bookings
     : bookings.filter(booking => {
-      if (tabValue === 'upcoming') return booking.status === 'CONFIRMED';
+      if (tabValue === 'events') return booking.bookingType === 'EVENT';
+      if (tabValue === 'upcoming') {
+        // 對於 upcoming，只顯示狀態為 CONFIRMED 或 UPCOMING 的預訂
+        // 明確排除 COMPLETED、CANCELLED 等狀態
+        return (booking.status === 'CONFIRMED' || booking.status === 'UPCOMING') &&
+               booking.status !== 'COMPLETED' &&
+               booking.status !== 'CANCELLED' &&
+               booking.status !== 'CANCELLATION_REQUESTED';
+      }
       if (tabValue === 'completed') return booking.status === 'COMPLETED';
       if (tabValue === 'cancelled') return booking.status === 'CANCELLED' || booking.status === 'CANCELLATION_REQUESTED';
       return true;
@@ -663,20 +689,39 @@ const BookingHistory = () => {
                 <CardContent sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <Avatar sx={{
-                      bgcolor: COLORS.primary,
+                      bgcolor: booking.bookingType === 'EVENT' ? COLORS.warning : COLORS.primary,
                       mr: 2,
                       width: 56,
                       height: 56,
-                      boxShadow: `0 4px 12px ${COLORS.primary}30`
+                      boxShadow: `0 4px 12px ${booking.bookingType === 'EVENT' ? COLORS.warning : COLORS.primary}30`
                     }}>
-                      <CourtIcon sx={{ fontSize: 28 }} />
+                      {booking.bookingType === 'EVENT' ? (
+                        <EventIcon sx={{ fontSize: 28 }} />
+                      ) : (
+                        <CourtIcon sx={{ fontSize: 28 }} />
+                      )}
                     </Avatar>
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: COLORS.neutral }}>
-                        {booking.courtName}
-                      </Typography>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: COLORS.neutral }}>
+                          {booking.courtName}
+                        </Typography>
+                        {booking.bookingType === 'EVENT' && (
+                          <Chip
+                            label="Event"
+                            size="small"
+                            sx={{
+                              backgroundColor: COLORS.warningLight,
+                              color: COLORS.warning,
+                              border: `1px solid ${COLORS.warning}20`,
+                              fontSize: '0.75rem',
+                              fontWeight: 600
+                            }}
+                          />
+                        )}
+                      </Box>
                       <Typography variant="body2" sx={{ color: COLORS.neutral, opacity: 0.7 }}>
-                        {booking.courtLocation}
+                        {booking.bookingType === 'EVENT' ? 'Event Registration' : booking.courtLocation}
                       </Typography>
                     </Box>
                   </Box>
@@ -704,7 +749,7 @@ const BookingHistory = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <PlayersIcon fontSize="small" sx={{ mr: 1, color: COLORS.primary }} />
                         <Typography variant="body2" sx={{ color: COLORS.neutral, fontWeight: 500 }}>
-                          {booking.numberOfPlayers} players
+                          {booking.bookingType === 'EVENT' ? 'Individual' : `${booking.numberOfPlayers} players`}
                         </Typography>
                       </Box>
                     </Grid>
@@ -719,16 +764,33 @@ const BookingHistory = () => {
                   </Grid>
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
-                    <StatusChip
-                      label={
-                        booking.status === 'CONFIRMED' ? 'Upcoming' :
-                        booking.status === 'COMPLETED' ? 'Completed' :
-                        booking.status === 'CANCELLED' ? 'Cancelled' :
-                        booking.status === 'CANCELLATION_REQUESTED' ? 'Cancellation Requested' :
-                        booking.status
-                      }
-                      status={booking.status}
-                    />
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <StatusChip
+                        label={
+                          booking.status === 'CONFIRMED' ? 'Upcoming' :
+                          booking.status === 'COMPLETED' ? 'Completed' :
+                          booking.status === 'CANCELLED' ? 'Cancelled' :
+                          booking.status === 'CANCELLATION_REQUESTED' ? 'Cancellation Requested' :
+                          booking.status === 'UPCOMING' ? 'Upcoming' :
+                          booking.status === 'ONGOING' ? 'Ongoing' :
+                          booking.status
+                        }
+                        status={booking.status}
+                      />
+                      {booking.bookingType === 'EVENT' && (
+                        <Chip
+                          label="REGISTERED"
+                          size="small"
+                          sx={{
+                            backgroundColor: COLORS.successLight,
+                            color: COLORS.success,
+                            border: `1px solid ${COLORS.success}20`,
+                            fontSize: '0.75rem',
+                            fontWeight: 500
+                          }}
+                        />
+                      )}
+                    </Box>
 
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <ModernButton
@@ -741,7 +803,7 @@ const BookingHistory = () => {
                         Details
                       </ModernButton>
 
-                    {booking.status === 'CONFIRMED' && (
+                    {booking.status === 'CONFIRMED' && booking.bookingType !== 'EVENT' && (
                       cancelStatus[booking.bookingId] === 'processing' ? (
                         <CircularProgress size={24} />
                       ) : (
@@ -760,7 +822,7 @@ const BookingHistory = () => {
                       )
                     )}
 
-                    {booking.status === 'COMPLETED' && (
+                    {booking.status === 'COMPLETED' && booking.bookingType !== 'EVENT' && (
                       booking.hasReviewed ? (
                         <ModernButton
                           variant="outlined"

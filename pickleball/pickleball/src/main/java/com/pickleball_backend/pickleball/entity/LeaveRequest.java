@@ -3,6 +3,7 @@ package com.pickleball_backend.pickleball.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,14 +17,17 @@ public class LeaveRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", referencedColumnName = "id", nullable = false)
+    @ToString.Exclude
     private User student;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "coach_id", referencedColumnName = "id", nullable = false)
+    @ToString.Exclude
     private User coach;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "original_session_id", referencedColumnName = "id", nullable = false)
+    @ToString.Exclude
     private ClassSession originalSession;
 
     @Column(nullable = false)
@@ -47,6 +51,7 @@ public class LeaveRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "replacement_session_id", referencedColumnName = "id")
+    @ToString.Exclude
     private ClassSession replacementSession;
 
     @Column

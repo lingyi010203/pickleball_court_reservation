@@ -3,6 +3,7 @@ package com.pickleball_backend.pickleball.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,11 +17,15 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", referencedColumnName = "id", nullable = false)
+    @ToString.Exclude
     private User sender;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "receiver_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "receiver_id", referencedColumnName = "id")
+    @ToString.Exclude
     private User receiver;
+    
+
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;

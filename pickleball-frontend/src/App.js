@@ -58,6 +58,7 @@ import CourtAvailabilityPage from './components/court/CourtAvailabilityPage';
 import ProfileOverview from './components/profile/ProfileOverview';
 import EditProfileForm from './components/profile/EditProfileForm';
 import AdminModerationDashboard from './components/admin/AdminModerationDashboard';
+import EventOrganizerDashboard from './components/event/EventOrganizerDashboard';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -106,6 +107,9 @@ function HomeRedirect() {
   if (currentUser.userType === 'Coach' || currentUser.userType === 'COACH') {
     return <Navigate to="/coaching" replace />;
   }
+  if (currentUser.userType === 'EventOrganizer' || currentUser.userType === 'EVENTORGANIZER') {
+    return <Navigate to="/event-organizer" replace />;
+  }
   return <HomePage />;
 }
 
@@ -122,6 +126,22 @@ function App() {
           <Route path="/coaching/students" element={<StudentManagementSystem />} />
           <Route path="/messages" element={<MessagingPage />} />
           <Route path="*" element={<Navigate to="/coaching" replace />} />
+        </Routes>
+      </SocketProvider>
+    );
+  }
+
+  // EventOrganizer 專屬路由
+  if (currentUser?.userType === 'EventOrganizer' || currentUser?.userType === 'EVENTORGANIZER') {
+    return (
+      <SocketProvider>
+        <Routes>
+          <Route path="/event-organizer" element={<EventOrganizerDashboard />} />
+          <Route path="/event-organizer/create" element={<EventOrganizerDashboard />} />
+          <Route path="/events/create" element={<EventCreatePage />} />
+          <Route path="/events/edit/:eventId" element={<EventEditPage />} />
+          <Route path="/messages" element={<MessagingPage />} />
+          <Route path="*" element={<Navigate to="/event-organizer" replace />} />
         </Routes>
       </SocketProvider>
     );

@@ -74,6 +74,8 @@ const LoginPage = () => {
           const userType = payload.userType || payload.role || '';
           if (userType === 'Coach' || userType === 'COACH') {
             navigate('/coaching');
+          } else if (userType === 'EventOrganizer' || userType === 'EVENTORGANIZER') {
+            navigate('/event-organizer');
           } else {
             navigate('/home');
           }

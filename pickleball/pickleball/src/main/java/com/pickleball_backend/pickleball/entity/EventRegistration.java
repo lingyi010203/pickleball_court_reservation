@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 
@@ -27,9 +28,11 @@ public class EventRegistration {
 
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 
     @ManyToOne
     @JoinColumn(name = "event_id")
+    @ToString.Exclude
     private Event event;
 }
