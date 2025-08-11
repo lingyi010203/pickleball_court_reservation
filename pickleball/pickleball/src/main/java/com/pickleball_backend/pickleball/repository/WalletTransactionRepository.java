@@ -35,4 +35,10 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     // Get transaction summary for wallet
     @Query("SELECT SUM(wt.amount) FROM WalletTransaction wt WHERE wt.walletId = :walletId AND wt.transactionType = :type AND wt.status = 'COMPLETED'")
     Double getTransactionSumByType(@Param("walletId") Integer walletId, @Param("type") String type);
+    
+    // Add missing method for finding transactions by wallet member ID
+    List<WalletTransaction> findByWallet_Member_IdOrderByCreatedAtDesc(Integer memberId);
+    
+    // Add missing method for finding transactions by wallet ID
+    List<WalletTransaction> findByWallet_Id(Integer walletId);
 } 

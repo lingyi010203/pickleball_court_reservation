@@ -20,4 +20,7 @@ public interface CancellationRequestRepository extends JpaRepository<Cancellatio
     List<CancellationRequest> findTop3ByOrderByRequestDateDesc();
 
     List<CancellationRequest> findByBookingId(Integer bookingId);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT cr FROM CancellationRequest cr WHERE cr.requestDate BETWEEN :start AND :end")
+    List<CancellationRequest> findByRequestDateBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

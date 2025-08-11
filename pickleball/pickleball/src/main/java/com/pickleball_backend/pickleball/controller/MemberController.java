@@ -171,7 +171,7 @@ public class MemberController {
     @PreAuthorize("hasAnyRole('USER', 'COACH')")
     public ResponseEntity<?> getAllCourtsForMember() {
         try {
-            List<Court> courts = courtService.getAllCourts();
+            List<Court> courts = courtService.getAllCourtsForMember();
             return new ResponseEntity<>(courts, HttpStatus.OK);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -110,6 +110,11 @@ const StatusChip = styled(Chip)(({ status, theme }) => {
       backgroundColor: COLORS.errorLight,
       color: COLORS.error,
       border: `1px solid ${COLORS.error}20`
+    },
+    CANCELLED_DUE_TO_COURT_DELETION: {
+      backgroundColor: '#fff3e0',
+      color: '#ff5722',
+      border: `1px solid #ff572220`
     }
   };
 

@@ -8,10 +8,12 @@ import {
 import axios from 'axios';
 import UserService from '../../service/UserService';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
   usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,7 +24,8 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
     username: '',
     password: '',
     status: 'ACTIVE',
-    generatePassword: true
+    generatePassword: true,
+    position: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -43,7 +46,8 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
         username: user.username || '',
         password: '',
         status: user.status || 'ACTIVE',
-        generatePassword: false
+        generatePassword: false,
+        position: user.position || ''
       });
     }
   }, [user]);
@@ -68,6 +72,12 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
       return;
     }
 
+    // 验证密码
+    if (!formData.generatePassword && (!formData.password || formData.password.length < 6)) {
+      setError(t('admin.passwordMustBeAtLeast6Characters'));
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -85,9 +95,16 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
         onUserUpdated(response.data);
       } else {
         // 创建新用户
+        let submitData = { ...formData };
+        
+        // 如果选择自动生成密码，移除password字段，让后端生成
+        if (formData.generatePassword) {
+          delete submitData.password;
+        }
+        
         const response = await axios.post(
           'http://localhost:8081/api/admin/users',
-          formData,
+          submitData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         onUserCreated(response.data);
@@ -95,7 +112,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
 
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Operation failed. Please try again.');
+      setError(err.response?.data?.message || t('admin.operationFailed'));
       console.error('Error saving user:', err);
     } finally {
       setLoading(false);
@@ -112,269 +129,512 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
             borderRadius: 1
           }}
         >
-          This user has been deleted. You can view their details but cannot make changes.
+          {t('admin.thisUserHasBeenDeleted')}
         </Alert>
       )}
 
       <Box component="form" onSubmit={handleSubmit}>
-        <Grid container spacing={2.5}>
-          {/* Personal Information */}
-          <Box sx={{
-            border: `1px solid ${theme.palette.divider}`,
-            borderRadius: 2,
-            p: 2.5,
-            mb: 3,
-            backgroundColor: theme.palette.background.default
-          }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>
-              Personal Information
-            </Typography>
-            <Grid item xs={12}>
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontWeight: 600,
-                  mb: 1.5,
-                  color: theme.palette.text.primary,
-                  fontSize: '1rem'
-                }}
-              >
-                Personal Information
-              </Typography>
-            </Grid>
-          </Box>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Full Name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              disabled={isReadOnly}
-              size="medium"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Email Address"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              disabled={isReadOnly}
-              size="medium"
-            />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              label="Phone Number"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              disabled={isReadOnly}
-              size="medium"
-            />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              label="Date of Birth"
-              name="dob"
-              type="date"
-              value={formData.dob}
-              onChange={handleChange}
-              InputLabelProps={{ shrink: true }}
-              disabled={isReadOnly}
-              size="medium"
-            />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <FormControl fullWidth>
-              <InputLabel>Gender</InputLabel>
-              <Select
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                label="Gender"
-                disabled={isReadOnly}
-              >
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
-                <MenuItem value="Other">Other</MenuItem>
-                <MenuItem value="Prefer not to say">Prefer not to say</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Account Settings */}
-          <Grid item xs={12} sx={{ mt: 1.5 }}>
-            <Box sx={{
-              border: `1px solid ${theme.palette.divider}`,
-              borderRadius: 2,
-              p: 2.5,
-              backgroundColor: theme.palette.background.default
-            }}>
-              <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                Account Settings
-              </Typography>
-            </Box>
-          </Grid>
-
-      <Grid item xs={12} sm={6}>
-        <FormControl fullWidth>
-          <InputLabel>User Role</InputLabel>
-          <Select
-            name="userType"
-            value={formData.userType}
-            onChange={handleChange}
-            label="User Role"
-            required
-            disabled={isReadOnly}
-          >
-            <MenuItem value="User">User</MenuItem>
-            <MenuItem value="Coach">Coach</MenuItem>
-            <MenuItem value="EventOrganizer">Event Organizer</MenuItem>
-            <MenuItem value="Admin">Admin</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          fullWidth
-          label="Username"
-          name="username"
-          value={formData.username}
-          onChange={handleChange}
-          required={!user}
-          disabled={!!user || isReadOnly}
-          size="medium"
-        />
-      </Grid>
-
-      {!user && !isReadOnly && (
-        <>
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.generatePassword}
-                  onChange={handleChange}
-                  name="generatePassword"
-                  disabled={isReadOnly}
-                />
-              }
-              label="Generate random password automatically"
-              sx={{
-                '& .MuiFormControlLabel-label': {
-                  fontSize: '0.95rem'
-                }
-              }}
-            />
-          </Grid>
-
-          {!formData.generatePassword && (
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={isReadOnly}
-              />
-            </Grid>
-          )}
-        </>
-      )}
-
-      <Grid item xs={12} sm={6}>
-        <FormControl fullWidth>
-          <InputLabel>Account Status</InputLabel>
-          <Select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            label="Account Status"
-            disabled={isReadOnly}
-          >
-            <MenuItem value="ACTIVE">Active</MenuItem>
-            <MenuItem value="INACTIVE">Inactive</MenuItem>
-            <MenuItem value="SUSPENDED">Suspended</MenuItem>
-            {user && <MenuItem value="DELETED">Deleted</MenuItem>}
-          </Select>
-        </FormControl>
-      </Grid>
-
-      {error && (
-        <Grid item xs={12}>
-          <Alert severity="error" sx={{ borderRadius: 1 }}>
-            {error}
-          </Alert>
-        </Grid>
-      )}
-
-      {/* Action Buttons */}
-      <Grid item xs={12} sx={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: 2,
-        mt: 2,
-        pt: 2,
-        borderTop: `1px solid ${theme.palette.divider}`
-      }}>
-        <Button
-          variant="outlined"
-          onClick={onClose}
-          disabled={loading}
-          sx={{
-            borderColor: theme.palette.primary.main,
-            color: theme.palette.primary.main,
-            '&:hover': { borderColor: theme.palette.primary.dark },
-            borderRadius: 2,
+        {/* Mandatory Fields Note */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="caption" sx={{ 
+            color: theme.palette.text.secondary,
             fontWeight: 600,
-            px: 3,
-            py: 1.2,
-            minWidth: 120,
-            textTransform: 'none'
-          }}
-        >
-          {isReadOnly ? 'Close' : 'Cancel'}
-        </Button>
-        {!isReadOnly && (
+            display: 'block',
+            mb: 2
+          }}>
+            * {t('admin.indicatesMandatoryFields')}
+          </Typography>
+        </Box>
+
+        {/* Personal Information Section */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ 
+            fontWeight: 600, 
+            color: theme.palette.primary.main,
+            mb: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <Box component="span" sx={{ 
+              width: 8, 
+              height: 8, 
+              backgroundColor: theme.palette.primary.main, 
+              borderRadius: '50%' 
+            }} />
+            {t('admin.personalInformation')}
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.fullName')} *
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('admin.enterFullName')}
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  disabled={isReadOnly}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.emailAddress')} *
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('admin.enterEmailAddress')}
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  disabled={isReadOnly}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.phoneNumber')}
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('admin.enterPhoneNumber')}
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  disabled={isReadOnly}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.dateOfBirth')}
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  name="dob"
+                  type="date"
+                  value={formData.dob}
+                  onChange={handleChange}
+                  InputLabelProps={{ shrink: true }}
+                  disabled={isReadOnly}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.gender')}
+                </Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    disabled={isReadOnly}
+                    sx={{ 
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }}
+                  >
+                    <MenuItem value="Male">{t('admin.male')}</MenuItem>
+                    <MenuItem value="Female">{t('admin.female')}</MenuItem>
+                    <MenuItem value="Other">{t('admin.other')}</MenuItem>
+                    <MenuItem value="Prefer not to say">Prefer not to say</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Account Settings Section */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ 
+            fontWeight: 600, 
+            color: theme.palette.primary.main,
+            mb: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <Box component="span" sx={{ 
+              width: 8, 
+              height: 8, 
+              backgroundColor: theme.palette.primary.main, 
+              borderRadius: '50%' 
+            }} />
+            {t('admin.accountInformation')}
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.userType')} *
+                </Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="userType"
+                    value={formData.userType}
+                    onChange={handleChange}
+                    required
+                    disabled={isReadOnly}
+                    sx={{ 
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }}
+                  >
+                    <MenuItem value="User">{t('admin.user')}</MenuItem>
+                    <MenuItem value="Coach">{t('admin.coach')}</MenuItem>
+                    <MenuItem value="EventOrganizer">{t('admin.eventOrganizer')}</MenuItem>
+                    <MenuItem value="Admin">{t('admin.admin')}</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.username')} {!user && '*'}
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('admin.enterUsername')}
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  required={!user}
+                  disabled={!!user || isReadOnly}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="label" sx={{ 
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  fontSize: '0.95rem',
+                  mb: 1,
+                  display: 'block'
+                }}>
+                  {t('admin.status')}
+                </Typography>
+                <FormControl fullWidth>
+                  <Select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleChange}
+                    disabled={isReadOnly}
+                    sx={{ 
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }}
+                  >
+                    <MenuItem value="ACTIVE">{t('admin.active')}</MenuItem>
+                    <MenuItem value="INACTIVE">{t('admin.inactive')}</MenuItem>
+                    <MenuItem value="SUSPENDED">{t('admin.suspended')}</MenuItem>
+                    {user && <MenuItem value="DELETED">Deleted</MenuItem>}
+                  </Select>
+                </FormControl>
+              </Box>
+            </Grid>
+
+            {/* Admin Position Field - Only show when userType is Admin */}
+            {formData.userType === 'Admin' && (
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.adminPosition')}
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder={t('admin.enterAdminPosition')}
+                    name="position"
+                    value={formData.position}
+                    onChange={handleChange}
+                    disabled={isReadOnly}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+            )}
+
+            {!user && !isReadOnly && (
+              <>
+                <Grid item xs={12}>
+                  <Box sx={{ 
+                    p: 2, 
+                    backgroundColor: '#f8f9fa', 
+                    borderRadius: 2, 
+                    border: '1px solid #e9ecef',
+                    mb: 2
+                  }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formData.generatePassword}
+                          onChange={handleChange}
+                          name="generatePassword"
+                          disabled={isReadOnly}
+                        />
+                      }
+                      label={t('admin.generateRandomPasswordAutomatically')}
+                      sx={{
+                        '& .MuiFormControlLabel-label': {
+                          fontSize: '0.95rem',
+                          fontWeight: 500
+                        }
+                      }}
+                    />
+                  </Box>
+                </Grid>
+
+                {!formData.generatePassword && (
+                  <Grid item xs={12}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography component="label" sx={{ 
+                        fontWeight: 600,
+                        color: theme.palette.text.primary,
+                        fontSize: '0.95rem',
+                        mb: 1,
+                        display: 'block'
+                      }}>
+                        {t('admin.password')} *
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                                                  placeholder={t('admin.enterPassword')}
+                        name="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required={!formData.generatePassword}
+                        disabled={isReadOnly}
+                        error={!formData.generatePassword && formData.password && formData.password.length < 6}
+                        helperText={!formData.generatePassword && formData.password && formData.password.length < 6 ? t('admin.passwordMustBeAtLeast6Characters') : ""}
+                        sx={{ 
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '12px',
+                            backgroundColor: '#f9fafb',
+                            '&:focus-within': {
+                              backgroundColor: theme.palette.background.paper,
+                              boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                            }
+                          }
+                        }}
+                      />
+                    </Box>
+                  </Grid>
+                )}
+              </>
+            )}
+          </Grid>
+        </Box>
+
+        {error && (
+          <Box sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ borderRadius: 1 }}>
+              {error}
+            </Alert>
+          </Box>
+        )}
+
+        {/* Action Buttons */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 2,
+          mt: 3,
+          pt: 3,
+          borderTop: `1px solid ${theme.palette.divider}`
+        }}>
           <Button
-            type="submit"
-            variant="contained"
+            variant="outlined"
+            onClick={onClose}
             disabled={loading}
             sx={{
-              backgroundColor: theme.palette.primary.main,
-              color: theme.palette.primary.contrastText,
-              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': { borderColor: theme.palette.primary.dark },
               borderRadius: 2,
+              fontWeight: 600,
               px: 3,
               py: 1.2,
-              minWidth: 160,
-              boxShadow: theme.shadows[2],
-              textTransform: 'none',
-              '&:hover': {
-                backgroundColor: theme.palette.primary.dark,
-                boxShadow: theme.shadows[4]
-              }
+              minWidth: 120,
+              textTransform: 'none'
             }}
           >
-            {loading ? <CircularProgress size={24} /> : user ? 'Update User' : 'Create User'}
+            {isReadOnly ? t('admin.close') : t('admin.cancel')}
           </Button>
-        )}
-      </Grid>
-    </Grid>
-        </Box >
-    </Box >
+          {!isReadOnly && (
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading}
+              sx={{
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.primary.contrastText,
+                fontWeight: 600,
+                borderRadius: 2,
+                px: 3,
+                py: 1.2,
+                minWidth: 160,
+                boxShadow: theme.shadows[2],
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.dark,
+                  boxShadow: theme.shadows[4]
+                }
+              }}
+            >
+              {loading ? <CircularProgress size={24} /> : user ? t('admin.updateAdmin') : t('admin.createAdmin')}
+            </Button>
+          )}
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

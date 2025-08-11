@@ -13,6 +13,9 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
+    
+    // Add missing method for email existence check
+    boolean existsByEmail(String email);
 
     // Fixed: Query through UserAccount relationship
     @Query("SELECT u FROM User u JOIN u.userAccount ua WHERE ua.username = :username")
@@ -26,6 +29,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :start AND :end")
     long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u WHERE u.createdAt BETWEEN :start AND :end")
+    List<User> findByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     @Query("SELECT u FROM User u " +
             "JOIN u.userAccount ua " +
@@ -39,8 +45,14 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             Pageable pageable);
 
     java.util.List<User> findTop3ByOrderByCreatedAtDesc();
+    
+    // Add missing method for top 10 users by creation date
+    List<User> findTop10ByOrderByCreatedAtDesc();
 
     List<User> findByUserTypeIn(List<String> userTypes);
+    
+    // Add missing method for counting users by type
+    long countByUserType(String userType);
 
     @Query("SELECT u FROM User u JOIN u.member m JOIN m.tier mt WHERE mt.tierName IN :tierNames AND u.email IS NOT NULL AND u.email != ''")
     List<User> findByMembershipTierNameIn(@Param("tierNames") List<String> tierNames);

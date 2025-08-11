@@ -5,10 +5,10 @@ public class DashboardSummaryDto {
     private long totalBookings;
     private double totalRevenue;
     private double averageRating;
-    private double totalUsersChange;
-    private double totalBookingsChange;
-    private double totalRevenueChange;
-    private double averageRatingChange;
+    private long newUsersThisMonth;
+    private long newBookingsThisMonth;
+    private double newRevenueThisMonth;
+    private long newRatingsThisMonth;
 
     public long getTotalUsers() { return totalUsers; }
     public void setTotalUsers(long totalUsers) { this.totalUsers = totalUsers; }
@@ -18,12 +18,12 @@ public class DashboardSummaryDto {
     public void setTotalRevenue(double totalRevenue) { this.totalRevenue = totalRevenue; }
     public double getAverageRating() { return averageRating; }
     public void setAverageRating(double averageRating) { this.averageRating = averageRating; }
-    public double getTotalUsersChange() { return totalUsersChange; }
-    public void setTotalUsersChange(double totalUsersChange) { this.totalUsersChange = totalUsersChange; }
-    public double getTotalBookingsChange() { return totalBookingsChange; }
-    public void setTotalBookingsChange(double totalBookingsChange) { this.totalBookingsChange = totalBookingsChange; }
-    public double getTotalRevenueChange() { return totalRevenueChange; }
-    public void setTotalRevenueChange(double totalRevenueChange) { this.totalRevenueChange = totalRevenueChange; }
-    public double getAverageRatingChange() { return averageRatingChange; }
-    public void setAverageRatingChange(double averageRatingChange) { this.averageRatingChange = averageRatingChange; }
+    public long getNewUsersThisMonth() { return newUsersThisMonth; }
+    public void setNewUsersThisMonth(long newUsersThisMonth) { this.newUsersThisMonth = newUsersThisMonth; }
+    public long getNewBookingsThisMonth() { return newBookingsThisMonth; }
+    public void setNewBookingsThisMonth(long newBookingsThisMonth) { this.newBookingsThisMonth = newBookingsThisMonth; }
+    public double getNewRevenueThisMonth() { return newRevenueThisMonth; }
+    public void setNewRevenueThisMonth(double newRevenueThisMonth) { this.newRevenueThisMonth = newRevenueThisMonth; }
+    public long getNewRatingsThisMonth() { return newRatingsThisMonth; }
+    public void setNewRatingsThisMonth(long newRatingsThisMonth) { this.newRatingsThisMonth = newRatingsThisMonth; }
 } 

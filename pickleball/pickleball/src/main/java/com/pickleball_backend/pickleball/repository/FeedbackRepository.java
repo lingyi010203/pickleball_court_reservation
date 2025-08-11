@@ -39,4 +39,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Integer> {
     
     // 通过bookingId查找feedback
     List<Feedback> findByBookingIdOrderByCreatedAtDesc(Integer bookingId);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(f) FROM Feedback f WHERE f.createdAt BETWEEN :start AND :end")
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT f FROM Feedback f WHERE f.createdAt BETWEEN :start AND :end")
+    List<Feedback> findByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    
+    // Add missing method for finding feedback by user ID ordered by creation date
+    List<Feedback> findByUser_IdOrderByCreatedAtDesc(Integer userId);
+    
+    // Add missing method for finding feedback by user ID
+    List<Feedback> findByUser_Id(Integer userId);
 }

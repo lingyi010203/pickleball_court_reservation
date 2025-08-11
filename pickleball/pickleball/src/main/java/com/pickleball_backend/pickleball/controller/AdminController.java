@@ -257,11 +257,20 @@ public class AdminController {
         return ResponseEntity.ok(bookingService.processCancellation(requestId, false, adminRemark));
     }
 
-    @GetMapping("/user-profile/{username}")
-    public ProfileDto getUserProfile(@PathVariable String username) {
-        User user = userRepository.findByUserAccount_Username(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return convertToProfileDto(user);
+    @GetMapping("/user-profile/{identifier}")
+    public org.springframework.http.ResponseEntity<ProfileDto> getUserProfile(@PathVariable String identifier) {
+        try {
+            java.util.Optional<User> userOpt = userRepository.findByUserAccount_Username(identifier);
+            if (userOpt.isEmpty() && identifier.contains("@")) {
+                userOpt = userRepository.findByEmail(identifier);
+            }
+            if (userOpt.isEmpty()) {
+                return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).build();
+            }
+            return org.springframework.http.ResponseEntity.ok(convertToProfileDto(userOpt.get()));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/profile")
@@ -369,6 +378,17 @@ public class AdminController {
         dto.setDob(user.getDob());
         dto.setUserType(user.getUserType());
         dto.setProfileImage(user.getProfileImage()); // Use correct field name
+        dto.setCreatedAt(user.getCreatedAt());
+        
+        // Set username from UserAccount
+        if (user.getUserAccount() != null) {
+            dto.setUsername(user.getUserAccount().getUsername());
+            dto.setStatus(user.getUserAccount().getStatus());
+            dto.setTheme(user.getUserAccount().getTheme());
+            dto.setEmailNotifications(user.getUserAccount().isEmailNotifications());
+            dto.setPushNotifications(user.getUserAccount().isPushNotifications());
+        }
+        
         // Add more fields as needed
         return dto;
     }

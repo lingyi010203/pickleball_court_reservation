@@ -19,4 +19,5 @@ public class AdminUserDto {
     private int pointBalance;
     private String tier;
     private LocalDateTime createdAt;
+    private String position;
 }

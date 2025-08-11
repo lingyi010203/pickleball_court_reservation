@@ -44,6 +44,7 @@ import { SocketProvider } from './context/SocketContext';
 import AdminManageUsers from './components/admin/AdminManageUsers';
 import AdminManageTiers from './components/admin/AdminManageTiers';
 import AdminManageCourts from './components/admin/AdminManageCourts';
+import AdminManageVenues from './components/admin/AdminManageVenues';
 import AdminManageBookings from './components/admin/AdminManageBookings';
 import CoachScheduleManagement from './components/coach/CoachScheduleManagement';
 import BrowseClassPage from './components/class/BrowseClassPage';
@@ -92,15 +93,16 @@ const AdminProtectedRoute = ({ children }) => {
 };
 
 function AdminDashboardLayout() {
-  return <AdminDashboard><Outlet /></AdminDashboard>;
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <AdminDashboard><Outlet /></AdminDashboard>
+    </div>
+  );
 }
 
 function HomeRedirect() {
   const { currentUser } = useAuth();
   if (!currentUser) return <HomePage />;
-  if (currentUser.userType === 'Admin' || currentUser.userType === 'ADMIN') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
   if (currentUser.userType === 'Coach' || currentUser.userType === 'COACH') {
     return <Navigate to="/coaching" replace />;
   }
@@ -302,7 +304,9 @@ function App() {
           <Route path="users" element={<AdminManageUsers />} />
           <Route path="tiers" element={<AdminManageTiers />} />
           <Route path="courts" element={<AdminManageCourts />} />
+          <Route path="venues" element={<AdminManageVenues />} />
           <Route path="bookings" element={<AdminManageBookings />} />
+          <Route path="booking/:courtId" element={<BookingPage />} />
           <Route path="feedback" element={<AdminModerationDashboard />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>

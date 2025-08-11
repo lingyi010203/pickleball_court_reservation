@@ -45,7 +45,7 @@ public class SlotController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<List<SlotResponseDto>> getAvailableSlots(
             @RequestParam Integer courtId) {
 

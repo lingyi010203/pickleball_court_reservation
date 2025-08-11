@@ -22,6 +22,7 @@ public class ProfileService {
     private final UserAccountRepository userAccountRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final UserTypeChangeRequestService userTypeChangeRequestService;
 
     public ProfileDto getProfile(String username) {
         UserAccount account = userAccountRepository.findByUsername(username)
@@ -75,6 +76,20 @@ public class ProfileService {
             typeChangeRequested = true;
             log.info("User type change requested: {} -> {}",
                     user.getUserType(), profileDto.getRequestedUserType());
+            
+            // Create user type change request record
+            try {
+                String requestReason = "User requested type change from profile page";
+                userTypeChangeRequestService.createRequest(
+                    user.getId(), 
+                    profileDto.getRequestedUserType(), 
+                    requestReason
+                );
+                log.info("Created user type change request for user: {}", user.getId());
+            } catch (Exception e) {
+                log.error("Failed to create user type change request for user {}: {}", user.getId(), e.getMessage());
+                // Don't throw exception to avoid breaking profile update
+            }
         }
 
         // Update username if changed

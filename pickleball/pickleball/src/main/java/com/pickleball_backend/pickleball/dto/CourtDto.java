@@ -1,6 +1,7 @@
 package com.pickleball_backend.pickleball.dto;
 
 import lombok.Data;
+import com.pickleball_backend.pickleball.entity.CourtType;
 
 @Data
 public class CourtDto {
@@ -16,4 +17,5 @@ public class CourtDto {
     private Double dailyPrice;
     private String peakStartTime;
     private String peakEndTime;
+    private CourtType courtType;  // 新增字段
 }

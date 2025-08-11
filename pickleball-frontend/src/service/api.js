@@ -9,9 +9,14 @@ api.interceptors.request.use(config => {
   // Check if this is an admin route
   const isAdminRoute = config.url?.startsWith('/admin/');
   
-  // Use admin token for admin routes, regular token for other routes
   // For admin routes, try admin token first, then fall back to regular token
-  const token = isAdminRoute ? (UserService.getAdminToken() || UserService.getToken()) : UserService.getToken();
+  // For non-admin routes, try regular token first, then fall back to admin token
+  let token;
+  if (isAdminRoute) {
+    token = UserService.getAdminToken() || UserService.getToken();
+  } else {
+    token = UserService.getToken() || UserService.getAdminToken();
+  }
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

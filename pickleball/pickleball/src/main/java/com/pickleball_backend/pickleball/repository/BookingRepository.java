@@ -164,4 +164,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findAllExpired(
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") java.time.LocalTime currentTime);
+    
+    // Add missing method for finding bookings by member user ID ordered by booking date
+    List<Booking> findByMember_User_IdOrderByBookingDateDesc(Integer userId);
+    
+    // Add missing method for finding bookings by member user ID
+    List<Booking> findByMember_User_Id(Integer userId);
 }

@@ -13,4 +13,7 @@ public interface WalletRepository extends JpaRepository<Wallet, Integer> {
 
     @Query("SELECT w FROM Wallet w WHERE w.member.id = :memberId")
     Optional<Wallet> findByMember(@Param("memberId") Integer memberId);
+    
+    // Add missing method for finding wallet by member ID
+    Optional<Wallet> findByMember_Id(Integer memberId);
 }

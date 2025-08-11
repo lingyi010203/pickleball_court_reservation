@@ -41,7 +41,10 @@ public class User {
     @Column(name = "requested_user_type")
     private String requestedUserType;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+    
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @Column(name = "bookings_made")

@@ -5,6 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookingSlotRepository extends JpaRepository<BookingSlot, Integer> {
     boolean existsBySlotIdAndStatus(Integer slotId, String status);
+    
+    // 检查slot是否有指定状态列表中的预订
+    boolean existsBySlotIdAndStatusIn(Integer slotId, java.util.List<String> statuses);
 
     // Check for existing booking-slot combination to prevent duplicates
     boolean existsByBookingIdAndSlotId(Integer bookingId, Integer slotId);
@@ -22,4 +25,11 @@ public interface BookingSlotRepository extends JpaRepository<BookingSlot, Intege
     java.util.List<java.time.LocalDate> findBookedDatesByVenueIdAndDateRange(@org.springframework.data.repository.query.Param("venueId") Integer venueId,
                                                                              @org.springframework.data.repository.query.Param("start") java.time.LocalDate start,
                                                                              @org.springframework.data.repository.query.Param("end") java.time.LocalDate end);
+    
+    // 场地利用率相关方法
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(bs) FROM BookingSlot bs JOIN Slot s ON bs.slot.id = s.id WHERE s.courtId = :courtId AND s.date BETWEEN :startDate AND :endDate AND bs.status = 'BOOKED'")
+    long countBySlotCourtIdAndSlotDateBetween(Integer courtId, java.time.LocalDate startDate, java.time.LocalDate endDate);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(bs) FROM BookingSlot bs JOIN Slot s ON bs.slot.id = s.id WHERE s.date BETWEEN :startDate AND :endDate AND s.startTime BETWEEN :startTime AND :endTime AND s.endTime BETWEEN :startTime AND :endTime AND bs.status = 'BOOKED'")
+    long countBySlotDateBetweenAndSlotStartTimeBetweenAndSlotEndTimeBetween(java.time.LocalDate startDate, java.time.LocalDate endDate, java.time.LocalTime startTime, java.time.LocalTime endTime);
 }

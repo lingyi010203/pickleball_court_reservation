@@ -5,7 +5,6 @@ import {
   Button, List, ListItem, ListItemIcon,
   ListItemText, Divider, Chip, Select,
   MenuItem, InputLabel, FormControl,
-  Checkbox, FormControlLabel, TextField,
   IconButton, Backdrop, CircularProgress,
   Dialog, DialogTitle, DialogContent, Rating,
   Skeleton
@@ -15,20 +14,14 @@ import {
   Event as BookingsIcon,
   SportsTennis as CourtsIcon,
   Settings as SettingsIcon,
-  Notifications as NotificationsIcon,
-  Logout as LogoutIcon,
   CardMembership as TierIcon,
   People as PeopleIcon,
-  BarChart as BarChartIcon,
   EventNote as EventNoteIcon,
   AttachMoney as AttachMoneyIcon,
-  Analytics as AnalyticsIcon,
   ArrowForward as ArrowForwardIcon,
-  PictureAsPdf as PictureAsPdfIcon,
-  TableChart as TableChartIcon,
-  GridOn as GridOnIcon,
-  FileDownload as FileDownloadIcon,
-  RateReview as FeedbackIcon
+  RateReview as FeedbackIcon,
+  Close as CloseIcon,
+  LocationOn as LocationOnIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import UserService from '../../service/UserService';
@@ -41,10 +34,12 @@ import ReportGenerator from './ReportGenerator';
 import { useTheme, alpha } from '@mui/material/styles';
 import { useMediaQuery } from '@mui/material';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 dayjs.extend(relativeTime);
 
 const AdminDashboard = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const { logout: authLogout } = useAuth();
@@ -58,13 +53,10 @@ const AdminDashboard = () => {
   
   // Responsive breakpoints
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isTablet = useMediaQuery(theme.breakpoints.between('md', 'lg'));
-  const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
 
   const [adminUsername, setAdminUsername] = useState(UserService.getAdminUsername() || 'Admin');
   const [adminProfile, setAdminProfile] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [currentView, setCurrentView] = useState('dashboard');
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [bookingTrendsLoading, setBookingTrendsLoading] = useState(false);
   const [revenueTrendsLoading, setRevenueTrendsLoading] = useState(false);
@@ -74,13 +66,13 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     totalUsers: 0,
-    totalUsersChange: 0,
+    newUsersThisMonth: 0,
     totalBookings: 0,
-    totalBookingsChange: 0,
+    newBookingsThisMonth: 0,
     totalRevenue: 0,
-    totalRevenueChange: 0,
+    newRevenueThisMonth: 0,
     averageRating: 0,
-    averageRatingChange: 0
+    newRatingsThisMonth: 0
   });
 
 
@@ -90,8 +82,31 @@ const AdminDashboard = () => {
   const [revenueTrends, setRevenueTrends] = useState({ labels: [], data: [] });
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [currentActivityPeriod, setCurrentActivityPeriod] = useState('recent'); // 跟踪当前显示的数据类型
   const [bookingSummary, setBookingSummary] = useState({ highest: null, lowest: null });
   const [revenueSummary, setRevenueSummary] = useState({ highest: null, lowest: null });
+  
+  // 场地利用率相关状态
+  const [courtUtilization, setCourtUtilization] = useState({ courtUtilizations: [], timeSlotUtilizations: {} });
+  const [courtUtilizationLoading, setCourtUtilizationLoading] = useState(false);
+  const [courtUtilizationPeriod, setCourtUtilizationPeriod] = useState('7d');
+  const [courtUtilizationError, setCourtUtilizationError] = useState('');
+  
+  // Activity type statistics
+  const activityStats = useMemo(() => {
+    const stats = {
+      booking: 0,
+      user: 0,
+      cancellation: 0,
+      review: 0
+    };
+    recentActivity.forEach(item => {
+      if (stats.hasOwnProperty(item.type)) {
+        stats[item.type]++;
+      }
+    });
+    return stats;
+  }, [recentActivity]);
   
   // Error states for better error handling
   const [dashboardError, setDashboardError] = useState('');
@@ -152,13 +167,13 @@ const AdminDashboard = () => {
   const validateDashboardData = useCallback((data) => {
     return {
       totalUsers: validateNumber(data?.totalUsers, 0),
-      totalUsersChange: validateNumber(data?.totalUsersChange, 0),
+      newUsersThisMonth: validateNumber(data?.newUsersThisMonth, 0),
       totalBookings: validateNumber(data?.totalBookings, 0),
-      totalBookingsChange: validateNumber(data?.totalBookingsChange, 0),
+      newBookingsThisMonth: validateNumber(data?.newBookingsThisMonth, 0),
       totalRevenue: validateNumber(data?.totalRevenue, 0),
-      totalRevenueChange: validateNumber(data?.totalRevenueChange, 0),
+      newRevenueThisMonth: validateNumber(data?.newRevenueThisMonth, 0),
       averageRating: validateNumber(data?.averageRating, 0),
-      averageRatingChange: validateNumber(data?.averageRatingChange, 0)
+      newRatingsThisMonth: validateNumber(data?.newRatingsThisMonth, 0)
     };
   }, [validateNumber]);
 
@@ -234,6 +249,7 @@ const AdminDashboard = () => {
     if (path.includes('/admin/dashboard')) return 'dashboard';
     if (path.includes('/admin/users')) return 'users';
     if (path.includes('/admin/courts')) return 'courts';
+    if (path.includes('/admin/venues')) return 'venues';
     if (path.includes('/admin/tiers')) return 'tiers';
     if (path.includes('/admin/bookings')) return 'bookings';
     if (path.includes('/admin/feedback')) return 'feedback';
@@ -269,20 +285,20 @@ const AdminDashboard = () => {
       // Set default values on error
       setDashboardData({
         totalUsers: 0,
-        totalUsersChange: 0,
+        newUsersThisMonth: 0,
         totalBookings: 0,
-        totalBookingsChange: 0,
+        newBookingsThisMonth: 0,
         totalRevenue: 0,
-        totalRevenueChange: 0,
+        newRevenueThisMonth: 0,
         averageRating: 0,
-        averageRatingChange: 0
+        newRatingsThisMonth: 0
       });
     } finally {
       setSummaryLoading(false);
     }
   }, [validateDashboardData]);
 
-  const fetchRecentActivity = useCallback(async () => {
+  const fetchRecentActivity = useCallback(async (period = 'recent') => {
     try {
       setRecentActivityLoading(true);
       setRecentActivityError('');
@@ -292,7 +308,7 @@ const AdminDashboard = () => {
         throw new Error('No authentication token available');
       }
       
-      const res = await axios.get('http://localhost:8081/api/admin/dashboard/recent-activity', {
+      const res = await axios.get(`http://localhost:8081/api/admin/dashboard/recent-activity?period=${period}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -308,6 +324,7 @@ const AdminDashboard = () => {
           icon: validateString(activity?.icon, '📋')
         }));
         setRecentActivity(validatedData);
+        setCurrentActivityPeriod(period); // 更新当前数据类型
         setRecentActivityError('');
       } else {
         throw new Error('Invalid recent activity data format received');
@@ -315,11 +332,41 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Failed to fetch recent activity:', err);
       setRecentActivity([]);
-      setRecentActivityError(err.response?.data?.message || err.message || 'Failed to load recent activity');
+              setRecentActivityError(err.response?.data?.message || err.message || t('admin.failedToLoadRecentActivity'));
     } finally {
       setRecentActivityLoading(false);
     }
   }, [validateNumber, validateString]);
+
+  // 获取场地利用率
+  const fetchCourtUtilization = useCallback(async (period = '7d') => {
+    try {
+      setCourtUtilizationLoading(true);
+      setCourtUtilizationError('');
+      
+      const token = UserService.getAdminToken() || UserService.getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      const res = await axios.get(`http://localhost:8081/api/admin/dashboard/court-utilization?period=${period}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data) {
+        setCourtUtilization(res.data);
+        setCourtUtilizationError('');
+      } else {
+        throw new Error('Invalid court utilization data format received');
+      }
+    } catch (err) {
+      console.error('Failed to fetch court utilization:', err);
+      setCourtUtilization({ courtUtilizations: [], timeSlotUtilizations: {} });
+              setCourtUtilizationError(err.response?.data?.message || err.message || t('admin.failedToLoadCourtUtilization'));
+    } finally {
+      setCourtUtilizationLoading(false);
+    }
+  }, []);
 
   // Chart and data fetching functions - memoized for performance
   const fetchBookingTrends = useCallback(async () => {
@@ -349,7 +396,7 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Failed to fetch booking trends:', err);
       setBookingTrends({ labels: [], data: [] });
-      setBookingTrendsError(err.response?.data?.message || err.message || 'Failed to load booking trends');
+              setBookingTrendsError(err.response?.data?.message || err.message || t('admin.failedToLoadBookingTrends'));
     } finally {
       setBookingTrendsLoading(false);
     }
@@ -383,7 +430,7 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Failed to fetch revenue trends:', err);
       setRevenueTrends({ labels: [], data: [] });
-      setRevenueTrendsError(err.response?.data?.message || err.message || 'Failed to load revenue trends');
+              setRevenueTrendsError(err.response?.data?.message || err.message || t('admin.failedToLoadRevenueTrends'));
     } finally {
       setRevenueTrendsLoading(false);
     }
@@ -627,10 +674,10 @@ const AdminDashboard = () => {
   const safeDisplayPercentage = useCallback((value, defaultValue = 0) => {
     const num = validateNumber(value, defaultValue);
     try {
-      return `${num >= 0 ? '+' : ''}${num.toFixed(1)}%`;
+      return `${num.toFixed(1)}%`;
     } catch (error) {
       console.error('Error formatting percentage:', error);
-      return `${defaultValue >= 0 ? '+' : ''}${defaultValue.toFixed(1)}%`;
+      return `${defaultValue.toFixed(1)}%`;
     }
   }, [validateNumber]);
 
@@ -692,6 +739,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (location.pathname === '/admin/dashboard' || location.pathname === '/admin') {
       fetchRecentActivity();
+      fetchCourtUtilization();
     }
   }, []);
 
@@ -732,44 +780,7 @@ const AdminDashboard = () => {
     }
   }, [location.pathname, getCurrentTab, bookingTrends, revenueTrends, initBookingChart, initRevenueChart]);
 
-  const getBookingLabels = useCallback((timeRange) => {
-    switch (timeRange) {
-      case 'week':
-        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      case 'month':
-        return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      case 'year':
-        return ['Q1', 'Q2', 'Q3', 'Q4'];
-      default:
-        return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    }
-  }, []);
 
-  const getBookingData = useCallback((timeRange) => {
-    switch (timeRange) {
-      case 'week':
-        return [40, 55, 70, 65, 85, 60, 75];
-      case 'month':
-        return [65, 59, 80, 81, 56, 55];
-      case 'year':
-        return [1200, 1900, 1500, 2100];
-      default:
-        return [65, 59, 80, 81, 56, 55];
-    }
-  }, []);
-
-  const getEngagementData = useCallback((timeRange) => {
-    switch (timeRange) {
-      case 'week':
-        return [120, 190, 300, 250, 200, 150, 100];
-      case 'month':
-        return [1200, 1900, 1500, 2100, 1800, 2200];
-      case 'year':
-        return [5000, 6000, 7000, 8000];
-      default:
-        return [120, 190, 300, 250, 200, 150, 100];
-    }
-  }, []);
 
   const handleLogout = useCallback(() => {
     // Clear all admin-related data
@@ -1003,7 +1014,7 @@ const AdminDashboard = () => {
                   component="h1"
                   sx={{ fontWeight: 700, color: theme.palette.primary.main }}
                 >
-                  Admin Portal
+                  {t('admin.adminPortal')}
                 </Typography>
               </Box>
               {isMobile && (
@@ -1054,7 +1065,7 @@ const AdminDashboard = () => {
               <DashboardIcon />
             </ListItemIcon>
             <ListItemText
-              primary="Dashboard"
+              primary={t('admin.dashboard')}
               primaryTypographyProps={{
                 fontWeight: getCurrentTab === 'dashboard' ? 'bold' : 'normal'
               }}
@@ -1090,10 +1101,18 @@ const AdminDashboard = () => {
             }}>
               <PeopleIcon />
             </ListItemIcon>
-            <ListItemText primary="User Management" />
+            <ListItemText primary={t('admin.userManagement')} />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/courts')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/courts');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'courts' ? 'page' : undefined}
+            tabIndex={0}
             sx={{
               borderRadius: 1,
               mb: 0.5,
@@ -1101,6 +1120,10 @@ const AdminDashboard = () => {
               cursor: 'pointer',
               '&:hover': {
                 backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
               }
             }}
           >
@@ -1110,10 +1133,50 @@ const AdminDashboard = () => {
             }}>
               <CourtsIcon />
             </ListItemIcon>
-            <ListItemText primary="Court Management" />
+            <ListItemText primary={t('admin.courtManagement')} />
+          </ListItem>
+          <ListItem
+            onClick={() => navigate('/admin/venues')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/venues');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'venues' ? 'page' : undefined}
+            tabIndex={0}
+            sx={{
+              borderRadius: 1,
+              mb: 0.5,
+              bgcolor: getCurrentTab === 'venues' ? theme.palette.action.hover : 'inherit',
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
+              }
+            }}
+          >
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: getCurrentTab === 'venues' ? theme.palette.primary.main : theme.palette.text.secondary
+            }}>
+              <LocationOnIcon />
+            </ListItemIcon>
+            <ListItemText primary={t('admin.venueManagement')} />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/tiers')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/tiers');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'tiers' ? 'page' : undefined}
+            tabIndex={0}
             sx={{
               borderRadius: 1,
               mb: 0.5,
@@ -1121,6 +1184,10 @@ const AdminDashboard = () => {
               cursor: 'pointer',
               '&:hover': {
                 backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
               }
             }}
           >
@@ -1130,10 +1197,18 @@ const AdminDashboard = () => {
             }}>
               <TierIcon />
             </ListItemIcon>
-            <ListItemText primary="Membership Management" />
+            <ListItemText primary={t('admin.membershipManagement')} />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/bookings')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/bookings');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'bookings' ? 'page' : undefined}
+            tabIndex={0}
             sx={{
               borderRadius: 1,
               mb: 0.5,
@@ -1141,6 +1216,10 @@ const AdminDashboard = () => {
               cursor: 'pointer',
               '&:hover': {
                 backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
               }
             }}
           >
@@ -1150,10 +1229,18 @@ const AdminDashboard = () => {
             }}>
               <BookingsIcon />
             </ListItemIcon>
-            <ListItemText primary="Booking Management" />
+            <ListItemText primary={t('admin.bookingManagement')} />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/feedback')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/feedback');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'feedback' ? 'page' : undefined}
+            tabIndex={0}
             sx={{
               borderRadius: 1,
               mb: 0.5,
@@ -1161,6 +1248,10 @@ const AdminDashboard = () => {
               cursor: 'pointer',
               '&:hover': {
                 backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
               }
             }}
           >
@@ -1170,16 +1261,28 @@ const AdminDashboard = () => {
             }}>
               <FeedbackIcon />
             </ListItemIcon>
-            <ListItemText primary="Feedback Management" />
+            <ListItemText primary={t('admin.feedbackManagement')} />
           </ListItem>
           <ListItem
             onClick={() => navigate('/admin/settings')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/settings');
+              }
+            }}
+            role="menuitem"
+            aria-current={getCurrentTab === 'settings' ? 'page' : undefined}
+            tabIndex={0}
             sx={{
               borderRadius: 1,
               cursor: 'pointer',
               bgcolor: getCurrentTab === 'settings' ? theme.palette.action.hover : 'inherit',
               '&:hover': {
                 backgroundColor: theme.palette.action.selected
+              },
+              '&:focus': {
+                outline: `2px solid ${theme.palette.primary.main}`,
+                outlineOffset: '2px'
               }
             }}
           >
@@ -1189,7 +1292,7 @@ const AdminDashboard = () => {
             }}>
               <SettingsIcon />
             </ListItemIcon>
-            <ListItemText primary="Settings" />
+            <ListItemText primary={t('admin.settings')} />
           </ListItem>
         </List>
       </Paper>
@@ -1291,17 +1394,17 @@ const AdminDashboard = () => {
                 )}
                 {bookingTrendsError && (
                   <Paper sx={{ p: 2, mb: 1, backgroundColor: theme.palette.error.light, color: theme.palette.error.contrastText }}>
-                    <Typography variant="body2">Booking Trends Error: {bookingTrendsError}</Typography>
+                    <Typography variant="body2">{t('admin.bookingTrendsError')}: {bookingTrendsError}</Typography>
                   </Paper>
                 )}
                 {revenueTrendsError && (
                   <Paper sx={{ p: 2, mb: 1, backgroundColor: theme.palette.error.light, color: theme.palette.error.contrastText }}>
-                    <Typography variant="body2">Revenue Trends Error: {revenueTrendsError}</Typography>
+                    <Typography variant="body2">{t('admin.revenueTrendsError')}: {revenueTrendsError}</Typography>
                   </Paper>
                 )}
                 {recentActivityError && (
                   <Paper sx={{ p: 2, mb: 1, backgroundColor: theme.palette.error.light, color: theme.palette.error.contrastText }}>
-                    <Typography variant="body2">Recent Activity Error: {recentActivityError}</Typography>
+                    <Typography variant="body2">{t('admin.recentActivityError')}: {recentActivityError}</Typography>
                   </Paper>
                 )}
               </Box>
@@ -1315,381 +1418,308 @@ const AdminDashboard = () => {
                 sx={{ 
                   fontWeight: 700, 
                   color: '#000000',
-                  mb: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1
+                  mb: 2
                 }}
               >
-                📊 Overview
+                {t('admin.dashboardOverview')}
               </Typography>
               
               <Grid 
                 container 
-                spacing={isMobile ? 2 : 3} 
+                spacing={3} 
                 role="region"
-                aria-label="Dashboard overview statistics"
+                aria-label={t('admin.dashboardOverviewStatistics')}
               >
               <Grid item xs={12} sm={6} md={6} lg={3}>
                 <Paper sx={{ 
-                  p: 3, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  textAlign: 'center',
-                  backgroundColor: theme.palette.background.paper, 
-                  color: theme.palette.text.primary,
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[1],
-                  transition: 'all 0.3s ease',
-                  height: 200,
+                  p: 2, 
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  borderRadius: 4,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  height: 140,
                   '&:hover': {
-                    boxShadow: theme.shadows[4],
-                    transform: 'translateY(-2px)'
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                    transform: 'translateY(-4px)'
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: '#1976d2'
                   }
                 }}>
-                  <Box sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    backgroundColor: '#2d4aa1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 2,
-                    fontSize: '1.5rem',
-                    color: '#ffffff'
-                  }}>
-                    👥
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h4" fontWeight="bold">
-                      {summaryLoading ? (
-                        <Skeleton variant="text" width={80} height={40} />
-                      ) : (
-                        safeDisplayNumber(dashboardData.totalUsers)
-                      )}
-                    </Typography>
-                    {/* Mini trend indicator */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      p: 0.5,
-                      borderRadius: 1,
-                      backgroundColor: dashboardData.totalUsersChange >= 0 ? alpha('#4caf50', 0.1) : alpha('#f44336', 0.1),
-                      border: `1px solid ${dashboardData.totalUsersChange >= 0 ? '#4caf50' : '#f44336'}`
-                    }}>
-                      <Box sx={{
-                        width: 0,
-                        height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderBottom: `8px solid ${dashboardData.totalUsersChange >= 0 ? '#4caf50' : '#f44336'}`,
-                        transform: dashboardData.totalUsersChange >= 0 ? 'rotate(0deg)' : 'rotate(180deg)'
-                      }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Total Users
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{ 
-                        color: dashboardData.totalUsersChange >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 700,
-                        fontSize: '0.75rem'
-                      }}
-                    >
-                      {dashboardData.totalUsersChange >= 0 ? '▲' : '▼'} {safeDisplayPercentage(dashboardData.totalUsersChange)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      from last month
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={6} lg={3}>
-                <Paper sx={{ 
-                  p: 3, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  textAlign: 'center',
-                  backgroundColor: theme.palette.background.paper, 
-                  color: theme.palette.text.primary,
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[1],
-                  transition: 'all 0.3s ease',
-                  height: 200,
-                  '&:hover': {
-                    boxShadow: theme.shadows[4],
-                    transform: 'translateY(-2px)'
-                  }
-                }}>
-                  <Box sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    backgroundColor: '#2d4aa1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 2,
-                    fontSize: '1.5rem',
-                    color: '#ffffff'
-                  }}>
-                    📅
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h4" fontWeight="bold">
-                      {summaryLoading ? (
-                        <Skeleton variant="text" width={80} height={40} />
-                      ) : (
-                        safeDisplayNumber(dashboardData.totalBookings)
-                      )}
-                    </Typography>
-                    {/* Mini trend indicator */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      p: 0.5,
-                      borderRadius: 1,
-                      backgroundColor: dashboardData.totalBookingsChange >= 0 ? alpha('#4caf50', 0.1) : alpha('#f44336', 0.1),
-                      border: `1px solid ${dashboardData.totalBookingsChange >= 0 ? '#4caf50' : '#f44336'}`
-                    }}>
-                      <Box sx={{
-                        width: 0,
-                        height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderBottom: `8px solid ${dashboardData.totalBookingsChange >= 0 ? '#4caf50' : '#f44336'}`,
-                        transform: dashboardData.totalBookingsChange >= 0 ? 'rotate(0deg)' : 'rotate(180deg)'
-                      }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Total Bookings
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{ 
-                        color: dashboardData.totalBookingsChange >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 700,
-                        fontSize: '0.75rem'
-                      }}
-                    >
-                      {dashboardData.totalBookingsChange >= 0 ? '▲' : '▼'} {safeDisplayPercentage(dashboardData.totalBookingsChange)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      from last month
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={6} lg={3}>
-                <Paper sx={{ 
-                  p: 3, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  textAlign: 'center',
-                  backgroundColor: theme.palette.background.paper, 
-                  color: theme.palette.text.primary,
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[1],
-                  transition: 'all 0.3s ease',
-                  height: 200,
-                  '&:hover': {
-                    boxShadow: theme.shadows[4],
-                    transform: 'translateY(-2px)'
-                  }
-                }}>
-                  <Box sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    backgroundColor: '#2d4aa1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 2,
-                    fontSize: '1.5rem',
-                    color: '#ffffff'
-                  }}>
-                    💰
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h4" fontWeight="bold">
-                      {summaryLoading ? (
-                        <Skeleton variant="text" width={100} height={40} />
-                      ) : (
-                        `RM ${safeDisplayNumber(dashboardData.totalRevenue, 0, (val) => val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`
-                      )}
-                    </Typography>
-                    {/* Mini trend indicator */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      p: 0.5,
-                      borderRadius: 1,
-                      backgroundColor: dashboardData.totalRevenueChange >= 0 ? alpha('#4caf50', 0.1) : alpha('#f44336', 0.1),
-                      border: `1px solid ${dashboardData.totalRevenueChange >= 0 ? '#4caf50' : '#f44336'}`
-                    }}>
-                      <Box sx={{
-                        width: 0,
-                        height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderBottom: `8px solid ${dashboardData.totalRevenueChange >= 0 ? '#4caf50' : '#f44336'}`,
-                        transform: dashboardData.totalRevenueChange >= 0 ? 'rotate(0deg)' : 'rotate(180deg)'
-                      }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Revenue
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{ 
-                        color: dashboardData.totalRevenueChange >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 700,
-                        fontSize: '0.75rem'
-                      }}
-                    >
-                      {dashboardData.totalRevenueChange >= 0 ? '▲' : '▼'} {safeDisplayPercentage(dashboardData.totalRevenueChange)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      from last month
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={6} lg={3}>
-                <Paper sx={{ 
-                  p: 3, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  textAlign: 'center',
-                  backgroundColor: theme.palette.background.paper, 
-                  color: theme.palette.text.primary,
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[1],
-                  transition: 'all 0.3s ease',
-                  height: 200,
-                  '&:hover': {
-                    boxShadow: theme.shadows[4],
-                    transform: 'translateY(-2px)'
-                  }
-                }}>
-                  <Box sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    backgroundColor: '#2d4aa1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 2,
-                    fontSize: '1.5rem',
-                    color: '#ffffff'
-                  }}>
-                    ⭐
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h4" fontWeight="bold">
-                      {safeDisplayRating(dashboardData.averageRating, 0)}
-                    </Typography>
-                    {/* Mini trend indicator */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      p: 0.5,
-                      borderRadius: 1,
-                      backgroundColor: validateNumber(dashboardData.averageRatingChange, 0) >= 0 ? alpha('#4caf50', 0.1) : alpha('#f44336', 0.1),
-                      border: `1px solid ${validateNumber(dashboardData.averageRatingChange, 0) >= 0 ? '#4caf50' : '#f44336'}`
-                    }}>
-                      <Box sx={{
-                        width: 0,
-                        height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderBottom: `8px solid ${validateNumber(dashboardData.averageRatingChange, 0) >= 0 ? '#4caf50' : '#f44336'}`,
-                        transform: validateNumber(dashboardData.averageRatingChange, 0) >= 0 ? 'rotate(0deg)' : 'rotate(180deg)'
-                      }} />
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Average Rating
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Rating
-                      value={validateNumber(dashboardData.averageRating, 0)}
-                      precision={0.1}
-                      readOnly
-                      size="small"
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {validateNumber(dashboardData.averageRatingChange, 0) !== 0 ? (
-                      <>
-                        <Typography
-                          variant="caption"
-                          sx={{ 
-                            color: validateNumber(dashboardData.averageRatingChange, 0) > 0 ? 'success.main' : 'error.main',
-                            fontWeight: 700,
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          {validateNumber(dashboardData.averageRatingChange, 0) > 0 ? '▲' : '▼'} {safeDisplayRating(Math.abs(validateNumber(dashboardData.averageRatingChange, 0)), 0)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                          from last month
-                        </Typography>
-                      </>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                        No change from last month
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography 
+                      variant="h6" 
+                        sx={{ 
+                        color: '#1976d2',
+                          fontWeight: 700,
+                        fontSize: '1rem'
+                        }}
+                      >
+                      {t('admin.totalUsers')}
                       </Typography>
-                    )}
                   </Box>
+                  <Typography variant="h3" component="div" sx={{ 
+                    fontWeight: 800, 
+                    mb: 1,
+                    background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}>
+                    {summaryLoading ? (
+                      <Skeleton variant="text" width={80} height={40} />
+                    ) : (
+                      safeDisplayNumber(dashboardData.totalUsers)
+                    )}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#1976d2',
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      display: 'block',
+                      mb: 1
+                    }}
+                  >
+                    {t('admin.newThisMonth')}: {dashboardData.newUsersThisMonth}
+                  </Typography>
+
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={6} lg={3}>
+                <Paper sx={{ 
+                  p: 2, 
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  borderRadius: 4,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  height: 140,
+                  '&:hover': {
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                    transform: 'translateY(-4px)'
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: '#e91e63'
+                  }
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography 
+                      variant="h6" 
+                        sx={{ 
+                        color: '#e91e63',
+                          fontWeight: 700,
+                        fontSize: '1rem'
+                        }}
+                      >
+                      {t('admin.totalBookings')}
+                      </Typography>
+                  </Box>
+                  <Typography variant="h3" component="div" sx={{ 
+                    fontWeight: 800, 
+                    mb: 1,
+                    background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}>
+                    {summaryLoading ? (
+                      <Skeleton variant="text" width={80} height={40} />
+                    ) : (
+                      safeDisplayNumber(dashboardData.totalBookings)
+                    )}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#e91e63',
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      display: 'block',
+                      mb: 1
+                    }}
+                  >
+                    {t('admin.newThisMonth')}: {dashboardData.newBookingsThisMonth}
+                  </Typography>
+
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={6} lg={3}>
+                <Paper sx={{ 
+                  p: 2, 
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  borderRadius: 4,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  height: 140,
+                  '&:hover': {
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                    transform: 'translateY(-4px)'
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: '#4caf50'
+                  }
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography 
+                      variant="h6" 
+                        sx={{ 
+                        color: '#4caf50',
+                          fontWeight: 700,
+                        fontSize: '1rem'
+                        }}
+                      >
+                      {t('admin.totalRevenue')}
+                      </Typography>
+                  </Box>
+                  <Typography variant="h3" component="div" sx={{ 
+                    fontWeight: 800, 
+                    mb: 1,
+                    background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}>
+                    {summaryLoading ? (
+                      <Skeleton variant="text" width={100} height={40} />
+                    ) : (
+                      `RM ${safeDisplayNumber(dashboardData.totalRevenue, 0, (val) => val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`
+                    )}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#4caf50',
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      display: 'block',
+                      mb: 1
+                    }}
+                  >
+                    {t('admin.newThisMonth')}: RM {dashboardData.newRevenueThisMonth.toLocaleString()}
+                  </Typography>
+
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={6} lg={3}>
+                <Paper sx={{ 
+                  p: 2, 
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  borderRadius: 4,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  height: 140,
+                  '&:hover': {
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                    transform: 'translateY(-4px)'
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: '#ff9800'
+                  }
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography 
+                      variant="h6" 
+                        sx={{ 
+                        color: '#ff9800',
+                          fontWeight: 700,
+                        fontSize: '1rem'
+                        }}
+                      >
+                      {t('admin.averageRating')}
+                      </Typography>
+                  </Box>
+                  <Typography variant="h3" component="div" sx={{ 
+                    fontWeight: 800, 
+                    mb: 1,
+                    background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}>
+                    {safeDisplayRating(dashboardData.averageRating, 0)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: '#ff9800',
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      display: 'block',
+                      mb: 1
+                    }}
+                  >
+                    {t('admin.newThisMonth')}: {dashboardData.newRatingsThisMonth}
+                  </Typography>
+
                 </Paper>
               </Grid>
             </Grid>
               </Box>
 
             {/* Charts Section */}
-            <Box sx={{ mb: 3 }}>
-              <Typography 
+            <Box sx={{ mb: 4 }}>
+                            <Typography 
                 variant="h4" 
                 component="h2" 
                 sx={{ 
-                  fontWeight: 700, 
+                  fontWeight: 700,
                   color: '#000000',
-                  mb: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1
+                  mb: 3
                 }}
               >
-                📈 Analytics
+                {t('admin.analytics')}
               </Typography>
               
               <Grid 
                 container 
-                spacing={isMobile ? 2 : 3} 
+                spacing={2} 
                 role="region"
-                aria-label="Dashboard charts and analytics"
+                aria-label={t('admin.dashboardChartsAndAnalytics')}
+                sx={{ maxWidth: '98%', mx: 'auto' }}
               >
               <Grid item xs={12} lg={6}>
                 <Paper 
@@ -1697,36 +1727,67 @@ const AdminDashboard = () => {
                   role="region"
                   aria-label="Booking trends chart"
                   sx={{ 
-                    p: isMobile ? 1 : 2, 
+                    p: 2.5, 
                     minHeight: isMobile ? 300 : 400, 
-                    width: '100%',
-                    backgroundColor: theme.palette.background.paper, 
-                    color: theme.palette.text.primary,
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                    borderRadius: 2,
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                    width: '98%',
+                    mx: 'auto',
+                    backgroundColor: '#ffffff',
+                    color: '#2c3e50',
+                    borderRadius: 4,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)'
+                    }
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1 : 0 }}>
-                    <Typography variant="h6" component="h2">Booking Trends</Typography>
-                                          <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 120 }}>
-                        <InputLabel id="booking-time-range-label">Time Range</InputLabel>
-                        <Select
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 2.5, 
+                    flexDirection: isMobile ? 'column' : 'row', 
+                    gap: isMobile ? 2 : 0 
+                  }}>
+                    <Typography 
+                      variant="h5" 
+                      component="h2" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: '#667eea'
+                      }}
+                    >
+                      {t('admin.bookingTrends')}
+                    </Typography>
+                    <FormControl size="small" sx={{ 
+                      minWidth: isMobile ? '100%' : 140,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#f8f9fa',
+                        '&:hover': {
+                          backgroundColor: '#e9ecef'
+                        }
+                      }
+                    }}>
+                      <InputLabel id="booking-time-range-label" sx={{ color: '#6c757d' }}>{t('admin.selectBookingTrendsTimeRange')}</InputLabel>
+                      <Select
                           labelId="booking-time-range-label"
                           value={bookingTimeRange}
                           onChange={(e) => setBookingTimeRange(e.target.value)}
                           aria-label="Select booking trends time range"
                         >
-                        <MenuItem value="7d">Last 7 Days</MenuItem>
-                        <MenuItem value="30d">Last 30 Days</MenuItem>
-                        <MenuItem value="12m">Last 12 Months</MenuItem>
+                        <MenuItem value="7d">{t('admin.last7Days')}</MenuItem>
+                        <MenuItem value="30d">{t('admin.last30Days')}</MenuItem>
+                        <MenuItem value="12m">{t('admin.last12Months')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Box>
-                  <Box sx={{ height: isMobile ? 250 : 320, position: 'relative', overflow: 'hidden' }}>
+                  <Box sx={{ height: isMobile ? 220 : 280, position: 'relative', overflow: 'hidden' }}>
                     {bookingTrendsLoading ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                        <CircularProgress aria-label="Loading booking trends chart" />
+                        <CircularProgress aria-label={t('admin.loadingBookingTrendsChart')} />
                       </Box>
                     ) : (
                       <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1739,7 +1800,7 @@ const AdminDashboard = () => {
                             maxHeight: '100%'
                           }}
                           role="img"
-                          aria-label="Booking trends chart showing booking data over time"
+                          aria-label={t('admin.bookingTrendsChart')}
                         />
                       </Box>
                     )}
@@ -1748,15 +1809,15 @@ const AdminDashboard = () => {
                   {/* Booking Summary */}
                   {bookingSummary.highest && bookingSummary.lowest && (
                     <Box sx={{ 
-                      mt: 2, 
-                      p: 2.5, 
+                      mt: 1.5, 
+                      p: 2, 
                       backgroundColor: alpha('#667eea', 0.08),
                       borderRadius: 2,
                       border: `1px solid ${alpha('#667eea', 0.2)}`,
                       boxShadow: '0 2px 8px rgba(102, 126, 234, 0.1)'
                     }}>
                       <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: '#000000' }}>
-                        📊 Booking Summary
+                        {t('admin.bookingSummary')}
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
@@ -1769,7 +1830,7 @@ const AdminDashboard = () => {
                           }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                              Peak Day
+                              {t('admin.peakDay')}
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#4caf50' }}>
                               {bookingSummary.highest.value} bookings on {bookingSummary.highest.label}
@@ -1786,7 +1847,7 @@ const AdminDashboard = () => {
                           }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                              Low Day
+                              {t('admin.lowDay')}
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#f44336' }}>
                               {bookingSummary.lowest.value} bookings on {bookingSummary.lowest.label}
@@ -1805,36 +1866,66 @@ const AdminDashboard = () => {
                   role="region"
                   aria-label="Revenue trends chart"
                   sx={{ 
-                    p: isMobile ? 1 : 2, 
+                    p: 2.5, 
                     minHeight: isMobile ? 300 : 400, 
-                    width: '100%',
-                    backgroundColor: theme.palette.background.paper, 
-                    color: theme.palette.text.primary,
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                    borderRadius: 2,
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                    width: '99%',
+                    backgroundColor: '#ffffff',
+                    color: '#2c3e50',
+                    borderRadius: 4,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)'
+                    }
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1 : 0 }}>
-                    <Typography variant="h6" component="h2">Revenue Trends</Typography>
-                                          <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 120 }}>
-                        <InputLabel id="revenue-time-range-label">Time Range</InputLabel>
-                        <Select
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 2.5, 
+                    flexDirection: isMobile ? 'column' : 'row', 
+                    gap: isMobile ? 2 : 0 
+                  }}>
+                    <Typography 
+                      variant="h5" 
+                      component="h2" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: '#4facfe'
+                      }}
+                    >
+                      {t('admin.revenueTrends')}
+                    </Typography>
+                    <FormControl size="small" sx={{ 
+                      minWidth: isMobile ? '100%' : 140,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#f8f9fa',
+                        '&:hover': {
+                          backgroundColor: '#e9ecef'
+                        }
+                      }
+                    }}>
+                      <InputLabel id="revenue-time-range-label" sx={{ color: '#6c757d' }}>{t('admin.selectRevenueTrendsTimeRange')}</InputLabel>
+                      <Select
                           labelId="revenue-time-range-label"
                           value={revenueTimeRange}
                           onChange={(e) => setRevenueTimeRange(e.target.value)}
                           aria-label="Select revenue trends time range"
                         >
-                        <MenuItem value="7d">Last 7 Days</MenuItem>
-                        <MenuItem value="30d">Last 30 Days</MenuItem>
-                        <MenuItem value="12m">Last 12 Months</MenuItem>
+                        <MenuItem value="7d">{t('admin.last7Days')}</MenuItem>
+                        <MenuItem value="30d">{t('admin.last30Days')}</MenuItem>
+                        <MenuItem value="12m">{t('admin.last12Months')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Box>
-                  <Box sx={{ height: isMobile ? 250 : 320, position: 'relative', overflow: 'hidden' }}>
+                  <Box sx={{ height: isMobile ? 220 : 280, position: 'relative', overflow: 'hidden' }}>
                     {revenueTrendsLoading ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                        <CircularProgress aria-label="Loading revenue trends chart" />
+                        <CircularProgress aria-label={t('admin.loadingRevenueTrendsChart')} />
                       </Box>
                     ) : (
                       <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1847,7 +1938,7 @@ const AdminDashboard = () => {
                             maxHeight: '100%'
                           }}
                           role="img"
-                          aria-label="Revenue trends chart showing revenue data over time"
+                          aria-label={t('admin.revenueTrendsChart')}
                         />
                       </Box>
                     )}
@@ -1856,15 +1947,15 @@ const AdminDashboard = () => {
                   {/* Revenue Summary */}
                   {revenueSummary.highest && revenueSummary.lowest && (
                     <Box sx={{ 
-                      mt: 2, 
-                      p: 2.5, 
+                      mt: 1.5, 
+                      p: 2, 
                       backgroundColor: alpha('#28a745', 0.08),
                       borderRadius: 2,
                       border: `1px solid ${alpha('#28a745', 0.2)}`,
                       boxShadow: '0 2px 8px rgba(40, 167, 69, 0.1)'
                     }}>
                       <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: '#000000' }}>
-                        💰 Revenue Summary
+                        {t('admin.revenueSummary')}
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
@@ -1877,7 +1968,7 @@ const AdminDashboard = () => {
                           }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                              Peak Day
+                              {t('admin.peakDay')}
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#4caf50' }}>
                               RM {revenueSummary.highest.value.toLocaleString()} on {revenueSummary.highest.label}
@@ -1894,7 +1985,7 @@ const AdminDashboard = () => {
                           }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                              Low Day
+                              {t('admin.lowDay')}
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#f44336' }}>
                               RM {revenueSummary.lowest.value.toLocaleString()} on {revenueSummary.lowest.label}
@@ -1906,33 +1997,466 @@ const AdminDashboard = () => {
                   )}
                 </Paper>
               </Grid>
+
+              {/* Court Utilization */}
+              <Grid item xs={12}>
+                <Paper 
+                  component="section"
+                  role="region"
+                  aria-label={t('admin.courtUtilizationChart')}
+                  sx={{ 
+                    p: 2.5, 
+                    minHeight: isMobile ? 300 : 400, 
+                    width: '99%',
+                    backgroundColor: '#ffffff',
+                    color: '#2c3e50',
+                    borderRadius: 4,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 2.5, 
+                    flexDirection: isMobile ? 'column' : 'row', 
+                    gap: isMobile ? 2 : 0 
+                  }}>
+                    <Typography 
+                      variant="h5" 
+                      component="h2" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: '#9c27b0'
+                      }}
+                    >
+                      {t('admin.courtUtilizationRate')}
+                    </Typography>
+                    <FormControl size="small" sx={{ 
+                      minWidth: isMobile ? '100%' : 140,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#f8f9fa',
+                        '&:hover': {
+                          backgroundColor: '#e9ecef'
+                        }
+                      }
+                    }}>
+                      <InputLabel id="utilization-time-range-label" sx={{ color: '#6c757d' }}>{t('admin.selectCourtUtilizationTimeRange')}</InputLabel>
+                      <Select
+                          labelId="utilization-time-range-label"
+                          value={courtUtilizationPeriod}
+                          onChange={(e) => {
+                            setCourtUtilizationPeriod(e.target.value);
+                            fetchCourtUtilization(e.target.value);
+                          }}
+                          aria-label="Select court utilization time range"
+                        >
+                        <MenuItem value="7d">{t('admin.last7Days')}</MenuItem>
+                        <MenuItem value="30d">{t('admin.last30Days')}</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  
+                  {courtUtilizationLoading ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                                              <CircularProgress aria-label={t('admin.loadingCourtUtilizationData')} />
+                    </Box>
+                  ) : courtUtilizationError ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+                      <Typography color="error">{courtUtilizationError}</Typography>
+                    </Box>
+                  ) : (
+                    <Box>
+                      {/* Overall Utilization Summary */}
+                      <Box sx={{ mb: 3, p: 3, backgroundColor: alpha('#9c27b0', 0.1), borderRadius: 3, border: '1px solid', borderColor: alpha('#9c27b0', 0.2) }}>
+                        <Typography variant="h5" sx={{ fontWeight: 700, color: '#9c27b0', mb: 1 }}>
+                          {t('admin.courtUtilization')}
+                        </Typography>
+                        <Typography variant="h3" sx={{ 
+                          fontWeight: 800, 
+                          color: '#9c27b0',
+                          mb: 1
+                        }}>
+                          {(() => {
+                            const totalUtilization = courtUtilization.courtUtilizations.reduce((sum, court) => sum + court.utilizationRate, 0);
+                            const averageUtilization = courtUtilization.courtUtilizations.length > 0 ? totalUtilization / courtUtilization.courtUtilizations.length : 0;
+                            return `${averageUtilization.toFixed(1)}%`;
+                          })()}
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                          Average utilization across all courts
+                        </Typography>
+                      </Box>
+
+                      {/* Court Utilization by Type */}
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#2c3e50' }}>
+                          {t('admin.courtUtilizationByType')}
+                        </Typography>
+                        
+                        {/* Standard Courts */}
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#1976d2', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box component="span" sx={{ width: 12, height: 12, backgroundColor: '#1976d2', borderRadius: '50%' }} />
+                            Standard Courts
+                          </Typography>
+                          <Grid container spacing={2}>
+                            {courtUtilization.courtUtilizations
+                              .filter(court => court.courtType === 'STANDARD')
+                              .map((court, index) => (
+                                <Grid item xs={12} sm={6} md={4} key={court.courtId}>
+                                  <Box sx={{ 
+                                    p: 2, 
+                                    border: '1px solid',
+                                    borderColor: alpha('#1976d2', 0.3),
+                                    borderRadius: 2,
+                                    backgroundColor: alpha('#1976d2', 0.05)
+                                  }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                      {court.courtName}
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ 
+                                      fontWeight: 700, 
+                                      color: court.utilizationRate > 70 ? '#4caf50' : 
+                                             court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                      mb: 1
+                                    }}>
+                                      {court.utilizationRate}%
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                                      {court.bookedSlots} / {court.totalSlots} slots booked
+                                    </Typography>
+                                    <Box sx={{ 
+                                      width: '100%', 
+                                      height: 8, 
+                                      backgroundColor: '#e0e0e0', 
+                                      borderRadius: 4,
+                                      overflow: 'hidden'
+                                    }}>
+                                      <Box sx={{ 
+                                        width: `${court.utilizationRate}%`, 
+                                        height: '100%', 
+                                        backgroundColor: court.utilizationRate > 70 ? '#4caf50' : 
+                                                       court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                        transition: 'width 0.3s ease'
+                                      }} />
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                              ))}
+                          </Grid>
+                        </Box>
+
+                        {/* VIP Courts */}
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#ff9800', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box component="span" sx={{ width: 12, height: 12, backgroundColor: '#ff9800', borderRadius: '50%' }} />
+                            VIP Courts
+                          </Typography>
+                          <Grid container spacing={2}>
+                            {courtUtilization.courtUtilizations
+                              .filter(court => court.courtType === 'VIP')
+                              .map((court, index) => (
+                                <Grid item xs={12} sm={6} md={4} key={court.courtId}>
+                                  <Box sx={{ 
+                                    p: 2, 
+                                    border: '1px solid',
+                                    borderColor: alpha('#ff9800', 0.3),
+                                    borderRadius: 2,
+                                    backgroundColor: alpha('#ff9800', 0.05)
+                                  }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#ff9800' }}>
+                                      {court.courtName}
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ 
+                                      fontWeight: 700, 
+                                      color: court.utilizationRate > 70 ? '#4caf50' : 
+                                             court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                      mb: 1
+                                    }}>
+                                      {court.utilizationRate}%
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                                      {court.bookedSlots} / {court.totalSlots} slots booked
+                                    </Typography>
+                                    <Box sx={{ 
+                                      width: '100%', 
+                                      height: 8, 
+                                      backgroundColor: '#e0e0e0', 
+                                      borderRadius: 4,
+                                      overflow: 'hidden'
+                                    }}>
+                                      <Box sx={{ 
+                                        width: `${court.utilizationRate}%`, 
+                                        height: '100%', 
+                                        backgroundColor: court.utilizationRate > 70 ? '#4caf50' : 
+                                                       court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                        transition: 'width 0.3s ease'
+                                      }} />
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                              ))}
+                          </Grid>
+                        </Box>
+
+                        {/* Other Courts */}
+                        {(() => {
+                          const otherCourts = courtUtilization.courtUtilizations.filter(court => 
+                            court.courtType === 'OTHER'
+                          );
+                          return otherCourts.length > 0 ? (
+                            <Box sx={{ mb: 3 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#9c27b0', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box component="span" sx={{ width: 12, height: 12, backgroundColor: '#9c27b0', borderRadius: '50%' }} />
+                                Other Courts
+                              </Typography>
+                              <Grid container spacing={2}>
+                                {otherCourts.map((court, index) => (
+                                  <Grid item xs={12} sm={6} md={4} key={court.courtId}>
+                                    <Box sx={{ 
+                                      p: 2, 
+                                      border: '1px solid',
+                                      borderColor: alpha('#9c27b0', 0.3),
+                                      borderRadius: 2,
+                                      backgroundColor: alpha('#9c27b0', 0.05)
+                                    }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#9c27b0' }}>
+                                        {court.courtName}
+                                      </Typography>
+                                      <Typography variant="h4" sx={{ 
+                                        fontWeight: 700, 
+                                        color: court.utilizationRate > 70 ? '#4caf50' : 
+                                               court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                        mb: 1
+                                      }}>
+                                        {court.utilizationRate}%
+                                      </Typography>
+                                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                                        {court.bookedSlots} / {court.totalSlots} slots booked
+                                      </Typography>
+                                      <Box sx={{ 
+                                        width: '100%', 
+                                        height: 8, 
+                                        backgroundColor: '#e0e0e0', 
+                                        borderRadius: 4,
+                                        overflow: 'hidden'
+                                      }}>
+                                        <Box sx={{ 
+                                          width: `${court.utilizationRate}%`, 
+                                          height: '100%', 
+                                          backgroundColor: court.utilizationRate > 70 ? '#4caf50' : 
+                                                         court.utilizationRate > 40 ? '#ff9800' : '#f44336',
+                                          transition: 'width 0.3s ease'
+                                        }} />
+                                      </Box>
+                                    </Box>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Box>
+                          ) : null;
+                        })()}
+                      </Box>
+                      
+                      {/* Hourly Time Slot Analysis for Promotions */}
+                      <Box sx={{ p: 3, backgroundColor: alpha('#4caf50', 0.05), borderRadius: 3, border: '1px solid', borderColor: alpha('#4caf50', 0.2) }}>
+                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#4caf50', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box component="span" sx={{ width: 12, height: 12, backgroundColor: '#4caf50', borderRadius: '50%' }} />
+                          Hourly Time Slot Analysis (Promotion Opportunities)
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                          Identify the best time slots for promotional campaigns based on utilization rates
+                        </Typography>
+                        <Grid container spacing={1}>
+                          {Object.entries(courtUtilization.timeSlotUtilizations || {})
+                            .sort(([,a], [,b]) => a - b) // 按利用率从低到高排序
+                            .map(([timeSlot, utilization]) => (
+                              <Grid item xs={6} sm={4} md={3} lg={2} key={timeSlot}>
+                                <Box sx={{ 
+                                  p: 1.5, 
+                                  border: '1px solid',
+                                  borderColor: utilization < 30 ? alpha('#f44336', 0.3) : 
+                                             utilization < 50 ? alpha('#ff9800', 0.3) : alpha('#4caf50', 0.3),
+                                  borderRadius: 2,
+                                  backgroundColor: utilization < 30 ? alpha('#f44336', 0.1) : 
+                                                 utilization < 50 ? alpha('#ff9800', 0.1) : alpha('#4caf50', 0.1),
+                                  textAlign: 'center'
+                                }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>
+                                    {timeSlot}
+                                  </Typography>
+                                  <Typography variant="h6" sx={{ 
+                                    fontWeight: 700, 
+                                    color: utilization < 30 ? '#f44336' : 
+                                           utilization < 50 ? '#ff9800' : '#4caf50',
+                                    mb: 0.5
+                                  }}>
+                                    {utilization}%
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ 
+                                    color: 'text.secondary',
+                                    fontSize: '0.7rem'
+                                  }}>
+                                    {utilization < 30 ? 'High potential' : 
+                                     utilization < 50 ? 'Moderate potential' : 'Low potential'}
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                            ))}
+                        </Grid>
+                      </Box>
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
             </Grid>
               </Box>
 
             {/* Recent Activity */}
-            <Box sx={{ mb: 3 }}>
-              <Typography 
+            <Box sx={{ mb: 4 }}>
+                            <Typography 
                 variant="h4" 
                 component="h2" 
                 sx={{ 
-                  fontWeight: 700, 
+                  fontWeight: 700,
                   color: '#000000',
-                  mb: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1
+                  mb: 3
                 }}
               >
-                📋 Recent Activity
+                {t('admin.recentActivity')}
               </Typography>
               
-              <Grid container spacing={isMobile ? 2 : 3} sx={{ mb: 3 }}>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} lg={8}>
-                <Paper sx={{ p: 2, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6">Recent Activity</Typography>
-                    <Button size="small" onClick={() => setActivityDialogOpen(true)} disabled={recentActivity.length <= 4}>View All</Button>
+                <Paper sx={{ 
+                  p: 3, 
+                  backgroundColor: '#ffffff',
+                  color: '#2c3e50',
+                  borderRadius: 4,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': {
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 3 
+                  }}>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: '#2c3e50'
+                      }}
+                    >
+                      {t('admin.recentActivity')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                          <Button 
+                        size="small" 
+                        onClick={() => fetchRecentActivity(currentActivityPeriod)}
+                        disabled={recentActivityLoading}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          backgroundColor: '#f8f9fa',
+                          color: '#6c757d',
+                          border: '1px solid #dee2e6',
+                          minWidth: 'auto',
+                          px: 2,
+                          '&:hover': {
+                            backgroundColor: '#e9ecef',
+                            borderColor: '#adb5bd'
+                          }
+                        }}
+                      >
+                        {t('admin.refresh')}
+                      </Button>
+                      <Button 
+                        size="small" 
+                        onClick={async () => {
+                          await fetchRecentActivity('week');
+                          setActivityDialogOpen(true);
+                        }} 
+                      disabled={recentActivity.length <= 4}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        backgroundColor: '#f8f9fa',
+                        color: '#6c757d',
+                        border: '1px solid #dee2e6',
+                        '&:hover': {
+                          backgroundColor: '#e9ecef',
+                          borderColor: '#adb5bd'
+                        }
+                      }}
+                    >
+                      {t('admin.viewAll')}
+                    </Button>
                   </Box>
+                  </Box>
+                  
+                  {/* Activity Statistics */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1, 
+                    mb: 3, 
+                    flexWrap: 'wrap',
+                    justifyContent: 'center'
+                  }}>
+                    <Chip 
+                      label={`${t('admin.bookings')}: ${activityStats.booking}`}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: alpha('#4caf50', 0.1),
+                        color: '#4caf50',
+                        fontWeight: 600
+                      }}
+                    />
+                    <Chip 
+                      label={`${t('admin.users')}: ${activityStats.user}`}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: alpha('#2196f3', 0.1),
+                        color: '#2196f3',
+                        fontWeight: 600
+                      }}
+                    />
+                    <Chip 
+                      label={`${t('admin.cancellations')}: ${activityStats.cancellation}`}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: alpha('#f44336', 0.1),
+                        color: '#f44336',
+                        fontWeight: 600
+                      }}
+                    />
+                    <Chip 
+                      label={`Reviews: ${activityStats.review}`}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: alpha('#ff9800', 0.1),
+                        color: '#ff9800',
+                        fontWeight: 600
+                      }}
+                    />
+                  </Box>
+                  
                   <List>
                     {recentActivityLoading ? (
                       // Skeleton loading for recent activity
@@ -1949,9 +2473,45 @@ const AdminDashboard = () => {
                         ))}
                       </>
                     ) : recentActivity.length === 0 ? (
-                      <ListItem>
-                        <ListItemText primary="No recent activity." />
-                      </ListItem>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center', 
+                        py: 4,
+                        textAlign: 'center'
+                      }}>
+                        <Box sx={{ 
+                          width: 64, 
+                          height: 64, 
+                          borderRadius: '50%', 
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          mb: 2
+                        }}>
+                          <Typography variant="h4" sx={{ color: theme.palette.primary.main }}>
+                            📊
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ mb: 1, color: 'text.primary', fontWeight: 600 }}>
+                          {t('admin.noRecentActivity')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                          {t('admin.noRecentActivitiesToDisplay')}
+                        </Typography>
+                        <Button 
+                          size="small" 
+                          onClick={fetchRecentActivity}
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            fontWeight: 600
+                          }}
+                        >
+                          {t('admin.refresh')}
+                        </Button>
+                      </Box>
                     ) : (
                       recentActivity.slice(0, 4).map((item, idx) => (
                         <React.Fragment key={idx}>
@@ -1998,10 +2558,10 @@ const AdminDashboard = () => {
                             <Box sx={{ flex: 1 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000000' }}>
-                                  {item.type === 'booking' ? 'New Booking' :
-                                   item.type === 'user' ? 'New User Registration' :
-                                   item.type === 'cancellation' ? 'Booking Cancellation' :
-                                   'New Review'}
+                                  {item.type === 'booking' ? t('admin.newBooking') :
+                                   item.type === 'user' ? t('admin.newUserRegistration') :
+                                   item.type === 'cancellation' ? t('admin.bookingCancellation') :
+                                   t('admin.newReview')}
                                 </Typography>
                                 <Chip 
                                   label={item.type.toUpperCase()} 
@@ -2037,7 +2597,7 @@ const AdminDashboard = () => {
                                   fontWeight: 500,
                                   fontSize: '0.75rem'
                                 }}>
-                                  {dayjs(item.timestamp).fromNow()}
+                                  {dayjs(item.timestamp).fromNow()} • {dayjs(item.timestamp).format('MMM D, YYYY h:mm A')}
                                 </Typography>
                               </Box>
                             </Box>
@@ -2054,19 +2614,62 @@ const AdminDashboard = () => {
                     )}
                   </List>
                   {/* Dialog for all activity */}
-                  <Dialog open={activityDialogOpen} onClose={() => setActivityDialogOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle>All Recent Activity</DialogTitle>
-                    <DialogContent>
-                      <List>
+                  <Dialog 
+                    open={activityDialogOpen} 
+                    onClose={() => {
+                      setActivityDialogOpen(false);
+                      // 如果当前显示的是week数据，关闭Dialog后恢复到recent数据
+                      if (currentActivityPeriod === 'week') {
+                        fetchRecentActivity('recent');
+                      }
+                    }} 
+                    maxWidth="md" 
+                    fullWidth
+                    PaperProps={{
+                      sx: {
+                        borderRadius: 3,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
+                      }
+                    }}
+                  >
+                    <DialogTitle sx={{ 
+                      pb: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider'
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                          {currentActivityPeriod === 'week' ? t('admin.recentActivitiesLastWeek') : t('admin.recentActivities')}
+                        </Typography>
+                        <IconButton onClick={() => {
+                          setActivityDialogOpen(false);
+                          // 如果当前显示的是week数据，关闭Dialog后恢复到recent数据
+                          if (currentActivityPeriod === 'week') {
+                            fetchRecentActivity('recent');
+                          }
+                        }} size="small">
+                          <CloseIcon />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
+                                                  {t('admin.showing')} {recentActivity.length} {t('admin.activities')} {currentActivityPeriod === 'week' ? t('admin.fromThePastWeek') : ''}
+                      </Typography>
+                    </DialogTitle>
+                    <DialogContent sx={{ p: 3 }}>
+                      <List sx={{ p: 0 }}>
                                                 {recentActivity.map((item, idx) => (
                           <React.Fragment key={idx}>
                             <ListItem sx={{ 
                               alignItems: 'flex-start', 
-                              p: 2, 
-                              borderRadius: 1,
+                              p: 3, 
+                              borderRadius: 2,
+                              mb: 1,
+                              border: '1px solid',
+                              borderColor: 'divider',
                               '&:hover': {
                                 backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                                transition: 'background-color 0.2s ease'
+                                transition: 'background-color 0.2s ease',
+                                borderColor: theme.palette.primary.main
                               }
                             }}>
                               <Box sx={{ position: 'relative', mr: 2 }}>
@@ -2103,10 +2706,10 @@ const AdminDashboard = () => {
                               <Box sx={{ flex: 1 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000000' }}>
-                                    {item.type === 'booking' ? 'New Booking' :
-                                     item.type === 'user' ? 'New User Registration' :
-                                     item.type === 'cancellation' ? 'Booking Cancellation' :
-                                     'New Review'}
+                                    {item.type === 'booking' ? t('admin.newBooking') :
+                                     item.type === 'user' ? t('admin.newUserRegistration') :
+                                     item.type === 'cancellation' ? t('admin.bookingCancellation') :
+                                     t('admin.newReview')}
                                   </Typography>
                                   <Chip 
                                     label={item.type.toUpperCase()} 
@@ -2142,7 +2745,7 @@ const AdminDashboard = () => {
                                     fontWeight: 500,
                                     fontSize: '0.75rem'
                                   }}>
-                                    {dayjs(item.timestamp).fromNow()}
+                                  {dayjs(item.timestamp).fromNow()} • {dayjs(item.timestamp).format('MMM D, YYYY h:mm A')}
                                   </Typography>
                                 </Box>
                               </Box>
@@ -2158,13 +2761,37 @@ const AdminDashboard = () => {
                         ))}
                       </List>
                     </DialogContent>
+                    <Box sx={{ 
+                      p: 3, 
+                      pt: 0, 
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {t('admin.total')}: {recentActivity.length} {t('admin.activities')} {currentActivityPeriod === 'week' ? t('admin.fromThePastWeek') : ''}
+                      </Typography>
+                      <Button 
+                        onClick={() => {
+                          setActivityDialogOpen(false);
+                          // 如果当前显示的是week数据，关闭Dialog后恢复到recent数据
+                          if (currentActivityPeriod === 'week') {
+                            fetchRecentActivity('recent');
+                          }
+                        }}
+                        variant="contained"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                      >
+                        {t('admin.close')}
+                      </Button>
+                    </Box>
                   </Dialog>
                 </Paper>
               </Grid>
 
-
-
-              <Grid item xs={12} lg={8}>
+              <Grid item xs={12} lg={4}>
                 <ReportGenerator 
                   onGenerateReport={generateReport} 
                   companyInfo={{ 

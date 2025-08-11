@@ -43,4 +43,10 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
     
     // Check if member exists by user ID
     boolean existsByUserId(Integer userId);
+    
+    // Add missing method for counting members by tier ID
+    long countByTier_Id(Integer tierId);
+    
+    // Add missing method for finding members by tier name
+    List<Member> findByTier_TierName(String tierName);
 }

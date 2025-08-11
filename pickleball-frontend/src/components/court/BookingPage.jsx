@@ -26,7 +26,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatTime } from '../../components/court/DateUtils';
 import CourtService from '../../service/CourtService';
-import { getAllSlotsForCourt } from '../../service/SlotService';
+import { getAvailableSlotsForCourt } from '../../service/SlotService';
 import BookingService from '../../service/BookingService';
 import dayjs from 'dayjs';
 import ThemedCard from '../common/ThemedCard';
@@ -102,7 +102,7 @@ const BookingPage = () => {
         const courtData = await CourtService.getCourtById(courtId);
         setCourt(courtData);
 
-        const slotsData = await getAllSlotsForCourt(courtId);
+        const slotsData = await getAvailableSlotsForCourt(courtId);
         setSlots(slotsData);
 
         const dates = [...new Set(slotsData.map(slot => slot.date))];

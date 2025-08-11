@@ -51,6 +51,10 @@ public class Court {
     @Column(name = "peak_end_time")
     private String peakEndTime;
 
+    @Column(name = "court_type")
+    @Enumerated(EnumType.STRING)
+    private CourtType courtType = CourtType.STANDARD;
+
     @ManyToOne
     @JoinColumn(name = "venue_id")
     @JsonIgnoreProperties("courts")  // 只忽略 courts，讓 venue 的基本信息能傳遞

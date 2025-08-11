@@ -52,14 +52,16 @@ import UserService from '../../service/UserService';
 import AdminUserForm from './AdminUserForm';
 import ConfirmationDialog from './ConfirmationDialog';
 import AdminInviteForm from './AdminInviteForm';
+import EnhancedPendingRequestsTab from './EnhancedPendingRequestsTab';
 import { useTheme, alpha } from '@mui/material/styles';
 import { getStatusChip } from './statusConfig';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 const AdminManageUsers = () => {
   const navigate = useNavigate();
-  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -69,35 +71,23 @@ const AdminManageUsers = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header Section */}
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        mb: 4,
-        flexWrap: 'wrap',
-        gap: 2
-      }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-            User Management
-          </Typography>
-          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1 }}>
-            Manage users and review type change requests
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          {t('admin.userManagement')}
+        </Typography>
       </Box>
 
       {/* Tab Navigation */}
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, '& .MuiTab-root.Mui-selected': { color: theme.palette.primary.main } }}>
-        <Tab label="Pending Requests" />
-        <Tab label="User Management" />
+        <Tab label={t('admin.pendingRequests')} />
+        <Tab label={t('admin.manageUsers')} />
       </Tabs>
 
       {/* Tab Content */}
       {activeTab === 0 ? (
-        <PendingRequestsTab />
+        <EnhancedPendingRequestsTab />
       ) : (
         <UserManagementTab inviteOpen={inviteOpen} setInviteOpen={setInviteOpen} />
       )}
@@ -107,6 +97,7 @@ const AdminManageUsers = () => {
 
 // Pending Requests Tab Component
 const PendingRequestsTab = () => {
+  const { t } = useLanguage();
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -140,9 +131,9 @@ const PendingRequestsTab = () => {
         UserService.logout();
         window.location.href = '/login';
       } else if (err.response?.status === 403) {
-        setError('You do not have permission to access this page');
+        setError(t('admin.youDoNotHavePermissionToAccessThisPage'));
       } else {
-        setError('Failed to load pending requests. Please try again later.');
+        setError(t('admin.failedToLoadPendingRequests'));
       }
     } finally {
       setLoading(false);
@@ -532,6 +523,7 @@ const PendingRequestsTab = () => {
 
 // User Management Tab Component - FIXED VERSION
 const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
+  const { t } = useLanguage();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -559,6 +551,15 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  
+  // 统计数据
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
+    adminUsers: 0
+  });
+  
   const theme = useTheme();
 
   const fetchUsers = async () => {
@@ -602,7 +603,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         UserService.logout();
         window.location.href = '/login';
       } else if (err.response?.status === 403) {
-        setError('You do not have permission to access this page');
+        setError(t('admin.youDoNotHavePermissionToAccessThisPage'));
       } else {
         setError('Failed to load users. Please try again later.');
       }
@@ -617,9 +618,39 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
     }
   };
 
+  const fetchStatistics = async () => {
+    try {
+      const token = UserService.getAdminToken() || UserService.getToken();
+      const response = await axios.get('http://localhost:8081/api/admin/users/system-statistics', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = response.data;
+      setStats({
+        totalUsers: data.totalUsers || 0,
+        activeUsers: data.activeUsers || 0,
+        inactiveUsers: data.inactiveUsers || 0,
+        adminUsers: data.adminUsers || 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch statistics:', err);
+      // 如果统计API失败，设置默认值
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        adminUsers: 0
+      });
+    }
+  };
+
   useEffect(() => {
     console.log("Component mounted or dependencies changed");
     fetchUsers();
+    fetchStatistics(); // 同时获取统计数据
   }, [page, rowsPerPage, order, orderBy, searchTerm, statusFilter, roleFilter]);
 
   const handleSort = (property) => {
@@ -658,6 +689,13 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
     setPage(0);
   };
 
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setRoleFilter('');
+    setPage(0);
+  };
+
   const handleOpenDialog = (user = null) => {
     setCurrentUser(user);
     setOpenDialog(true);
@@ -671,19 +709,21 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   const handleUserCreated = (newUser) => {
     setSnackbar({
       open: true,
-      message: `User ${newUser.name} created successfully!`,
+      message: t('admin.userCreatedSuccessfully'),
       severity: 'success'
     });
     fetchUsers();
+    fetchStatistics(); // 刷新统计数据
   };
 
   const handleUserUpdated = (updatedUser) => {
     setSnackbar({
       open: true,
-      message: `User ${updatedUser.name} updated successfully!`,
+      message: t('admin.userUpdatedSuccessfully'),
       severity: 'success'
     });
     fetchUsers();
+    fetchStatistics(); // 刷新统计数据
   };
 
   const handleOpenDeleteDialog = (user) => {
@@ -705,15 +745,16 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
       setSnackbar({
         open: true,
-        message: `User ${userToDelete.name} deleted successfully!`,
+        message: t('admin.userDeletedSuccessfully'),
         severity: 'success'
       });
 
       fetchUsers();
+      fetchStatistics(); // 刷新统计数据
     } catch (err) {
       setSnackbar({
         open: true,
-        message: `Error: ${err.response?.data?.message || 'Deletion failed'}`,
+        message: `Error: ${err.response?.data?.message || t('admin.failedToDeleteUser')}`,
         severity: 'error'
       });
     } finally {
@@ -754,16 +795,17 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
       setSnackbar({
         open: true,
-        message: `Updated status for ${selectedUsers.length} users`,
+        message: t('admin.batchStatusChangeSuccess'),
         severity: 'success'
       });
 
       setSelectedUsers([]);
       fetchUsers();
+      fetchStatistics(); // 刷新统计数据
     } catch (err) {
       setSnackbar({
         open: true,
-        message: `Error: ${err.response?.data?.message || 'Batch update failed'}`,
+        message: `Error: ${err.response?.data?.message || t('admin.failedToChangeBatchStatus')}`,
         severity: 'error'
       });
     }
@@ -774,17 +816,17 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
   };
 
   const statusOptions = [
-    { value: 'ACTIVE', label: 'Active' },
-    { value: 'INACTIVE', label: 'Inactive' },
-    { value: 'SUSPENDED', label: 'Suspended' },
-    { value: 'DELETED', label: 'Deleted' }
+    { value: 'ACTIVE', label: t('admin.active') },
+    { value: 'INACTIVE', label: t('admin.inactive') },
+    { value: 'SUSPENDED', label: t('admin.suspended') },
+    { value: 'DELETED', label: t('admin.deleted') }
   ];
 
   const roleOptions = [
-    { value: 'User', label: 'User' },
-    { value: 'Coach', label: 'Coach' },
-    { value: 'EventOrganizer', label: 'Event Organizer' },
-    { value: 'Admin', label: 'Admin' }
+    { value: 'User', label: t('admin.user') },
+    { value: 'Coach', label: t('admin.coach') },
+    { value: 'EventOrganizer', label: t('admin.eventOrganizer') },
+    { value: 'Admin', label: t('admin.admin') }
   ];
 
   if (loading && !users.length) {
@@ -797,27 +839,142 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
 
   return (
     <>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: alpha(theme.palette.primary.dark, 0.85) } }}
-        >
-          Add New User
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => setInviteOpen(true)}
-          sx={{ borderColor: theme.palette.primary.main, color: theme.palette.primary.main, '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) } }}
-        >
-          Send Invitation
-        </Button>
+      {/* Header with Add Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+          {t('admin.manageUsers')}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              borderRadius: '8px',
+              px: 3,
+              py: 1.5,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              '&:hover': {
+                boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                transform: 'translateY(-1px)'
+              }
+            }}
+          >
+            {t('admin.addNewAdmin')}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => setInviteOpen(true)}
+            sx={{ borderColor: theme.palette.primary.main, color: theme.palette.primary.main, '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) } }}
+          >
+            {t('admin.sendInvitation')}
+          </Button>
+        </Box>
       </Box>
       <AdminInviteForm open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
+      {/* Statistics Dashboard */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, 
+        gap: 2, 
+        mb: 3 
+      }}>
+        {/* Total Users */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.totalUsers}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.totalUsers')}
+          </Typography>
+        </Paper>
+
+        {/* Active Users */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.activeUsers}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.activeUsers')}
+          </Typography>
+        </Paper>
+
+        {/* Inactive Users */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.inactiveUsers}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.inactiveUsers')}
+          </Typography>
+        </Paper>
+
+        {/* Admin Users */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.adminUsers}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.adminUsers')}
+          </Typography>
+        </Paper>
+      </Box>
+
       {/* Filter and Search Bar */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <Paper sx={{ p: 3, mb: 3, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
         <Box sx={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -825,39 +982,47 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
           alignItems: 'center',
           gap: 2
         }}>
-          <TextField
-            sx={{ minWidth: 220 }}
-            variant="outlined"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-            }}
-          />
-          <FormControl sx={{ minWidth: 180 }}>
-            <InputLabel shrink>Status</InputLabel>
+          <Tooltip title={t('admin.searchByNameEmailOrUsername')} arrow>
+            <TextField
+              sx={{ minWidth: 220 }}
+              variant="outlined"
+              size="small"
+              placeholder={t('admin.search')}
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                endAdornment: searchTerm && (
+                  <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ mr: 0.5 }}>
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>✕</Typography>
+                  </IconButton>
+                )
+              }}
+            />
+          </Tooltip>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel shrink>{t('admin.status')}</InputLabel>
             <Select
               value={statusFilter}
               onChange={handleStatusFilterChange}
               displayEmpty
-              renderValue={(selected) => selected || "All Statuses"}
+              renderValue={(selected) => selected || t('admin.allStatuses')}
             >
-              <MenuItem value="">All Statuses</MenuItem>
+              <MenuItem value="">{t('admin.allStatuses')}</MenuItem>
               {statusOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl sx={{ minWidth: 180 }}>
-            <InputLabel shrink>Role</InputLabel>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel shrink>{t('admin.role')}</InputLabel>
             <Select
               value={roleFilter}
               onChange={handleRoleFilterChange}
               displayEmpty
-              renderValue={(selected) => selected || "All Roles"}
+              renderValue={(selected) => selected || t('admin.allRoles')}
             >
-              <MenuItem value="">All Roles</MenuItem>
+              <MenuItem value="">{t('admin.allRoles')}</MenuItem>
               {roleOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
               ))}
@@ -865,16 +1030,38 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
           </FormControl>
           <Button
             variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchUsers}
+            size="small"
+            color="error"
+            onClick={clearAllFilters}
             sx={{
-              borderColor: theme.palette.primary.main,
-              color: theme.palette.primary.main,
-              minWidth: 120,
-              '&:hover': { borderColor: alpha(theme.palette.primary.dark, 0.85) }
+              borderRadius: '8px',
+              px: 2,
+              py: 1
             }}
           >
-            Refresh
+            {t('admin.clear')}
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchUsers}
+            disabled={loading}
+            sx={{ 
+              ml: 'auto',
+              borderColor: theme.palette.primary.main, 
+              color: theme.palette.primary.main, 
+              minWidth: 120,
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': { 
+                borderColor: alpha(theme.palette.primary.dark, 0.85),
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {loading ? t('admin.refreshing') : t('admin.refresh')}
           </Button>
         </Box>
       </Paper>
@@ -884,18 +1071,18 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         <Paper sx={{ p: 2, mb: 2, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="subtitle1">
-              {selectedUsers.length} user(s) selected
+              {selectedUsers.length} {t('admin.usersSelected')}
             </Typography>
             <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Set Status</InputLabel>
+              <InputLabel>{t('admin.setStatus')}</InputLabel>
               <Select
                 value=""
                 onChange={(e) => handleBatchStatusChange(e.target.value)}
                 label="Set Status"
               >
-                <MenuItem value="ACTIVE">Active</MenuItem>
-                <MenuItem value="INACTIVE">Inactive</MenuItem>
-                <MenuItem value="SUSPENDED">Suspend</MenuItem>
+                <MenuItem value="ACTIVE">{t('admin.active')}</MenuItem>
+                <MenuItem value="INACTIVE">{t('admin.inactive')}</MenuItem>
+                <MenuItem value="SUSPENDED">{t('admin.suspended')}</MenuItem>
               </Select>
             </FormControl>
             <Button
@@ -903,7 +1090,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
               color="error"
               onClick={() => handleBatchStatusChange('DELETED')}
             >
-              Delete Selected
+              {t('admin.deleteSelected')}
             </Button>
           </Box>
         </Paper>
@@ -947,14 +1134,14 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                   onClick={() => handleSort('name')}
                   disabled={loading}
                 >
-                  <Typography sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Name</Typography>
+                  <Typography sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.name')}</Typography>
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Email</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Role</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Join Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.email')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.role')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.status')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.joinDate')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.actions')}</TableCell>
             </TableRow>
           </TableHead>
 
@@ -964,14 +1151,14 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                 <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
-                      No users found
+                      {t('admin.noUsersFound')}
                     </Typography>
                     <Button
                       variant="outlined"
                       startIcon={<RefreshIcon />}
                       onClick={fetchUsers}
                     >
-                      Refresh Data
+                                              {t('admin.refreshData')}
                     </Button>
                   </Box>
                 </TableCell>
@@ -996,16 +1183,16 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                         {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                       </Avatar>
                       <Box>
-                        <Typography fontWeight="500">
-                          {user.name || 'Unknown User'}
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {user.name || t('admin.unknownUser')}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          @{user.username || 'no-username'}
+                                                      @{user.username || t('admin.noUsername')}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell>{user.email || 'No email'}</TableCell>
+                  <TableCell>{user.email || t('admin.noEmail')}</TableCell>
                   <TableCell>
                     {getStatusChip(user.userType?.toUpperCase() || 'USER')}
                   </TableCell>
@@ -1018,7 +1205,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       {user.status === 'DELETED' ? (
-                        <Tooltip title="View user details (read-only)">
+                        <Tooltip title={t('admin.viewUserDetails')}>
                           <IconButton
                             onClick={() => handleOpenDialog(user)}
                             disabled={loading}
@@ -1027,7 +1214,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                           </IconButton>
                         </Tooltip>
                       ) : (
-                        <Tooltip title="Edit user">
+                        <Tooltip title={t('admin.editUser')}>
                           <IconButton
                             onClick={() => handleOpenDialog(user)}
                             disabled={loading}
@@ -1036,7 +1223,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
                           </IconButton>
                         </Tooltip>
                       )}
-                      <Tooltip title="Delete user">
+                      <Tooltip title={t('admin.deleteUser')}>
                         <IconButton
                           onClick={() => handleOpenDeleteDialog(user)}
                           disabled={loading}
@@ -1080,21 +1267,52 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
             p: 2,
             backgroundColor: theme.palette.background.paper,
             boxShadow: theme.shadows[10],
+            position: 'relative',
+            overflow: 'hidden'
           }
         }}
       >
-        <DialogTitle
+        {/* Background Mascot with Low Opacity */}
+        <Box
+          component="img"
+          src={`${process.env.PUBLIC_URL}/mascot_lowopacity1.png`}
+          alt="Background Mascot"
           sx={{
-            fontWeight: 700,
-            fontSize: '1.4rem',
-            pb: 1,
-            mb: 1,
-            color: theme.palette.text.primary,
+            position: 'absolute',
+            top: '60%',
+            right: '-5px',
+            transform: 'translateY(-50%)',
+            width: '400px',
+            height: 'auto',
+            opacity: 0.15,
+            zIndex: 0,
+            pointerEvents: 'none'
           }}
-        >
-          {currentUser ? `Edit User: ${currentUser.name}` : 'Create New User'}
+        />
+
+        <DialogTitle sx={{ 
+          textAlign: 'center', 
+          pb: 1,
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h4" sx={{ 
+              fontWeight: 700, 
+              color: theme.palette.primary.main,
+              mb: 1
+            }}>
+              {currentUser ? `${t('admin.edit')} ${t('admin.admin')}: ${currentUser.name}` : t('admin.addNewAdmin')}
+            </Typography>
+            <Typography variant="body2" sx={{ 
+              color: theme.palette.text.secondary,
+              fontWeight: 500
+            }}>
+              {currentUser ? t('admin.updateAdminInformationAndSettings') : t('admin.createNewAdminWithDetailedInformation')}
+            </Typography>
+          </Box>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent sx={{ position: 'relative', zIndex: 1 }}>
           <AdminUserForm
             user={currentUser}
             onClose={handleCloseDialog}
@@ -1109,8 +1327,8 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
         open={openDeleteDialog}
         onClose={handleCloseDeleteDialog}
         onConfirm={handleDeleteUser}
-        title="Confirm Deletion"
-        content={`Are you sure you want to delete user "${userToDelete?.name}"? This action cannot be undone.`}
+        title={t('admin.confirm') + ' ' + t('admin.delete')}
+        content={`${t('admin.confirmDeleteUser')} "${userToDelete?.name}"? ${t('admin.deleteUserWarning')}`}
       />
 
       <Snackbar

@@ -4,6 +4,7 @@ import com.pickleball_backend.pickleball.dto.AdminBookingDto;
 import com.pickleball_backend.pickleball.dto.AdminUserDto;
 import com.pickleball_backend.pickleball.dto.DashboardSummaryDto;
 import com.pickleball_backend.pickleball.dto.RecentActivityDto;
+import com.pickleball_backend.pickleball.dto.CourtUtilizationDto;
 import com.pickleball_backend.pickleball.entity.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +22,8 @@ public interface AdminDashboardService {
     DashboardSummaryDto getDashboardSummary();
     Object getBookingTrends(String range);
     Object getRevenueTrends(String range);
-    List<RecentActivityDto> getRecentActivity();
+    List<RecentActivityDto> getRecentActivity(String period);
+    CourtUtilizationDto getCourtUtilization(String period);
     ResponseEntity<InputStreamResource> generateReport(ReportRequestDto request) throws Exception;
     AdminBookingDto convertToAdminBookingDto(Booking booking);
 }

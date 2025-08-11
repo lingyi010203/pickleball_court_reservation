@@ -20,11 +20,12 @@ import { uploadCourtImage, getCourtImages } from '../../service/CourtService';
 import { getStatusChip } from './statusConfig';
 import api from '../../service/api';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 
 const AdminManageCourts = () => {
-  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
+  const { t } = useLanguage();
   const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,6 +40,7 @@ const AdminManageCourts = () => {
     name: '',
     location: '',
     status: 'ACTIVE',
+    courtType: 'STANDARD',
     openingTime: '10:00',
     closingTime: '00:00',
     operatingDays: '',
@@ -51,8 +53,11 @@ const AdminManageCourts = () => {
   const [daysOfWeek, setDaysOfWeek] = useState([]);
   const [formErrors, setFormErrors] = useState({});
   const [deleteDialog, setDeleteDialog] = useState({ open: false, courtId: null });
+  const [deletePreviewDialog, setDeletePreviewDialog] = useState({ open: false, courtId: null, courtName: '', affectedData: null });
   const [deleting, setDeleting] = useState(false);
-  const [selectedCourts, setSelectedCourts] = useState([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const [restoreDialog, setRestoreDialog] = useState({ open: false, courtId: null, courtName: '' });
   
   // 分页和排序状态
   const [page, setPage] = useState(0);
@@ -64,6 +69,45 @@ const AdminManageCourts = () => {
   // 过滤状态
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [courtTypeFilter, setCourtTypeFilter] = useState('');
+
+
+  // 统计数据
+  const [stats, setStats] = useState({
+    totalCourts: 0,
+    activeCourts: 0,
+    deletedCourts: 0,
+    averagePrice: 0
+  });
+
+  // 应用filter逻辑
+  const filteredCourts = courts.filter(court => {
+    // 搜索filter
+    const matchesSearch = !searchTerm || 
+      court.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.venue?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // 状态filter - 直接显示所有状态的球场
+    const matchesStatus = !statusFilter || court.status?.toUpperCase() === statusFilter;
+    
+    // Court type filter
+    const matchesCourtType = !courtTypeFilter || court.courtType === courtTypeFilter;
+    
+    // 调试信息
+    if (statusFilter && !matchesStatus) {
+      console.log(`Court ${court.id} (${court.name}) status: "${court.status}" doesn't match filter: "${statusFilter}"`);
+    }
+    
+    return matchesSearch && matchesStatus && matchesCourtType;
+  });
+
+  // 调试：显示所有court的status
+  useEffect(() => {
+    if (courts.length > 0) {
+      console.log('All court statuses:', courts.map(c => ({ id: c.id, name: c.name, status: c.status })));
+    }
+  }, [courts]);
 
   // 1. 新增 useState
   const [venues, setVenues] = useState([]);
@@ -79,8 +123,9 @@ const AdminManageCourts = () => {
 
   const statusOptions = [
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'INACTIVE', label: 'Inactive' },
     { value: 'MAINTENANCE', label: 'Maintenance' },
-    { value: 'CLOSED', label: 'Closed' }
+    { value: 'DELETED', label: 'Deleted' }
   ];
 
   // 2. 获取场馆列表
@@ -129,6 +174,7 @@ const AdminManageCourts = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'Court name is required';
     if (!formData.location.trim()) errors.location = 'Location is required';
+    if (!formData.courtType) errors.courtType = 'Court type is required';
     if (!daysOfWeek.length) errors.operatingDays = 'Select at least one day';
     if (!formData.openingTime) errors.openingTime = 'Opening time required';
     if (!formData.closingTime) errors.closingTime = 'Closing time required';
@@ -147,6 +193,16 @@ const AdminManageCourts = () => {
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
     
+    // 检查是否是恢复DELETED状态的球场
+    if (currentCourt && currentCourt.status === 'DELETED' && formData.status !== 'DELETED') {
+      setRestoreDialog({
+        open: true,
+        courtId: currentCourt.id,
+        courtName: currentCourt.name
+      });
+      return;
+    }
+    
     try {
       setLoading(true);
       const uniqueDays = Array.from(new Set(daysOfWeek));
@@ -162,6 +218,8 @@ const AdminManageCourts = () => {
       if (payload.operatingDays === '') payload.operatingDays = null;
 
       if (currentCourt) {
+        console.log('Updating court with payload:', payload);
+        console.log('Operating days in payload:', payload.operatingDays);
         await api.put(`/admin/courts/${currentCourt.id}`, payload);
         setSnackbar({
           open: true,
@@ -226,60 +284,97 @@ const AdminManageCourts = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const handleDeleteClick = (courtId) => {
-    setDeleteDialog({ open: true, courtId });
+  const handleDeleteClick = async (courtId) => {
+    try {
+      setLoadingPreview(true);
+      // 获取删除预览数据
+      const response = await api.get(`/admin/courts/${courtId}/delete-preview`);
+      const court = courts.find(c => c.id === courtId);
+      
+      setDeletePreviewDialog({
+        open: true,
+        courtId,
+        courtName: court?.name || 'Unknown Court',
+        affectedData: response.data
+      });
+    } catch (err) {
+      console.error('Error fetching delete preview:', err);
+      
+      // 显示更详细的错误信息
+      let errorMessage = 'Error fetching delete preview. Please try again.';
+      if (err.response) {
+        // 服务器返回了错误响应
+        if (err.response.status === 404) {
+          errorMessage = 'Court not found.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data) {
+          errorMessage = err.response.data;
+        }
+      } else if (err.request) {
+        // 请求发送了但没有收到响应
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error'
+      });
+    } finally {
+      setLoadingPreview(false);
+    }
   };
   
   const handleDeleteConfirm = async () => {
     setDeleting(true);
-    await handleDelete(deleteDialog.courtId);
+    await handleDelete(deletePreviewDialog.courtId);
     setDeleting(false);
-    setDeleteDialog({ open: false, courtId: null });
+    setDeletePreviewDialog({ open: false, courtId: null, courtName: '', affectedData: null });
   };
   
   const handleDeleteCancel = () => {
-    setDeleteDialog({ open: false, courtId: null });
+    setDeletePreviewDialog({ open: false, courtId: null, courtName: '', affectedData: null });
   };
 
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelecteds = courts.map((c) => c.id);
-      setSelectedCourts(newSelecteds);
-      return;
-    }
-    setSelectedCourts([]);
-  };
-
-  const handleSelectCourt = (event, id) => {
-    const selectedIndex = selectedCourts.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = [...selectedCourts, id];
-    } else {
-      newSelected = selectedCourts.filter((c) => c !== id);
-    }
-
-    setSelectedCourts(newSelected);
-  };
-
-  const handleBatchDelete = async () => {
+  const handleRestoreConfirm = async () => {
     try {
       setLoading(true);
-      await api.post('/admin/courts/batch-delete', { courtIds: selectedCourts });
+      const uniqueDays = Array.from(new Set(daysOfWeek));
+      const payload = {
+        ...formData,
+        status: 'ACTIVE', // 强制设置为ACTIVE状态进行恢复
+        venueId: selectedVenueId,
+        operatingDays: uniqueDays.map(d => d.toUpperCase()).join(','),
+        peakHourlyPrice: parseFloat(formData.peakHourlyPrice) || 0,
+        offPeakHourlyPrice: parseFloat(formData.offPeakHourlyPrice) || 0,
+        dailyPrice: parseFloat(formData.dailyPrice) || 0,
+      };
       
+      if (payload.operatingDays === '') payload.operatingDays = null;
+
+      console.log('Restoring court with payload:', payload);
+      await api.put(`/admin/courts/${currentCourt.id}`, payload);
       setSnackbar({
         open: true,
-        message: `${selectedCourts.length} courts deleted successfully!`,
+        message: `Court "${currentCourt.name}" has been restored successfully!`,
         severity: 'success'
       });
-      
-      setSelectedCourts([]);
+
       fetchCourts();
+      handleCloseDialog();
+      setRestoreDialog({ open: false, courtId: null, courtName: '' });
     } catch (err) {
+      let errorMsg = 'Restore failed';
+      if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
       setSnackbar({
         open: true,
-        message: 'Failed to delete courts. Please try again.',
+        message: `Error: ${errorMsg}`,
         severity: 'error'
       });
     } finally {
@@ -287,7 +382,11 @@ const AdminManageCourts = () => {
     }
   };
 
-  const isSelected = (id) => selectedCourts.indexOf(id) !== -1;
+  const handleRestoreCancel = () => {
+    setRestoreDialog({ open: false, courtId: null, courtName: '' });
+  };
+
+
 
   // Missing functions
   const fetchCourts = async () => {
@@ -296,6 +395,21 @@ const AdminManageCourts = () => {
       const response = await api.get('/admin/courts');
       setCourts(response.data);
       setTotalCourts(response.data.length);
+      
+      // 计算统计数据
+      const totalCourts = response.data.length;
+      const activeCourts = response.data.filter(court => court.status !== 'DELETED').length;
+      const deletedCourts = response.data.filter(court => court.status === 'DELETED').length;
+      const averagePrice = response.data.length > 0 
+        ? (response.data.reduce((sum, court) => sum + (court.peakHourlyPrice || 0), 0) / response.data.length).toFixed(0)
+        : 0;
+
+      setStats({
+        totalCourts,
+        activeCourts,
+        deletedCourts,
+        averagePrice
+      });
     } catch (err) {
       setError('Failed to fetch courts');
       setSnackbar({
@@ -315,6 +429,7 @@ const AdminManageCourts = () => {
         name: court.name || '',
         location: court.location || '',
         status: court.status || 'ACTIVE',
+        courtType: court.courtType || 'STANDARD',
         openingTime: court.openingTime || '10:00',
         closingTime: court.closingTime || '00:00',
         operatingDays: court.operatingDays || '',
@@ -325,13 +440,18 @@ const AdminManageCourts = () => {
         peakEndTime: court.peakEndTime || '00:00'
       });
       setSelectedVenueId(court.venue?.id || '');
-      setDaysOfWeek(court.operatingDays ? court.operatingDays.split(',').map(d => d.trim()) : []);
+      setDaysOfWeek(court.operatingDays ? court.operatingDays.split(',').map(d => {
+        const trimmed = d.trim();
+        // 将后端格式 (MON, TUE) 转换为前端格式 (Mon, Tue)
+        return trimmed.charAt(0) + trimmed.slice(1).toLowerCase();
+      }) : []);
     } else {
       setCurrentCourt(null);
       setFormData({
         name: '',
         location: '',
         status: 'ACTIVE',
+        courtType: 'STANDARD',
         openingTime: '10:00',
         closingTime: '00:00',
         operatingDays: '',
@@ -355,6 +475,7 @@ const AdminManageCourts = () => {
       name: '',
       location: '',
       status: 'ACTIVE',
+      courtType: 'STANDARD',
       openingTime: '10:00',
       closingTime: '00:00',
       operatingDays: '',
@@ -373,7 +494,19 @@ const AdminManageCourts = () => {
   };
 
   const handleStatusFilterChange = (e) => {
+    console.log('Status filter changed to:', e.target.value);
     setStatusFilter(e.target.value);
+  };
+
+  const handleCourtTypeFilterChange = (e) => {
+    setCourtTypeFilter(e.target.value);
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setCourtTypeFilter('');
+    setPage(0);
   };
 
   const handleSort = (property) => {
@@ -460,137 +593,298 @@ const AdminManageCourts = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-            Manage Courts
-          </Typography>
-          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1 }}>
-            Manage and organize all sports courts
-          </Typography>
-        </Box>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          {t('admin.courtManagement')}
+        </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ backgroundColor: theme.palette.primary.main, color: theme.palette.primary.contrastText, fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] } }}
+          sx={{ 
+            borderRadius: '8px',
+            px: 3,
+            py: 1.5,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            '&:hover': { 
+              boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+              transform: 'translateY(-1px)'
+            }
+          }}
         >
-          Add New Court
+          {t('admin.addNewCourt')}
         </Button>
       </Box>
 
-      {/* Filter and Search Bar */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-          <TextField
-            sx={{ minWidth: 220 }}
-            variant="outlined"
-            placeholder="Search courts..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-            }}
-          />
-          <FormControl sx={{ minWidth: 180 }}>
-            <InputLabel shrink>Status</InputLabel>
-            <Select
-              value={statusFilter}
-              onChange={handleStatusFilterChange}
-              displayEmpty
-              renderValue={(selected) => selected || "All Statuses"}
-            >
-              <MenuItem value="">All Statuses</MenuItem>
+      {/* Statistics Dashboard */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, 
+        gap: 2, 
+        mb: 3 
+      }}>
+        {/* Total Courts */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.totalCourts}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.totalCourts')}
+          </Typography>
+        </Paper>
+
+        {/* Active Courts */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.activeCourts}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.activeCourts')}
+          </Typography>
+        </Paper>
+
+        {/* Deleted Courts */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {stats.deletedCourts}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.deletedCourts')}
+          </Typography>
+        </Paper>
+
+        {/* Average Price */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            RM {stats.averagePrice}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.averagePrice')}
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* Search and Actions Bar */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Tooltip title={t('admin.searchByCourtInfo')} arrow>
+            <TextField
+              placeholder={t('admin.search')}
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                endAdornment: searchTerm && (
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchTerm('')}
+                    sx={{ mr: 1 }}
+                  >
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>✕</Typography>
+                  </IconButton>
+                )
+              }}
+              sx={{ minWidth: 200 }}
+            />
+          </Tooltip>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>{t('admin.status')}</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                label={t('admin.status')}
+              >
+              <MenuItem value="">{t('admin.allStatuses')}</MenuItem>
               {statusOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
               ))}
             </Select>
           </FormControl>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>{t('admin.courtType')}</InputLabel>
+              <Select
+                value={courtTypeFilter}
+                onChange={handleCourtTypeFilterChange}
+                label={t('admin.courtType')}
+              >
+              <MenuItem value="">{t('admin.allTypes')}</MenuItem>
+              <MenuItem value="STANDARD">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 12, height: 12, backgroundColor: '#1976d2', borderRadius: '50%' }} />
+                  {t('admin.standardCourt')}
+                </Box>
+              </MenuItem>
+              <MenuItem value="VIP">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 12, height: 12, backgroundColor: '#ff9800', borderRadius: '50%' }} />
+                  {t('admin.vipCourt')}
+                </Box>
+              </MenuItem>
+              <MenuItem value="OTHER">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 12, height: 12, backgroundColor: '#9c27b0', borderRadius: '50%' }} />
+                  {t('admin.otherCourt')}
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+
           <Button
             variant="outlined"
+            size="small"
+            color="error"
+            onClick={clearAllFilters}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {t('admin.clear')}
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
             startIcon={<RefreshIcon />}
             onClick={fetchCourts}
+            disabled={loading}
             sx={{ 
+              ml: 'auto',
               borderColor: theme.palette.primary.main, 
               color: theme.palette.primary.main, 
               minWidth: 120,
               '&:hover': { borderColor: theme.palette.primary.dark }
             }}
           >
-            Refresh
+            {loading ? t('admin.refreshing') : t('admin.refresh')}
           </Button>
         </Box>
       </Paper>
 
-      {/* Batch Operation Bar */}
-      {selectedCourts.length > 0 && (
-        <Paper sx={{ p: 2, mb: 2, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1">
-              {selectedCourts.length} court(s) selected
-            </Typography>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={handleBatchDelete}
-            >
-              Delete Selected
-            </Button>
-          </Box>
-        </Paper>
-      )}
 
+
+      {/* Courts Table */}
       <TableContainer component={Paper} sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
         <Table>
           <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
             <TableRow>
-              <TableCell padding="checkbox" sx={{ color: theme.palette.text.primary }}>
-                <Checkbox
-                  indeterminate={selectedCourts.length > 0 && selectedCourts.length < courts.length}
-                  checked={courts.length > 0 && selectedCourts.length === courts.length}
-                  onChange={handleSelectAllClick}
-                />
-              </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={orderBy === 'name'}
                   direction={orderBy === 'name' ? order : 'asc'}
                   onClick={() => handleSort('name')}
                 >
-                  Court Name
+                  {t('admin.courtName')}
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Venue</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.venue')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
+                <TableSortLabel
+                  active={orderBy === 'courtType'}
+                  direction={orderBy === 'courtType' ? order : 'asc'}
+                  onClick={() => handleSort('courtType')}
+                >
+                  {t('admin.courtType')}
+                </TableSortLabel>
+              </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
                 <TableSortLabel
                   active={orderBy === 'status'}
                   direction={orderBy === 'status' ? order : 'asc'}
                   onClick={() => handleSort('status')}
                 >
-                  Status
+                  {t('admin.status')}
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Operating Day(s)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Peak Hourly Price (RM)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Off-Peak Hourly Price (RM)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.operatingDays')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.peakHourlyPrice')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.offPeakHourlyPrice')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {courts.length > 0 ? courts.map((court) => {
-              const isItemSelected = isSelected(court.id);
-              return (
-                <TableRow key={court.id} hover selected={isItemSelected}>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      checked={isItemSelected}
-                      onChange={(event) => handleSelectCourt(event, court.id)}
+            {filteredCourts.length > 0 ? filteredCourts.map((court) => (
+                <TableRow key={court.id} hover>
+                  <TableCell>
+                    <Typography sx={{ fontWeight: 700 }}>
+                      {court.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{court.venue ? `${court.venue.name} (${court.venue.location})` : t('admin.noVenue')}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={court.courtType || 'STANDARD'}
+                      size="small"
+                      sx={{
+                        backgroundColor: 
+                          court.courtType === 'VIP' ? '#ff9800' :
+                          court.courtType === 'OTHER' ? '#9c27b0' : '#1976d2',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.75rem'
+                      }}
                     />
                   </TableCell>
-                  <TableCell>{court.name}</TableCell>
-                  <TableCell>{court.venue ? `${court.venue.name} (${court.venue.location})` : 'N/A'}</TableCell>
                   <TableCell>
                     {getStatusChip(court.status?.toUpperCase() || 'UNKNOWN')}
                   </TableCell>
@@ -610,22 +904,22 @@ const AdminManageCourts = () => {
                             return map[day] || (day.charAt(0) + day.slice(1).toLowerCase());
                           })
                           .join(', ')
-                      : 'N/A'}
+                      : t('admin.noVenue')}
                   </TableCell>
                   <TableCell>
-                    {court.peakHourlyPrice ? `RM ${court.peakHourlyPrice.toFixed(2)}` : 'N/A'}
+                    {court.peakHourlyPrice ? `RM ${court.peakHourlyPrice.toFixed(2)}` : t('admin.noVenue')}
                   </TableCell>
                   <TableCell>
-                    {court.offPeakHourlyPrice ? `RM ${court.offPeakHourlyPrice.toFixed(2)}` : 'N/A'}
+                    {court.offPeakHourlyPrice ? `RM ${court.offPeakHourlyPrice.toFixed(2)}` : t('admin.noVenue')}
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Tooltip title="Edit">
+                      <Tooltip title={court.status === 'DELETED' ? t('admin.restore') : t('admin.edit')}>
                         <IconButton onClick={() => handleOpenDialog(court)}>
-                          <EditIcon color="primary" />
+                          <EditIcon color={court.status === 'DELETED' ? 'success' : 'primary'} />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete">
+                      <Tooltip title={t('admin.delete')}>
                         <IconButton onClick={() => handleDeleteClick(court.id)} disabled={deleting}>
                           <DeleteIcon color="error" />
                         </IconButton>
@@ -633,12 +927,11 @@ const AdminManageCourts = () => {
                     </Box>
                   </TableCell>
                 </TableRow>
-              );
-            }) : (
+              )) : (
               <TableRow>
                 <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                   <Typography variant="body1" color="textSecondary">
-                    No courts found
+                    {t('admin.noCourtsFound')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -649,7 +942,7 @@ const AdminManageCourts = () => {
               <TablePagination
                 rowsPerPageOptions={[5, 10, 25]}
                 colSpan={8}
-                count={totalCourts}
+                count={filteredCourts.length}
                 rowsPerPage={rowsPerPage}
                 page={page}
                 onPageChange={handleChangePage}
@@ -661,63 +954,398 @@ const AdminManageCourts = () => {
       </TableContainer>
 
       {/* Add/Edit Court Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
-        <DialogTitle>
-          {currentCourt ? 'Edit Court' : 'Add New Court'}
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog} 
+        fullWidth 
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Background Mascot with Low Opacity */}
+        <Box
+          component="img"
+          src={`${process.env.PUBLIC_URL}/mascot_lowopacity1.png`}
+          alt="Background Mascot"
+          sx={{
+            position: 'absolute',
+            top: '60%',
+            right: '-5px',
+            transform: 'translateY(-50%)',
+            width: '400px',
+            height: 'auto',
+            opacity: 0.15,
+            zIndex: 0,
+            pointerEvents: 'none'
+          }}
+        />
+
+        <DialogTitle sx={{ 
+          textAlign: 'center', 
+          pb: 1,
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h4" sx={{ 
+              fontWeight: 700, 
+              color: currentCourt?.status === 'DELETED' ? theme.palette.success.main : theme.palette.primary.main,
+              mb: 1
+            }}>
+              {currentCourt ? (currentCourt.status === 'DELETED' ? t('admin.restoreCourt') : t('admin.editCourt')) : t('admin.addNewCourt')}
+            </Typography>
+            <Typography variant="body2" sx={{ 
+              color: theme.palette.text.secondary,
+              fontWeight: 500
+            }}>
+              {currentCourt ? (currentCourt.status === 'DELETED' ? t('admin.restoreCourtDescription') : t('admin.updateCourtDescription')) : t('admin.addNewCourtDescription')}
+            </Typography>
+          </Box>
         </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}><Typography variant="caption" color="textSecondary">* Indicates Mandatory fields</Typography></Grid>
-            <Divider sx={{ my: 2, width: '100%' }}>Basic Info</Divider>
+
+        <DialogContent sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="caption" sx={{ 
+              color: theme.palette.text.secondary,
+              fontWeight: 600,
+              display: 'block',
+              mb: 2
+            }}>
+              * {t('admin.required')}
+            </Typography>
+          </Box>
+
+          {/* Basic Information Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.basicInformation')}
+            </Typography>
+            
+            <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.courtName')} *
+                  </Typography>
               <TextField
                 fullWidth
-                label="Court Name *"
+                    variant="outlined"
+                    placeholder={t('admin.enterCourtName')}
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                margin="normal"
-                required
                 error={!!formErrors.name}
                 helperText={formErrors.name}
-              />
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.courtType')} *
+                  </Typography>
+                  <FormControl fullWidth error={!!formErrors.courtType}>
+                    <Select
+                      name="courtType"
+                      value={formData.courtType}
+                      onChange={handleChange}
+                      sx={{ 
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }}
+                    >
+                      <MenuItem value="STANDARD">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            backgroundColor: '#1976d2', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.standardCourt')}
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="VIP">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            backgroundColor: '#ff9800', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.vipCourt')}
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="OTHER">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 12, 
+                            height: 12, 
+                            backgroundColor: '#9c27b0', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.otherCourt')}
+                        </Box>
+                      </MenuItem>
+                    </Select>
+                    {formErrors.courtType && (
+                      <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
+                        {formErrors.courtType}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.venue')} *
+                  </Typography>
               <TextField
                 fullWidth
-                label="Location *"
+                    variant="outlined"
+                    placeholder={t('admin.selectVenue')}
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                margin="normal"
-                required
                 error={!!formErrors.location}
                 helperText={formErrors.location}
-              />
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal" required error={!selectedVenueId && !!formErrors.venueId}>
-                <InputLabel>Venue *</InputLabel>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.status')}
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      sx={{ 
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }}
+                    >
+                      <MenuItem value="ACTIVE">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            backgroundColor: '#4caf50', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.active')}
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="INACTIVE">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            backgroundColor: '#f44336', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.inactive')}
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="MAINTENANCE">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            backgroundColor: '#ff9800', 
+                            borderRadius: '50%' 
+                          }} />
+                          {t('admin.maintenance')}
+                        </Box>
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Venue Selection Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.venue')} {t('admin.selection')}
+            </Typography>
+            
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.selectVenue')} *
+                  </Typography>
+                  <FormControl fullWidth error={!selectedVenueId && !!formErrors.venueId}>
                 <Select
                   value={selectedVenueId}
                   onChange={handleVenueSelect}
-                  label="Venue *"
                   displayEmpty
-                >
-                  <MenuItem value="" disabled>请选择场馆</MenuItem>
+                      sx={{ 
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }}
+                    >
+                      <MenuItem value="" disabled>{t('admin.selectVenue')}</MenuItem>
                   {venues.map(v => (
-                    <MenuItem key={v.id} value={v.id}>{v.name} ({v.address || v.location})</MenuItem>
-                  ))}
-                  <MenuItem value="add_new_venue" style={{ color: theme.palette.primary.main, fontWeight: 'bold' }}>+ 新建场馆</MenuItem>
+                        <MenuItem key={v.id} value={v.id}>
+                          {v.name} ({v.address || v.location})
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="add_new_venue" sx={{ 
+                        color: theme.palette.primary.main, 
+                        fontWeight: 'bold' 
+                      }}>
+                        + {t('admin.addNewVenue')}
+                      </MenuItem>
                 </Select>
-                {formErrors.venueId && <Typography color="error" variant="caption">{formErrors.venueId}</Typography>}
+                    {formErrors.venueId && (
+                      <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
+                        {formErrors.venueId}
+                      </Typography>
+                    )}
+
               </FormControl>
+                </Box>
             </Grid>
-            <Divider sx={{ my: 2, width: '100%' }}>Operating Days</Divider>
+            </Grid>
+          </Box>
+
+          {/* Operating Schedule Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.operatingSchedule')}
+            </Typography>
+            
+            <Grid container spacing={3}>
             <Grid item xs={12}>
-              <FormControl component="fieldset" margin="normal" error={!!formErrors.operatingDays}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Operating Days *</Typography>
-                <FormGroup row>
+                <Box sx={{ mb: 3 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 2,
+                    display: 'block'
+                  }}>
+                    {t('admin.operatingDays')} *
+                  </Typography>
+                  <FormGroup row sx={{ gap: 1 }}>
                   {daysOptions.map((day) => (
                     <FormControlLabel
                       key={day}
@@ -739,180 +1367,984 @@ const AdminManageCourts = () => {
                           }}
                           name={day}
                           color="primary"
+                            sx={{
+                              '&.Mui-checked': {
+                                color: theme.palette.primary.main,
+                              }
+                            }}
                         />
                       }
                       label={day}
+                        sx={{
+                          '& .MuiFormControlLabel-label': {
+                            fontWeight: 500,
+                            fontSize: '0.9rem'
+                          }
+                        }}
                     />
                   ))}
                 </FormGroup>
-                {formErrors.operatingDays && <Typography color="error" variant="caption">{formErrors.operatingDays}</Typography>}
-              </FormControl>
+                  {formErrors.operatingDays && (
+                    <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
+                      {formErrors.operatingDays}
+                    </Typography>
+                  )}
+                </Box>
             </Grid>
-            <Divider sx={{ my: 2, width: '100%' }}>Operating Hours</Divider>
+              
             <Grid item xs={12} md={6}>
-              <Tooltip title="12-hour format (HH:mm)">
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.openingTime')} *
+                  </Typography>
                 <TextField
                   fullWidth
-                  label="Opening Time *"
-                  name="openingTime"
                   type="time"
+                    name="openingTime"
                   value={formData.openingTime}
                   onChange={handleChange}
-                  margin="normal"
-                  required
-                  InputLabelProps={{ shrink: true }}
                   error={!!formErrors.openingTime}
                   helperText={formErrors.openingTime}
-                />
-              </Tooltip>
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={6}>
-              <Tooltip title="12-hour format (HH:mm)">
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.closingTime')} *
+                  </Typography>
                 <TextField
                   fullWidth
-                  label="Closing Time *"
-                  name="closingTime"
                   type="time"
+                    name="closingTime"
                   value={formData.closingTime}
                   onChange={handleChange}
-                  margin="normal"
-                  required
-                  InputLabelProps={{ shrink: true }}
                   error={!!formErrors.closingTime}
                   helperText={formErrors.closingTime}
-                />
-              </Tooltip>
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
-            <Divider sx={{ my: 2, width: '100%' }}>Peak Hours Configuration</Divider>
+            </Grid>
+          </Box>
+
+          {/* Peak Hours Configuration Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.peakHoursConfiguration')}
+            </Typography>
+            
+            <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <Tooltip title="24-hour format (HH:mm)">
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.peakStartTime')}
+                  </Typography>
                 <TextField
                   fullWidth
-                  label="Peak Start Time"
-                  name="peakStartTime"
                   type="time"
+                    name="peakStartTime"
                   value={formData.peakStartTime}
                   onChange={handleChange}
-                  margin="normal"
                   InputLabelProps={{ shrink: true }}
-                />
-              </Tooltip>
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={6}>
-              <Tooltip title="24-hour format (HH:mm)">
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.peakEndTime')}
+                  </Typography>
                 <TextField
                   fullWidth
-                  label="Peak End Time"
-                  name="peakEndTime"
                   type="time"
+                    name="peakEndTime"
                   value={formData.peakEndTime}
                   onChange={handleChange}
-                  margin="normal"
                   InputLabelProps={{ shrink: true }}
-                />
-              </Tooltip>
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
-            <Divider sx={{ my: 2, width: '100%' }}>Pricing (RM)</Divider>
+            </Grid>
+          </Box>
+
+          {/* Pricing Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.pricingConfiguration')} (RM)
+            </Typography>
+            
+            <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.peakHourlyPrice')}
+                  </Typography>
               <TextField
                 fullWidth
                 type="number"
-                label="Peak Hourly Price"
+                    placeholder="e.g. 50.00"
                 name="peakHourlyPrice"
                 value={formData.peakHourlyPrice}
                 onChange={handleChange}
-                margin="normal"
-                placeholder="e.g. 50.00"
+                    error={!!formErrors.peakHourlyPrice}
+                    helperText={formErrors.peakHourlyPrice}
                 InputProps={{
                   inputProps: { min: 0, step: 0.01 },
                   startAdornment: <InputAdornment position="start">RM</InputAdornment>
                 }}
-                error={!!formErrors.peakHourlyPrice}
-                helperText={formErrors.peakHourlyPrice}
-              />
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={4}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.offPeakHourlyPrice')}
+                  </Typography>
               <TextField
                 fullWidth
                 type="number"
-                label="Off-Peak Hourly Price"
+                    placeholder="e.g. 30.00"
                 name="offPeakHourlyPrice"
                 value={formData.offPeakHourlyPrice}
                 onChange={handleChange}
-                margin="normal"
-                placeholder="e.g. 30.00"
+                    error={!!formErrors.offPeakHourlyPrice}
+                    helperText={formErrors.offPeakHourlyPrice}
                 InputProps={{
                   inputProps: { min: 0, step: 0.01 },
                   startAdornment: <InputAdornment position="start">RM</InputAdornment>
                 }}
-                error={!!formErrors.offPeakHourlyPrice}
-                helperText={formErrors.offPeakHourlyPrice}
-              />
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
+              
             <Grid item xs={12} md={4}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.dailyPrice')}
+                  </Typography>
               <TextField
                 fullWidth
                 type="number"
-                label="Daily Price"
+                    placeholder="e.g. 200.00"
                 name="dailyPrice"
                 value={formData.dailyPrice}
                 onChange={handleChange}
-                margin="normal"
-                placeholder="e.g. 200.00"
+                    error={!!formErrors.dailyPrice}
+                    helperText={formErrors.dailyPrice}
                 InputProps={{
                   inputProps: { min: 0, step: 0.01 },
                   startAdornment: <InputAdornment position="start">RM</InputAdornment>
                 }}
-                error={!!formErrors.dailyPrice}
-                helperText={formErrors.dailyPrice}
-              />
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
             </Grid>
-            {/* 图片上传控件 */}
+            </Grid>
+          </Box>
+
+          {/* Court Images Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{ 
+                width: 8, 
+                height: 8, 
+                backgroundColor: theme.palette.primary.main, 
+                borderRadius: '50%' 
+              }} />
+              {t('admin.courtImages')}
+            </Typography>
+            
+            <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>Court Images</Typography>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.uploadImages')}
+                  </Typography>
               <input
                 type="file"
                 accept="image/*"
                 multiple
                 onChange={handleImageChange}
-                style={{ marginBottom: 8 }}
-              />
-              <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
-                {courtImages && courtImages.length > 0 && courtImages.map(img => (
+                    style={{ 
+                      marginBottom: 8,
+                      padding: '12px',
+                      border: '2px dashed #e0e0e0',
+                      borderRadius: '12px',
+                      width: '100%',
+                      backgroundColor: '#f9fafb',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  {courtImages && courtImages.length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
+                      {courtImages.map(img => (
                   <img
                     key={img.id || img.imagePath}
                     src={img.imagePath}
                     alt="court"
-                    style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
+                          style={{ 
+                            width: 80, 
+                            height: 60, 
+                            objectFit: 'cover', 
+                            borderRadius: 8, 
+                            border: '1px solid #e0e0e0',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
                   />
                 ))}
+                    </Box>
+                  )}
               </Box>
             </Grid>
           </Grid>
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
+
+        <DialogActions sx={{ 
+          p: 3, 
+          pt: 0,
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <Button 
+            onClick={handleCloseDialog} 
+            disabled={loading}
+            sx={{
+              px: 3,
+              py: 1.2,
+              borderRadius: '12px',
+              textTransform: 'none',
+              fontWeight: 600,
+              border: `2px solid ${theme.palette.grey[300]}`,
+              color: theme.palette.text.primary,
+              '&:hover': {
+                borderColor: theme.palette.grey[400],
+                backgroundColor: theme.palette.grey[50]
+              }
+            }}
+          >
+            {t('admin.cancel')}
+          </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
             disabled={loading}
-            sx={{ backgroundColor: theme.palette.primary.main, color: theme.palette.primary.contrastText, fontWeight: 600, borderRadius: 3, px: 3, py: 1.2, boxShadow: theme.shadows[2], '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] } }}
+            sx={{
+              px: 3,
+              py: 1.2,
+              fontSize: '1rem',
+              fontWeight: 600,
+              borderRadius: '12px',
+              textTransform: 'none',
+              backgroundColor: currentCourt?.status === 'DELETED' ? theme.palette.success.main : theme.palette.primary.main,
+              color: 'white',
+              boxShadow: currentCourt?.status === 'DELETED' 
+                ? `0 4px 14px ${theme.palette.success.main}40`
+                : `0 4px 14px ${theme.palette.primary.main}40`,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                backgroundColor: currentCourt?.status === 'DELETED' ? theme.palette.success.dark : theme.palette.primary.dark,
+                boxShadow: currentCourt?.status === 'DELETED'
+                  ? `0 6px 20px ${theme.palette.success.main}60`
+                  : `0 6px 20px ${theme.palette.primary.main}60`,
+                transform: 'translateY(-1px)'
+              },
+              '&:disabled': {
+                backgroundColor: theme.palette.action.disabledBackground,
+                transform: 'none'
+              }
+            }}
           >
-            {loading ? <CircularProgress size={24} /> : currentCourt ? 'Update' : 'Create'}
+            {loading ? (
+              <CircularProgress size={24} sx={{ color: 'white' }} />
+            ) : (
+              currentCourt ? (currentCourt.status === 'DELETED' ? t('admin.restoreCourt') : t('admin.update')) : t('admin.create')
+            )}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog.open} onClose={handleDeleteCancel}>
-        <DialogTitle>Delete Court</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete this court? This action cannot be undone.
+      {/* Delete Preview Dialog */}
+      <Dialog 
+        open={deletePreviewDialog.open} 
+        onClose={handleDeleteCancel}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Header */}
+        <Box sx={{ 
+          backgroundColor: theme.palette.error.main,
+          color: 'white',
+          p: 4,
+          textAlign: 'center'
+        }}>
+          <Typography variant="h5" sx={{ 
+            fontWeight: 600, 
+            mb: 1,
+            fontSize: { xs: '1.25rem', sm: '1.5rem' }
+          }}>
+            {t('admin.delete')} {t('admin.courtName')}
+          </Typography>
+          <Typography variant="body1" sx={{ 
+            opacity: 0.9,
+            fontWeight: 500,
+            fontSize: { xs: '0.9rem', sm: '1rem' }
+          }}>
+            {deletePreviewDialog.courtName}
+          </Typography>
+        </Box>
+
+        {/* Content */}
+        <DialogContent sx={{ p: 0 }}>
+          {loadingPreview ? (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              py: 8,
+              px: 4
+            }}>
+              <CircularProgress size={60} sx={{ color: theme.palette.primary.main, mb: 2 }} />
+              <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+                {t('admin.loadingPreviewData')}
+              </Typography>
+            </Box>
+          ) : deletePreviewDialog.affectedData ? (
+            <Box sx={{ p: 4 }}>
+              {/* Impact Summary */}
+              <Box sx={{ 
+                backgroundColor: theme.palette.grey[50],
+                borderRadius: '12px', 
+                p: 3, 
+                mb: 4,
+                border: `1px solid ${theme.palette.grey[200]}`
+              }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  mb: 2,
+                  color: theme.palette.text.primary
+                }}>
+                  {t('admin.impactSummary')}
+                </Typography>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 3,
+                  flexWrap: 'wrap'
+                }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    borderRadius: '8px',
+                    backgroundColor: 'white',
+                    border: `1px solid ${theme.palette.grey[300]}`
+                  }}>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 700, 
+                      color: theme.palette.error.main 
+                    }}>
+                      {deletePreviewDialog.affectedData.activeBookings?.length || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ 
+                      fontWeight: 500,
+                      color: theme.palette.text.secondary
+                    }}>
+                      {t('admin.activeBookings')}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    borderRadius: '8px',
+                    backgroundColor: 'white',
+                    border: `1px solid ${theme.palette.grey[300]}`
+                  }}>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 700, 
+                      color: theme.palette.warning.main 
+                    }}>
+                      {deletePreviewDialog.affectedData.friendlyMatches?.length || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ 
+                      fontWeight: 500,
+                      color: theme.palette.text.secondary
+                    }}>
+                      {t('admin.friendlyMatches')}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* No Affected Items */}
+              {(!deletePreviewDialog.affectedData.activeBookings || deletePreviewDialog.affectedData.activeBookings.length === 0) &&
+               (!deletePreviewDialog.affectedData.friendlyMatches || deletePreviewDialog.affectedData.friendlyMatches.length === 0) && (
+                <Box sx={{ 
+                  backgroundColor: theme.palette.success[50],
+                  p: 3, 
+                  borderRadius: '12px', 
+                  mb: 4,
+                  textAlign: 'center',
+                  border: `1px solid ${theme.palette.success[200]}`
+                }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.success.main,
+                    mb: 1
+                  }}>
+                    {t('admin.noImpact')}
+                  </Typography>
+                  <Typography variant="body1" sx={{ 
+                    fontWeight: 500,
+                    color: theme.palette.text.secondary
+                  }}>
+                    {t('admin.noActiveBookingsOrFriendlyMatchesWillBeAffected')}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Affected Items Lists */}
+              {deletePreviewDialog.affectedData.activeBookings && deletePreviewDialog.affectedData.activeBookings.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600, 
+                    mb: 3,
+                    color: theme.palette.text.primary
+                  }}>
+                    {t('admin.activeBookings')}
+                  </Typography>
+                  <Box sx={{ 
+                    maxHeight: 200, 
+                    overflow: 'auto',
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.palette.grey[200]}`
+                  }}>
+                    {deletePreviewDialog.affectedData.activeBookings.map((booking, index) => (
+                      <Box key={index} sx={{ 
+                        p: 3, 
+                        borderBottom: index < deletePreviewDialog.affectedData.activeBookings.length - 1 ? `1px solid ${theme.palette.grey[200]}` : 'none',
+                        backgroundColor: index % 2 === 0 ? theme.palette.grey[50] : 'white',
+                        '&:last-child': {
+                          borderBottom: 'none'
+                        }
+                      }}>
+                        <Typography variant="subtitle1" sx={{ 
+                          fontWeight: 600, 
+                          mb: 1,
+                          color: theme.palette.text.primary
+                        }}>
+                          {booking.memberName}
+                        </Typography>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          gap: 2,
+                          flexWrap: 'wrap',
+                          alignItems: 'center'
+                        }}>
+                          <Typography variant="body2" sx={{ 
+                            color: theme.palette.text.secondary
+                          }}>
+                            {booking.slotDate}
+                          </Typography>
+                          <Typography variant="body2" sx={{ 
+                            color: theme.palette.text.secondary
+                          }}>
+                            {booking.slotTime}
+                          </Typography>
+                          <Typography variant="body2" sx={{ 
+                            color: theme.palette.primary.main,
+                            fontWeight: 600
+                          }}>
+                            RM {booking.totalAmount}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {deletePreviewDialog.affectedData.friendlyMatches && deletePreviewDialog.affectedData.friendlyMatches.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600, 
+                    mb: 3,
+                    color: theme.palette.text.primary
+                  }}>
+                    {t('admin.friendlyMatches')}
+                  </Typography>
+                  <Box sx={{ 
+                    maxHeight: 200, 
+                    overflow: 'auto',
+                    borderRadius: '12px',
+                    border: `1px solid ${theme.palette.grey[200]}`
+                  }}>
+                    {deletePreviewDialog.affectedData.friendlyMatches.map((match, index) => (
+                      <Box key={index} sx={{ 
+                        p: 3, 
+                        borderBottom: index < deletePreviewDialog.affectedData.friendlyMatches.length - 1 ? `1px solid ${theme.palette.grey[200]}` : 'none',
+                        backgroundColor: index % 2 === 0 ? theme.palette.grey[50] : 'white',
+                        '&:last-child': {
+                          borderBottom: 'none'
+                        }
+                      }}>
+                        <Typography variant="subtitle1" sx={{ 
+                          fontWeight: 600, 
+                          mb: 1,
+                          color: theme.palette.text.primary
+                        }}>
+                          {match.title}
+                        </Typography>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          gap: 2,
+                          flexWrap: 'wrap',
+                          alignItems: 'center'
+                        }}>
+                          <Typography variant="body2" sx={{ 
+                            color: theme.palette.text.secondary
+                          }}>
+                            {match.date}
+                          </Typography>
+                          <Typography variant="body2" sx={{ 
+                            color: theme.palette.warning.main,
+                            fontWeight: 600
+                          }}>
+                            {match.participantCount} {t('admin.participants')}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Actions That Will Be Taken */}
+              <Box sx={{ 
+                backgroundColor: theme.palette.warning[50],
+                p: 3, 
+                borderRadius: '12px',
+                border: `1px solid ${theme.palette.warning[200]}`
+              }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  mb: 2,
+                  color: theme.palette.text.primary
+                }}>
+                  {t('admin.actionsThatWillBeTaken')}
+                </Typography>
+                <Box component="ul" sx={{ 
+                  margin: 0, 
+                  paddingLeft: 3,
+                  '& li': { 
+                    fontSize: '0.95rem', 
+                    mb: 1,
+                    color: theme.palette.text.secondary,
+                    fontWeight: 500
+                  }
+                }}>
+                  <li>{t('admin.allAffectedBookingsWillBeAutomaticallyCancelled')}</li>
+                  <li>{t('admin.fullRefundsWillBeProcessedForCancelledBookings')}</li>
+                  <li>{t('admin.compensationPointsWillBeAddedToAffectedUsers')}</li>
+                  <li>{t('admin.emailNotificationsWillBeSentToAffectedUsers')}</li>
+                  <li>{t('admin.courtWillBeSoftDeleted')}</li>
+                </Box>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              py: 8,
+              px: 4
+            }}>
+              <Typography variant="h6" sx={{ 
+                color: theme.palette.error.main,
+                mb: 2
+              }}>
+                {t('admin.errorLoadingPreviewData')}
+              </Typography>
+              <Typography variant="body1" sx={{ 
+                color: theme.palette.text.secondary,
+                textAlign: 'center'
+              }}>
+                {t('admin.pleaseTryAgainOrContactSupport')}
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel} disabled={deleting}>Cancel</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
-            {deleting ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
+
+        {/* Actions */}
+        <DialogActions sx={{ 
+          p: 4, 
+          pt: 0,
+          gap: 2,
+          justifyContent: 'center'
+        }}>
+          <Button 
+            onClick={handleDeleteCancel} 
+            disabled={deleting}
+            variant="outlined"
+            size="large"
+            sx={{ 
+              px: 4, 
+              py: 1.5, 
+              borderRadius: '12px',
+              borderColor: theme.palette.grey[400],
+              color: theme.palette.text.primary,
+              fontWeight: 600,
+              fontSize: '1rem',
+              minWidth: '120px',
+              '&:hover': {
+                borderColor: theme.palette.grey[600],
+                backgroundColor: theme.palette.grey[50]
+              }
+            }}
+          >
+            {t('admin.cancel')}
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained" 
+            disabled={deleting}
+            size="large"
+            sx={{ 
+              px: 4, 
+              py: 1.5, 
+              borderRadius: '12px', 
+              fontWeight: 700,
+              fontSize: '1rem',
+              minWidth: '120px',
+              '&:hover': {
+                backgroundColor: theme.palette.error.dark
+              }
+            }}
+          >
+            {deleting ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} color="inherit" />
+                <span>{t('admin.deleting')}</span>
+              </Box>
+            ) : (
+              t('admin.confirm') + ' ' + t('admin.delete')
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Restore Court Confirmation Dialog */}
+      <Dialog
+        open={restoreDialog.open}
+        onClose={handleRestoreCancel}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Header */}
+        <Box sx={{
+          backgroundColor: theme.palette.success.main,
+          color: 'white',
+          p: 3,
+          textAlign: 'center'
+        }}>
+          <Typography variant="h5" sx={{
+            fontWeight: 600,
+            mb: 1
+          }}>
+            {t('admin.restoreCourt')}
+          </Typography>
+          <Typography variant="body1" sx={{
+            opacity: 0.9,
+            fontWeight: 500
+          }}>
+            {restoreDialog.courtName}
+          </Typography>
+        </Box>
+
+        {/* Content */}
+        <DialogContent sx={{ p: 4 }}>
+          <Typography variant="body1" sx={{
+            color: theme.palette.text.primary,
+            mb: 2,
+            textAlign: 'center'
+          }}>
+            {t('admin.confirmRestoreCourt')}
+          </Typography>
+          
+          <Box sx={{
+            backgroundColor: theme.palette.info[50],
+            p: 3,
+            borderRadius: '12px',
+            border: `1px solid ${theme.palette.info[200]}`
+          }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              mb: 2,
+              color: theme.palette.info.main
+            }}>
+              {t('admin.whatWillHappen')}
+            </Typography>
+            <Box component="ul" sx={{
+              margin: 0,
+              paddingLeft: 3,
+              '& li': {
+                fontSize: '0.95rem',
+                mb: 1,
+                color: theme.palette.text.secondary,
+                fontWeight: 500
+              }
+            }}>
+              <li>{t('admin.courtStatusWillBeChangedTo')} "{formData.status}"</li>
+              <li>{t('admin.courtWillBecomeVisibleToUsersAgain')}</li>
+              <li>{t('admin.allCourtSettingsWillBeUpdated')}</li>
+              <li><strong>{t('admin.newTimeSlotsWillBeAutomaticallyGenerated')}</strong></li>
+              <li>{t('admin.courtWillBeAvailableForBookingsImmediately')}</li>
+            </Box>
+          </Box>
+        </DialogContent>
+
+        {/* Actions */}
+        <DialogActions sx={{
+          p: 4,
+          pt: 0,
+          gap: 2,
+          justifyContent: 'center'
+        }}>
+          <Button
+            onClick={handleRestoreCancel}
+            disabled={loading}
+            variant="outlined"
+            size="large"
+            sx={{
+              px: 4,
+              py: 1.5,
+              borderRadius: '12px',
+              borderColor: theme.palette.grey[400],
+              color: theme.palette.text.primary,
+              fontWeight: 600,
+              fontSize: '1rem',
+              minWidth: '120px',
+              '&:hover': {
+                borderColor: theme.palette.grey[600],
+                backgroundColor: theme.palette.grey[50]
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRestoreConfirm}
+            color="success"
+            variant="contained"
+            disabled={loading}
+            size="large"
+            sx={{
+              px: 4,
+              py: 1.5,
+              borderRadius: '12px',
+              fontWeight: 700,
+              fontSize: '1rem',
+              minWidth: '120px',
+              background: theme.palette.success.main,
+              boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
+              '&:hover': {
+                background: theme.palette.success.dark,
+                boxShadow: '0 6px 20px rgba(76, 175, 80, 0.4)'
+              },
+              '&:disabled': {
+                background: theme.palette.success[200],
+                boxShadow: 'none'
+              }
+            }}
+          >
+            {loading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} color="inherit" />
+                <span>Restoring...</span>
+              </Box>
+            ) : (
+              'Confirm Restore'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

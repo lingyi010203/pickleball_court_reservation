@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.pickleball_backend.pickleball.dto.DashboardSummaryDto;
 import com.pickleball_backend.pickleball.dto.RecentActivityDto;
+import com.pickleball_backend.pickleball.dto.CourtUtilizationDto;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -155,8 +156,13 @@ public class AdminDashboardController {
     }
 
     @GetMapping("/recent-activity")
-    public List<RecentActivityDto> getRecentActivity() {
-        return adminDashboardService.getRecentActivity();
+    public List<RecentActivityDto> getRecentActivity(@RequestParam(defaultValue = "recent") String period) {
+        return adminDashboardService.getRecentActivity(period);
+    }
+
+    @GetMapping("/court-utilization")
+    public CourtUtilizationDto getCourtUtilization(@RequestParam(defaultValue = "7d") String period) {
+        return adminDashboardService.getCourtUtilization(period);
     }
 
     @PostMapping("/generate-report")

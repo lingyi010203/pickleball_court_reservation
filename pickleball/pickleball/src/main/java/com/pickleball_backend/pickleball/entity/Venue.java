@@ -27,7 +27,8 @@ public class Venue {
 
     private Boolean isArchived = false;
 
-    @OneToMany(mappedBy = "venue", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "venue", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
-    private List<Court> courts = new ArrayList<>();}
+    private List<Court> courts = new ArrayList<>();
+}
 

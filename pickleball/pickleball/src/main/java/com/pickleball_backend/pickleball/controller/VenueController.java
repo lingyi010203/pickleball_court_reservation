@@ -1,6 +1,7 @@
 package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.dto.VenueDto;
+import com.pickleball_backend.pickleball.dto.VenueWithCourtCountDto;
 import com.pickleball_backend.pickleball.entity.Venue;
 import com.pickleball_backend.pickleball.service.VenueService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,9 +66,81 @@ public class VenueController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<List<Venue>> getAllVenues() {
+    public ResponseEntity<List<VenueWithCourtCountDto>> getAllVenues() {
         List<Venue> venues = venueRepository.findAll();
-        return ResponseEntity.ok(venues);
+        List<VenueWithCourtCountDto> venueDtos = venues.stream()
+            .map(venue -> new VenueWithCourtCountDto(
+                venue.getId(),
+                venue.getName(),
+                venue.getLocation(),
+                venue.getState(),
+                venue.getDescription(),
+                venue.getIsArchived(),
+                venue.getCourts().size()
+            ))
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(venueDtos);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Venue> getVenueById(@PathVariable Integer id) {
+        Venue venue = venueRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Venue not found with id: " + id));
+        return ResponseEntity.ok(venue);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> updateVenue(@PathVariable Integer id, @RequestBody VenueDto venueDto) {
+        try {
+            Venue existingVenue = venueRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Venue not found with id: " + id));
+            
+            // Check for duplicate name and location (excluding current venue)
+            List<Venue> existingVenues = venueRepository.findAll();
+            boolean duplicate = existingVenues.stream()
+                    .filter(v -> !v.getId().equals(id)) // Exclude current venue
+                    .anyMatch(v -> v.getName().equalsIgnoreCase(venueDto.getName()) &&
+                                 v.getLocation().equalsIgnoreCase(venueDto.getAddress()));
+            
+            if (duplicate) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Venue with the same name and location already exists");
+            }
+            
+            // Update venue fields
+            existingVenue.setName(venueDto.getName());
+            existingVenue.setLocation(venueDto.getAddress());
+            existingVenue.setDescription(venueDto.getDescription());
+            
+            Venue updatedVenue = venueRepository.save(existingVenue);
+            return ResponseEntity.ok(updatedVenue);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating venue: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> deleteVenue(@PathVariable Integer id) {
+        try {
+            Venue venue = venueRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Venue not found with id: " + id));
+            
+            // Check if venue has any courts
+            if (!venue.getCourts().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Cannot delete venue that has courts. Please delete all courts first.");
+            }
+            
+            venueRepository.delete(venue);
+            return ResponseEntity.ok("Venue deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error deleting venue: " + e.getMessage());
+        }
     }
 
     @GetMapping("/bystate")

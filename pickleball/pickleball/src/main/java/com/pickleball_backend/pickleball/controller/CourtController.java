@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.dto.CourtDto;
 import com.pickleball_backend.pickleball.dto.CourtPricingDto;
+import com.pickleball_backend.pickleball.dto.CourtDeletePreviewDto;
 import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.service.CourtService;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.pickleball_backend.pickleball.entity.CourtType;
 
 @RestController
 @RequestMapping("/api/admin/courts")
@@ -105,6 +107,19 @@ public class CourtController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error archiving court");
+        }
+    }
+
+    @GetMapping("/{id}/delete-preview")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> getDeletePreview(@PathVariable Integer id) {
+        try {
+            CourtDeletePreviewDto preview = courtService.getDeletePreview(id);
+            return ResponseEntity.ok(preview);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching delete preview");
         }
     }
 
@@ -228,5 +243,37 @@ public class CourtController {
     public ResponseEntity<?> getCourtImagesPublic(@PathVariable Integer courtId) {
         List<CourtImage> images = courtImageRepository.findByCourtId(courtId);
         return ResponseEntity.ok(images);
+    }
+
+    @PutMapping("/{id}/type")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> updateCourtType(
+            @PathVariable Integer id,
+            @RequestBody Map<String, String> request) {
+        try {
+            String courtTypeStr = request.get("courtType");
+            if (courtTypeStr == null) {
+                return ResponseEntity.badRequest().body("courtType is required");
+            }
+            
+            CourtType courtType;
+            try {
+                courtType = CourtType.valueOf(courtTypeStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body("Invalid court type. Must be STANDARD, VIP, or OTHER");
+            }
+            
+            Court court = courtRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Court not found"));
+            
+            court.setCourtType(courtType);
+            courtRepository.save(court);
+            
+            return ResponseEntity.ok(Map.of("message", "Court type updated successfully"));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating court type");
+        }
     }
 }

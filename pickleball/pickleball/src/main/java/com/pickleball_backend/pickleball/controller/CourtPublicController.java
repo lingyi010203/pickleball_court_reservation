@@ -15,7 +15,10 @@ public class CourtPublicController {
 
     @GetMapping("/api/courts")
     public ResponseEntity<List<Court>> getAllCourtsForAllRoles() {
-        List<Court> courts = courtRepository.findAll();
+        // 只返回非DELETED状态的球场给用户
+        List<Court> courts = courtRepository.findAll().stream()
+                .filter(court -> !"DELETED".equalsIgnoreCase(court.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(courts);
     }
 
@@ -23,13 +26,22 @@ public class CourtPublicController {
     public ResponseEntity<Court> getCourtById(@PathVariable Integer id) {
         Court court = courtRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Court not found"));
+        
+        // 检查球场是否已被删除
+        if ("DELETED".equalsIgnoreCase(court.getStatus())) {
+            throw new RuntimeException("Court not found");
+        }
+        
         return ResponseEntity.ok(court);
     }
 
     @GetMapping("/api/courts/booked")
     public ResponseEntity<List<Court>> getBookedCourts() {
         // TODO: Implement logic to get courts booked by current user
-        List<Court> courts = courtRepository.findAll();
+        // 只返回非DELETED状态的球场
+        List<Court> courts = courtRepository.findAll().stream()
+                .filter(court -> !"DELETED".equalsIgnoreCase(court.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(courts);
     }
 
@@ -39,7 +51,10 @@ public class CourtPublicController {
             @RequestParam String startTime,
             @RequestParam String endTime) {
         // TODO: Implement logic to get available courts for given date and time
-        List<Court> courts = courtRepository.findAll();
+        // 只返回非DELETED状态的球场
+        List<Court> courts = courtRepository.findAll().stream()
+                .filter(court -> !"DELETED".equalsIgnoreCase(court.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(courts);
     }
 } 

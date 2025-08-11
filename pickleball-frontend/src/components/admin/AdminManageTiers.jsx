@@ -4,28 +4,33 @@ import {
   Box, Container, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Button, IconButton, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
-  CircularProgress, Grid, Chip, Switch, FormControlLabel, MenuItem, 
-  FormControl, InputLabel, Select, TableSortLabel, DialogContentText, useTheme, alpha, Tabs, Tab
+  CircularProgress, Grid, Chip, Switch, FormControlLabel, MenuItem,
+  FormControl, InputLabel, Select, TableSortLabel, DialogContentText, useTheme, alpha, Tabs, Tab,
+  InputAdornment, TablePagination, TableFooter
 } from '@mui/material';
-import { 
-  Add as AddIcon, 
-  Edit as EditIcon, 
-  Delete as DeleteIcon, 
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
   ArrowBack as BackIcon,
   Info as InfoIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import UserService from '../../service/UserService';
-import { getStatusChip } from './statusConfig';
+import { getStatusChip, getTierChip } from './statusConfig';
 import { formatDateToDDMMYYYY, formatDateForHTMLInput, formatDateFromHTMLInput } from '../../utils/dateUtils';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 const AdminManageTiers = () => {
-  usePageTheme('admin'); // 设置页面类型为admin
   const theme = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +67,17 @@ const AdminManageTiers = () => {
     key: 'minPoints',
     direction: 'asc'
   });
-  //const [searchTerm, setSearchTerm] = useState('');
+
+  // 分页状态
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalTiers, setTotalTiers] = useState(0);
+
+  // 搜索和过滤状态
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+
 
   useEffect(() => {
     fetchTiers();
@@ -76,9 +91,10 @@ const AdminManageTiers = () => {
       const response = await axios.get('http://localhost:8081/api/admin/tiers', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (Array.isArray(response.data)) {
         setTiers(response.data);
+        setTotalTiers(response.data.length);
       } else {
         setError('Received invalid tiers data format');
         setTiers([]);
@@ -133,7 +149,7 @@ const AdminManageTiers = () => {
       ...prev,
       [name]: name === 'minPoints' || name === 'maxPoints' ? Number(value) : value
     }));
-    
+
     // 清除对应字段的错误
     if (formErrors[name]) {
       setFormErrors(prev => ({
@@ -141,7 +157,7 @@ const AdminManageTiers = () => {
         [name]: ''
       }));
     }
-    
+
     // 清除范围错误
     if (name === 'minPoints' || name === 'maxPoints') {
       setFormErrors(prev => ({
@@ -166,9 +182,9 @@ const AdminManageTiers = () => {
       maxPoints: '',
       range: ''
     };
-    
+
     let isValid = true;
-    
+
     // Tier Name 验证
     if (!formData.tierName.trim()) {
       errors.tierName = 'Tier name is required';
@@ -177,19 +193,19 @@ const AdminManageTiers = () => {
       errors.tierName = 'Tier name is too long (max 30 characters)';
       isValid = false;
     }
-    
+
     // Benefits 验证
     if (!formData.benefits.trim()) {
       errors.benefits = 'Benefits description is required';
       isValid = false;
     }
-    
+
     // Min Points 验证
     if (formData.minPoints < 0) {
       errors.minPoints = 'Min points must be 0 or greater';
       isValid = false;
     }
-    
+
     // Max Points 验证
     if (formData.maxPoints <= 0) {
       errors.maxPoints = 'Max points must be greater than 0';
@@ -198,28 +214,28 @@ const AdminManageTiers = () => {
       errors.range = 'Max points must be greater than min points';
       isValid = false;
     }
-    
+
     // 积分范围重叠验证
     if (isValid) {
       const overlappingTier = tiers.find(tier => {
         // 排除当前编辑的等级
         if (currentTier && tier.id === currentTier.id) return false;
-        
+
         // 检查范围重叠
         const newMin = formData.minPoints;
         const newMax = formData.maxPoints;
         const existingMin = tier.minPoints;
         const existingMax = tier.maxPoints;
-        
+
         return (newMin <= existingMax && newMax >= existingMin);
       });
-      
+
       if (overlappingTier) {
         errors.range = `Points range overlaps with ${overlappingTier.tierName} tier (${overlappingTier.minPoints}-${overlappingTier.maxPoints})`;
         isValid = false;
       }
     }
-    
+
     setFormErrors(errors);
     return isValid;
   };
@@ -278,8 +294,8 @@ const AdminManageTiers = () => {
     setConfirmDialog({
       open: true,
       title: active ? 'Activate Tier' : 'Deactivate Tier',
-      content: active 
-        ? `Activate "${tier.tierName}" tier? Members will be able to achieve this tier.` 
+      content: active
+        ? `Activate "${tier.tierName}" tier? Members will be able to achieve this tier.`
         : `Deactivate "${tier.tierName}" tier? Existing members will keep this tier but new members won't be assigned.`,
       action: active ? 'activate' : 'deactivate',
       tierId
@@ -322,21 +338,43 @@ const AdminManageTiers = () => {
     setSortConfig({ key, direction });
   };
 
-  //const handleSearchChange = (e) => {
-  //  setSearchTerm(e.target.value);
-  //};
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
 
-  // 保证 sortedAndFilteredTiers 始终为数组，直接用 tiers 排序，不用 searchTerm
-  const sortedAndFilteredTiers = React.useMemo(() => {
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setPage(0);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // 过滤和排序逻辑
+  const filteredAndSortedTiers = React.useMemo(() => {
     let filtered = tiers;
-    // 搜索相关逻辑已注释
-    // if (searchTerm) {
-    //   const term = searchTerm.toLowerCase();
-    //   filtered = tiers.filter(tier => 
-    //     tier.tierName.toLowerCase().includes(term) || 
-    //     tier.benefits.toLowerCase().includes(term)
-    //   );
-    // }
+
+    // 状态过滤
+    if (statusFilter) {
+      filtered = filtered.filter(tier => {
+        if (statusFilter === 'active') return tier.active;
+        if (statusFilter === 'inactive') return !tier.active;
+        return true;
+      });
+    }
+
+    // 排序
     return [...filtered].sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
         return sortConfig.direction === 'asc' ? -1 : 1;
@@ -346,7 +384,13 @@ const AdminManageTiers = () => {
       }
       return 0;
     });
-  }, [tiers, sortConfig]);
+  }, [tiers, statusFilter, sortConfig]);
+
+  // 分页逻辑
+  const paginatedTiers = React.useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return filteredAndSortedTiers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredAndSortedTiers, page, rowsPerPage]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -358,175 +402,367 @@ const AdminManageTiers = () => {
 
   if (loading && !tiers.length) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
-      </Box>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress size={60} sx={{ color: '#8e44ad' }} />
+        </Box>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <Box sx={{ textAlign: 'center', p: 4 }}>
-        <Typography variant="h5" color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-        <Button
-          variant="contained"
-          sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
-          onClick={fetchTiers}
-        >
-          Try Again
-        </Button>
-      </Box>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Box sx={{ textAlign: 'center', p: 4 }}>
+          <Typography variant="h5" color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+          <Button
+            variant="contained"
+            sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
+            onClick={fetchTiers}
+          >
+            Try Again
+          </Button>
+        </Box>
+      </Container>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap' }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main, mb: { xs: 2, sm: 0 } }}>
-          Membership Management
-        </Typography>
-        <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 1, mb: 2 }}>
-          Manage and configure membership tiers, benefits, and point ranges for your club members.
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header Section */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          {t('admin.membershipManagement')}
         </Typography>
       </Box>
 
+
+
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, '& .MuiTab-root.Mui-selected': { color: theme.palette.primary.main } }}>
-        <Tab label="Tier Management" />
-        <Tab label="Voucher Management" />
+        <Tab label={t('admin.tierManagement')} />
+        <Tab label={t('admin.voucherManagement')} />
       </Tabs>
 
       {/* Tab Content */}
       {activeTab === 0 ? (
         <TierManagementTab
-          tiers={tiers}
+          tiers={paginatedTiers}
+          totalTiers={filteredAndSortedTiers.length}
           sortConfig={sortConfig}
           handleSort={handleSort}
           getStatusIcon={getStatusIcon}
           handleOpenDialog={handleOpenDialog}
           handleDelete={handleDelete}
+          statusFilter={statusFilter}
+          handleStatusFilterChange={handleStatusFilterChange}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          handleChangePage={handleChangePage}
+          handleChangeRowsPerPage={handleChangeRowsPerPage}
+          loading={loading}
+          fetchTiers={fetchTiers}
+          clearAllFilters={clearAllFilters}
         />
       ) : (
         <VoucherManagementTab />
       )}
 
       {/* 添加/编辑等级对话框 */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ 
-          backgroundColor: '#f5f5f5', 
-          borderBottom: '1px solid #eee',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px'
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Background Mascot with Low Opacity */}
+        <Box
+          component="img"
+          src={`${process.env.PUBLIC_URL}/mascot_lowopacity1.png`}
+          alt="Background Mascot"
+          sx={{
+            position: 'absolute',
+            top: '20%',
+            right: '-5px',
+            width: '400px',
+            height: 'auto',
+            opacity: 0.15,
+            zIndex: 0,
+            pointerEvents: 'none'
+          }}
+        />
+
+        <DialogTitle sx={{
+          textAlign: 'center',
+          pb: 1,
+          position: 'relative',
+          zIndex: 1
         }}>
-          {currentTier ? (
-            <>
-              <EditIcon color="primary" sx={{ mr: 1.5, fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Edit {currentTier.tierName} Tier
-              </Typography>
-            </>
-          ) : (
-            <>
-              <AddIcon color="primary" sx={{ mr: 1.5, fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Create New Tier
-              </Typography>
-            </>
-          )}
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              mb: 1
+            }}>
+              {currentTier ? t('admin.editTier') : t('admin.addNewTier')}
+            </Typography>
+            <Typography variant="body2" sx={{
+              color: theme.palette.text.secondary,
+              fontWeight: 500
+            }}>
+              {currentTier ? t('admin.updateTierDescription') : t('admin.addNewTierDescription')}
+            </Typography>
+          </Box>
         </DialogTitle>
-        
-        <DialogContent sx={{ py: 3 }}>
-          <Grid container spacing={2}>
-            {/* Tier Name 字段 - 改为自由输入 */}
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Tier Name *"
-                name="tierName"
-                value={formData.tierName}
-                onChange={handleChange}
-                error={!!formErrors.tierName}
-                helperText={formErrors.tierName}
-                required
-              />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.8rem' }}>
-                Example: Silver, Gold, Platinum
-              </Typography>
-            </Grid>
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Benefits *"
-                name="benefits"
-                value={formData.benefits}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                placeholder="Describe the benefits for this tier..."
-                error={!!formErrors.benefits}
-                helperText={formErrors.benefits}
-                required
+        <DialogContent sx={{ position: 'relative', zIndex: 1 }}>
+          {/* Basic Information Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: theme.palette.primary.main,
+                mb: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  width: 8,
+                  height: 8,
+                  backgroundColor: theme.palette.primary.main,
+                  borderRadius: '50%'
+                }}
               />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, fontSize: '0.8rem' }}>
-                Example: 10% discount on all bookings, 2 free bookings per month
-              </Typography>
-            </Grid>
+              {t('admin.basicInformation')}
+            </Typography>
 
-            {/* 积分范围 - 添加重叠验证 */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Minimum Points *"
-                name="minPoints"
-                value={formData.minPoints}
-                onChange={handleChange}
-                InputProps={{ inputProps: { min: 0 } }}
-                error={!!formErrors.minPoints}
-                helperText={formErrors.minPoints}
-                required
-              />
-            </Grid>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <Typography
+                  component="label"
+                  sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}
+                >
+                  {t('admin.tierName')} *
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('admin.enterTierName')}
+                  name="tierName"
+                  value={formData.tierName}
+                  onChange={handleChange}
+                  error={!!formErrors.tierName}
+                  helperText={formErrors.tierName}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Maximum Points *"
-                name="maxPoints"
-                value={formData.maxPoints}
-                onChange={handleChange}
-                InputProps={{ inputProps: { min: formData.minPoints + 1 } }}
-                error={!!formErrors.maxPoints}
-                helperText={formErrors.maxPoints}
-                required
-              />
+              <Grid item xs={12} md={8}>
+                <Typography
+                  component="label"
+                  sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}
+                >
+                  {t('admin.benefits')} *
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  multiline
+                  rows={3}
+                  placeholder={t('admin.enterBenefits')}
+                  name="benefits"
+                  value={formData.benefits}
+                  onChange={handleChange}
+                  error={!!formErrors.benefits}
+                  helperText={formErrors.benefits}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#f9fafb',
+                      '&:focus-within': {
+                        backgroundColor: theme.palette.background.paper,
+                        boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                      }
+                    }
+                  }}
+                />
+              </Grid>
             </Grid>
-            
-            {/* 范围错误提示 */}
-            {formErrors.range && (
-              <Grid item xs={12}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  backgroundColor: '#fff8e1', 
-                  padding: '8px 12px', 
-                  borderRadius: '4px',
-                  borderLeft: '4px solid #ffc107'
-                }}>
-                  <WarningIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="body2" color="error">
-                    {formErrors.range}
+          </Box>
+
+          {/* Points Configuration Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.pointsRange')}
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.minPoints')} *
                   </Typography>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    placeholder={t('admin.enterMinPoints')}
+                    name="minPoints"
+                    value={formData.minPoints}
+                    onChange={handleChange}
+                    error={!!formErrors.minPoints}
+                    helperText={formErrors.minPoints}
+                    InputProps={{ inputProps: { min: 0 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
                 </Box>
               </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.maxPoints')} *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    placeholder={t('admin.enterMaxPoints')}
+                    name="maxPoints"
+                    value={formData.maxPoints}
+                    onChange={handleChange}
+                    error={!!formErrors.maxPoints}
+                    helperText={formErrors.maxPoints}
+                    InputProps={{ inputProps: { min: formData.minPoints + 1 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+
+            {/* 范围错误提示 */}
+            {formErrors.range && (
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: '#fff8e1',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                borderLeft: '4px solid #ffc107',
+                mt: 2
+              }}>
+                <WarningIcon color="warning" sx={{ mr: 1 }} />
+                <Typography variant="body2" color="error" sx={{ fontWeight: 500 }}>
+                  {formErrors.range}
+                </Typography>
+              </Box>
             )}
-            
-            <Grid item xs={12}>
+          </Box>
+
+          {/* Status Configuration Section */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.tierStatus')}
+            </Typography>
+
+            <Box sx={{
+              backgroundColor: '#f9fafb',
+              borderRadius: '12px',
+              p: 3,
+              border: '1px solid #e5e7eb'
+            }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -536,37 +772,62 @@ const AdminManageTiers = () => {
                     color="primary"
                   />
                 }
-                label="Active Tier"
-                sx={{ mt: 1 }}
+                label={
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
+                      {t('admin.active')} {t('admin.tierName')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mt: 0.5 }}>
+                      {formData.active
+                        ? "Active tiers are available for members to achieve"
+                        : "Inactive tiers are not available for new members"}
+                    </Typography>
+                  </Box>
+                }
+                sx={{ m: 0 }}
               />
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontSize: '0.8rem' }}>
-                {formData.active 
-                  ? "Active tiers are available for members to achieve" 
-                  : "Inactive tiers are not available for new members"}
-              </Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </DialogContent>
-        
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #eee' }}>
-          <Button 
+
+        <DialogActions sx={{ p: 4, pt: 2, gap: 2, justifyContent: 'flex-end' }}>
+          <Button
             onClick={handleCloseDialog}
             variant="outlined"
-            sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main }}
+            sx={{
+              borderRadius: '12px',
+              px: 3,
+              py: 1.5,
+              borderColor: theme.palette.grey[300],
+              color: theme.palette.text.primary,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: theme.palette.primary.main + '10'
+              }
+            }}
           >
-            Cancel
+            {t('admin.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
             disabled={loading}
-            sx={{ 
-              backgroundColor: '#8e44ad', 
-              '&:hover': { backgroundColor: '#732d91' },
-              ml: 1
+            sx={{
+              borderRadius: '12px',
+              px: 3,
+              py: 1.5,
+              backgroundColor: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.primary.dark,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : currentTier ? 'Update Tier' : 'Create Tier'}
+            {loading ? (
+              <CircularProgress size={24} sx={{ color: 'white' }} />
+            ) : (
+              currentTier ? t('admin.update') : t('admin.create')
+            )}
           </Button>
         </DialogActions>
       </Dialog>
@@ -585,26 +846,26 @@ const AdminManageTiers = () => {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #eee' }}>
-          <Button 
+          <Button
             onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
             variant="outlined"
             sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main }}
           >
-            Cancel
+            {t('admin.cancel')}
           </Button>
           <Button
             onClick={confirmAction}
             variant="contained"
             disabled={loading}
-            sx={{ 
-              backgroundColor: confirmDialog.action === 'delete' ? '#e74c3c' : '#8e44ad', 
-              '&:hover': { 
-                backgroundColor: confirmDialog.action === 'delete' ? '#c0392b' : '#732d91' 
+            sx={{
+              backgroundColor: confirmDialog.action === 'delete' ? '#e74c3c' : '#8e44ad',
+              '&:hover': {
+                backgroundColor: confirmDialog.action === 'delete' ? '#c0392b' : '#732d91'
               },
               ml: 1
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : confirmDialog.action === 'delete' ? 'Delete' : confirmDialog.action === 'activate' ? 'Activate' : 'Deactivate'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : confirmDialog.action === 'delete' ? t('admin.delete') : confirmDialog.action === 'activate' ? t('admin.active') : t('admin.inactive')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -629,21 +890,26 @@ const AdminManageTiers = () => {
 };
 
 // Tier Management Tab Component
-const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handleOpenDialog, handleDelete }) => {
+const TierManagementTab = ({
+  tiers,
+  totalTiers,
+  sortConfig,
+  handleSort,
+  getStatusIcon,
+  handleOpenDialog,
+  handleDelete,
+  statusFilter,
+  handleStatusFilterChange,
+  page,
+  rowsPerPage,
+  handleChangePage,
+  handleChangeRowsPerPage,
+  loading,
+  fetchTiers,
+  clearAllFilters
+}) => {
   const theme = useTheme();
-  // sortedAndFilteredTiers 逻辑移到这里
-  const sortedAndFilteredTiers = React.useMemo(() => {
-    let filtered = tiers;
-    return [...filtered].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [tiers, sortConfig]);
+  const { t } = useLanguage();
 
   return (
     <Box>
@@ -653,28 +919,80 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ 
-            backgroundColor: theme.palette.primary.main, 
-            color: theme.palette.primary.contrastText,
-            fontWeight: 600,
-            borderRadius: 3,
+          sx={{
+            borderRadius: '8px',
             px: 3,
-            py: 1.2,
-            boxShadow: theme.shadows[2],
-            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] }
+            py: 1.5,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            '&:hover': {
+              boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+              transform: 'translateY(-1px)'
+            }
           }}
         >
-          Add New Tier
+          {t('admin.addNewTier')}
         </Button>
       </Box>
 
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          borderRadius: '16px', 
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          maxHeight: 'calc(100vh - 250px)',
-          overflowY: 'auto'
+      {/* Actions Bar */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>{t('admin.status')}</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              label={t('admin.status')}
+            >
+              <MenuItem value="">{t('admin.allStatuses')}</MenuItem>
+              <MenuItem value="active">{t('admin.active')}</MenuItem>
+              <MenuItem value="inactive">{t('admin.inactive')}</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            onClick={clearAllFilters}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {t('admin.clear')}
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchTiers}
+            disabled={loading}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {t('admin.refresh')}
+          </Button>
+        </Box>
+      </Paper>
+
+      {/* Tiers Table */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}
       >
         <Table stickyHeader>
@@ -686,7 +1004,7 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
                   direction={sortConfig.direction}
                   onClick={() => handleSort('tierName')}
                 >
-                  Tier Name
+                  {t('admin.tierName')}
                 </TableSortLabel>
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
@@ -695,7 +1013,7 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
                   direction={sortConfig.direction}
                   onClick={() => handleSort('minPoints')}
                 >
-                  Min Points
+                  {t('admin.minPoints')}
                 </TableSortLabel>
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
@@ -704,18 +1022,18 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
                   direction={sortConfig.direction}
                   onClick={() => handleSort('maxPoints')}
                 >
-                  Max Points
+                  {t('admin.maxPoints')}
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Benefits</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, textAlign: 'center' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.benefits')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.status')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, textAlign: 'center' }}>{t('admin.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedAndFilteredTiers.length > 0 ? (
-              sortedAndFilteredTiers.map((tier) => (
-                <TableRow 
+            {tiers.length > 0 ? (
+              tiers.map((tier) => (
+                <TableRow
                   key={tier.id}
                   sx={{
                     opacity: tier.active ? 1 : 0.8,
@@ -727,17 +1045,17 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
                 >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography sx={{ fontWeight: 600 }}>{tier.tierName}</Typography>
+                      <Typography sx={{ fontWeight: 700 }}>{tier.tierName}</Typography>
                       {!tier.active && (
-                        <Chip 
-                          label="Inactive" 
-                          size="small" 
-                          sx={{ 
-                            ml: 1, 
+                        <Chip
+                          label={t('admin.inactive')}
+                          size="small"
+                          sx={{
+                            ml: 1,
                             backgroundColor: '#f5f5f5',
                             color: '#757575',
                             fontSize: '0.7rem'
-                          }} 
+                          }}
                         />
                       )}
                     </Box>
@@ -753,16 +1071,16 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
                     {getStatusChip(tier.active ? 'ACTIVE' : 'INACTIVE')}
                   </TableCell>
                   <TableCell sx={{ textAlign: 'center' }}>
-                    <Tooltip title="Edit">
-                      <IconButton 
+                    <Tooltip title={t('admin.edit')}>
+                      <IconButton
                         onClick={() => handleOpenDialog(tier)}
                         sx={{ color: theme.palette.primary.main }}
                       >
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton 
+                    <Tooltip title={t('admin.delete')}>
+                      <IconButton
                         onClick={() => handleDelete(tier.id)}
                         sx={{ color: '#e74c3c' }}
                       >
@@ -775,12 +1093,29 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
             ) : (
               <TableRow>
                 <TableCell colSpan={6} align="center">
-                  No tiers found.
+                  {t('admin.noTiersFound')}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+
+        {/* Table Pagination */}
+        <TableFooter>
+          <TableRow>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              colSpan={6}
+              count={totalTiers}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              labelRowsPerPage="Rows per page:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count !== -1 ? count : `more than ${to}`}`}
+            />
+          </TableRow>
+        </TableFooter>
       </TableContainer>
     </Box>
   );
@@ -788,6 +1123,7 @@ const TierManagementTab = ({ tiers, sortConfig, handleSort, getStatusIcon, handl
 
 // Voucher Management Tab Component
 const VoucherManagementTab = () => {
+  const { t } = useLanguage();
   const [vouchers, setVouchers] = useState([]);
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -824,6 +1160,12 @@ const VoucherManagementTab = () => {
     key: 'code',
     direction: 'asc'
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    tierName: '',
+    discountType: '',
+    expiryStatus: ''
+  });
   const theme = useTheme();
 
   useEffect(() => {
@@ -839,7 +1181,7 @@ const VoucherManagementTab = () => {
       const response = await axios.get('http://localhost:8081/api/admin/vouchers', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (Array.isArray(response.data)) {
         setVouchers(response.data);
       } else {
@@ -909,7 +1251,7 @@ const VoucherManagementTab = () => {
       ...prev,
       [name]: name === 'discountValue' || name === 'requestPoints' ? Number(value) : value
     }));
-    
+
     // 清除对应字段的错误
     if (formErrors[name]) {
       setFormErrors(prev => ({
@@ -926,9 +1268,9 @@ const VoucherManagementTab = () => {
       requestPoints: '',
       tierName: ''
     };
-    
+
     let isValid = true;
-    
+
     // Code 验证
     if (!formData.code.trim()) {
       errors.code = 'Voucher code is required';
@@ -937,25 +1279,25 @@ const VoucherManagementTab = () => {
       errors.code = 'Voucher code is too long (max 20 characters)';
       isValid = false;
     }
-    
+
     // Discount Value 验证
     if (formData.discountValue <= 0) {
       errors.discountValue = 'Discount value must be greater than 0';
       isValid = false;
     }
-    
+
     // Request Points 验证
     if (formData.requestPoints < 0) {
       errors.requestPoints = 'Request points must be 0 or greater';
       isValid = false;
     }
-    
+
     // Tier Name 验证 - 移除必填验证，允许创建general voucher
     // if (!currentVoucher && !formData.tierName.trim()) {
     //   errors.tierName = 'Tier name is required';
     //   isValid = false;
     // }
-    
+
     setFormErrors(errors);
     return isValid;
   };
@@ -1067,8 +1409,63 @@ const VoucherManagementTab = () => {
     setSortConfig({ key, direction });
   };
 
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleFilterChange = (filterType, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setFilters({
+      tierName: '',
+      discountType: '',
+      expiryStatus: ''
+    });
+  };
+
   const sortedAndFilteredVouchers = React.useMemo(() => {
-    return [...vouchers].sort((a, b) => {
+    let filtered = vouchers;
+
+    // 搜索过滤
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(voucher =>
+        voucher.code.toLowerCase().includes(term) ||
+        (voucher.tierName && voucher.tierName.toLowerCase().includes(term))
+      );
+    }
+
+    // Tier过滤器
+    if (filters.tierName) {
+      if (filters.tierName === 'no-tier') {
+        filtered = filtered.filter(voucher => !voucher.tierName);
+      } else {
+        filtered = filtered.filter(voucher => voucher.tierName === filters.tierName);
+      }
+    }
+
+    // Discount Type过滤器
+    if (filters.discountType) {
+      filtered = filtered.filter(voucher => voucher.discountType === filters.discountType);
+    }
+
+    // Expiry Status过滤器
+    if (filters.expiryStatus) {
+      if (filters.expiryStatus === 'has-expiry') {
+        filtered = filtered.filter(voucher => voucher.expiryDate);
+      } else if (filters.expiryStatus === 'no-expiry') {
+        filtered = filtered.filter(voucher => !voucher.expiryDate);
+      }
+    }
+
+    // 排序
+    return [...filtered].sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
         return sortConfig.direction === 'asc' ? -1 : 1;
       }
@@ -1077,7 +1474,7 @@ const VoucherManagementTab = () => {
       }
       return 0;
     });
-  }, [vouchers, sortConfig]);
+  }, [vouchers, searchTerm, filters, sortConfig]);
 
   const handleSnackbarClose = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
@@ -1102,7 +1499,7 @@ const VoucherManagementTab = () => {
           sx={{ backgroundColor: '#8e44ad', '&:hover': { backgroundColor: '#732d91' } }}
           onClick={fetchVouchers}
         >
-          Try Again
+          {t('admin.refresh')}
         </Button>
       </Box>
     );
@@ -1110,35 +1507,142 @@ const VoucherManagementTab = () => {
 
   return (
     <>
-      {/* Header Section */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 4, flexWrap: 'wrap' }}>
+      {/* Add New Voucher Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
-          sx={{ 
-            backgroundColor: theme.palette.primary.main, 
-            color: theme.palette.primary.contrastText,
-            fontWeight: 600,
-            borderRadius: 3,
+          sx={{
+            borderRadius: '8px',
             px: 3,
-            py: 1.2,
-            boxShadow: theme.shadows[2],
-            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: theme.shadows[4] }
+            py: 1.5,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            '&:hover': {
+              boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+              transform: 'translateY(-1px)'
+            }
           }}
         >
-          Add New Voucher
+          {t('admin.addNewVoucher')}
         </Button>
       </Box>
 
+      {/* Search and Actions Bar */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Tooltip title={t('admin.search')} arrow>
+            <TextField
+              placeholder={t('admin.search')}
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                endAdornment: searchTerm && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSearchChange({ target: { value: '' } })}
+                    sx={{ mr: 1 }}
+                  >
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>✕</Typography>
+                  </IconButton>
+                )
+              }}
+              sx={{ minWidth: 200 }}
+            />
+          </Tooltip>
+
+          {/* Tier Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>{t('admin.tierName')}</InputLabel>
+            <Select
+              value={filters.tierName}
+              onChange={(e) => handleFilterChange('tierName', e.target.value)}
+              label={t('admin.tierName')}
+            >
+              <MenuItem value="">{t('admin.allTiers')}</MenuItem>
+              <MenuItem value="no-tier">{t('admin.general')}</MenuItem>
+              {tiers.map((tier) => (
+                <MenuItem key={tier.id} value={tier.tierName}>
+                  {tier.tierName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Discount Type Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>{t('admin.discountType')}</InputLabel>
+            <Select
+              value={filters.discountType}
+              onChange={(e) => handleFilterChange('discountType', e.target.value)}
+              label={t('admin.discountType')}
+            >
+              <MenuItem value="">{t('admin.allTypes')}</MenuItem>
+              <MenuItem value="amount">{t('admin.amount')}</MenuItem>
+              <MenuItem value="percentage">{t('admin.percentage')}</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Expiry Status Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Expiry Status</InputLabel>
+            <Select
+              value={filters.expiryStatus}
+              onChange={(e) => handleFilterChange('expiryStatus', e.target.value)}
+              label="Expiry Status"
+            >
+              <MenuItem value="">All Statuses</MenuItem>
+              <MenuItem value="has-expiry">Has Expiry Date</MenuItem>
+              <MenuItem value="no-expiry">No Expiry Date</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            onClick={clearAllFilters}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {t('admin.clear')}
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchVouchers}
+            disabled={loading}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+          >
+            {t('admin.refresh')}
+          </Button>
+        </Box>
+      </Paper>
+
       {/* Vouchers Table */}
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          borderRadius: '16px', 
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          maxHeight: 'calc(100vh - 250px)',
-          overflowY: 'auto'
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}
       >
         <Table stickyHeader>
@@ -1150,7 +1654,7 @@ const VoucherManagementTab = () => {
                   direction={sortConfig.direction}
                   onClick={() => handleSort('code')}
                 >
-                  Voucher Code
+                  {t('admin.voucherCode')}
                 </TableSortLabel>
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
@@ -1159,7 +1663,7 @@ const VoucherManagementTab = () => {
                   direction={sortConfig.direction}
                   onClick={() => handleSort('discountValue')}
                 >
-                  Discount
+                  {t('admin.discountValue')}
                 </TableSortLabel>
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>
@@ -1168,18 +1672,18 @@ const VoucherManagementTab = () => {
                   direction={sortConfig.direction}
                   onClick={() => handleSort('requestPoints')}
                 >
-                  Points Required
+                  {t('admin.requestPoints')}
                 </TableSortLabel>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Tier</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>Expiry Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, textAlign: 'center' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.tierName')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.expiryDate')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, textAlign: 'center' }}>{t('admin.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {sortedAndFilteredVouchers.length > 0 ? (
               sortedAndFilteredVouchers.map((voucher) => (
-                <TableRow 
+                <TableRow
                   key={voucher.id}
                   sx={{
                     '&:hover': {
@@ -1188,27 +1692,26 @@ const VoucherManagementTab = () => {
                   }}
                 >
                   <TableCell>
-                    <Typography sx={{ fontWeight: 600 }}>{voucher.code}</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{voucher.code}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip 
+                    <Chip
                       label={voucher.discountType === 'percentage' ? `${voucher.discountValue}%` : `RM${voucher.discountValue}`}
-                            color="primary"
+                      color={voucher.discountType === 'percentage' ? 'secondary' : 'primary'}
                       size="small"
+                      sx={{
+                        backgroundColor: voucher.discountType === 'percentage' ? '#9c27b0' : '#1976d2',
+                        color: 'white',
+                        fontWeight: 600,
+                        '&:hover': {
+                          backgroundColor: voucher.discountType === 'percentage' ? '#7b1fa2' : '#1565c0'
+                        }
+                      }}
                     />
                   </TableCell>
                   <TableCell>{voucher.requestPoints.toLocaleString()}</TableCell>
                   <TableCell>
-                    {voucher.tierName ? (
-                      <Chip 
-                        label={voucher.tierName} 
-                        size="small" 
-                        color="info" 
-                        variant="outlined"
-                      />
-                    ) : (
-                      <Chip label="No Tier" size="small" color="default" />
-                    )}
+                    {getTierChip(voucher.tierName)}
                   </TableCell>
                   <TableCell>
                     {voucher.expiryDate ? (
@@ -1216,20 +1719,20 @@ const VoucherManagementTab = () => {
                         {formatDateToDDMMYYYY(voucher.expiryDate)}
                       </Typography>
                     ) : (
-                      <Chip label="No Expiry" size="small" color="default" />
+                      <Chip label={t('admin.general')} size="small" color="default" />
                     )}
                   </TableCell>
                   <TableCell sx={{ textAlign: 'center' }}>
-                    <Tooltip title="Edit">
-                      <IconButton 
+                    <Tooltip title={t('admin.edit')}>
+                      <IconButton
                         onClick={() => handleOpenDialog(voucher)}
                         sx={{ color: theme.palette.primary.main }}
                       >
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton 
+                    <Tooltip title={t('admin.delete')}>
+                      <IconButton
                         onClick={() => handleDelete(voucher.id)}
                         sx={{ color: '#e74c3c' }}
                       >
@@ -1242,7 +1745,7 @@ const VoucherManagementTab = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} align="center">
-                  No vouchers found.
+                  {t('admin.noVouchersFound')}
                 </TableCell>
               </TableRow>
             )}
@@ -1251,165 +1754,427 @@ const VoucherManagementTab = () => {
       </TableContainer>
 
       {/* Add/Edit Voucher Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ 
-          backgroundColor: '#f5f5f5', 
-          borderBottom: '1px solid #eee',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 24px'
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Background Mascot with Low Opacity */}
+        <Box
+          component="img"
+          src={`${process.env.PUBLIC_URL}/mascot_lowopacity1.png`}
+          alt="Background Mascot"
+          sx={{
+            position: 'absolute',
+            top: '20%',
+            right: '-5px',
+            width: '400px',
+            height: 'auto',
+            opacity: 0.15,
+            zIndex: 0,
+            pointerEvents: 'none'
+          }}
+        />
+
+        <DialogTitle sx={{
+          textAlign: 'center',
+          pb: 1,
+          position: 'relative',
+          zIndex: 1
         }}>
-          {currentVoucher ? (
-            <>
-              <EditIcon color="primary" sx={{ mr: 1.5, fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Edit Voucher
-              </Typography>
-            </>
-          ) : (
-            <>
-              <AddIcon color="primary" sx={{ mr: 1.5, fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Create New Voucher
-              </Typography>
-            </>
-          )}
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              mb: 1
+            }}>
+              {currentVoucher ? t('admin.editVoucher') : t('admin.addNewVoucher')}
+            </Typography>
+            <Typography variant="body2" sx={{
+              color: theme.palette.text.secondary,
+              fontWeight: 500
+            }}>
+              {currentVoucher ? t('admin.updateVoucherDescription') : t('admin.addNewVoucherDescription')}
+            </Typography>
+          </Box>
         </DialogTitle>
-        
-        <DialogContent sx={{ py: 3 }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Voucher Code *"
-                name="code"
-                value={formData.code}
-                onChange={handleChange}
-                error={!!formErrors.code}
-                helperText={formErrors.code}
-                required
-              />
-            </Grid>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Discount Value *"
-                name="discountValue"
-                value={formData.discountValue}
-                onChange={handleChange}
-                InputProps={{ inputProps: { min: 0, step: 0.01 } }}
-                error={!!formErrors.discountValue}
-                helperText={formErrors.discountValue}
-                required
-              />
-            </Grid>
+        <DialogContent sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="caption" sx={{
+              color: theme.palette.text.secondary,
+              fontWeight: 600,
+              display: 'block',
+              mb: 2
+            }}>
+              * {t('admin.required')}
+            </Typography>
+          </Box>
 
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Discount Type *</InputLabel>
-                <Select
-                  name="discountType"
-                  value={formData.discountType}
-                  onChange={handleChange}
-                  label="Discount Type *"
-                >
-                  <MenuItem value="amount">Fixed Amount (RM)</MenuItem>
-                  <MenuItem value="percentage">Percentage (%)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+          {/* Basic Information Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.basicInformation')}
+            </Typography>
 
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Points Required *"
-                name="requestPoints"
-                value={formData.requestPoints}
-                onChange={handleChange}
-                InputProps={{ inputProps: { min: 0 } }}
-                error={!!formErrors.requestPoints}
-                helperText={formErrors.requestPoints}
-                required
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Expiry Date"
-                name="expiryDate"
-                value={formatDateForHTMLInput(formData.expiryDate)}
-                onChange={(e) => {
-                  const { value } = e.target;
-                  if (value) {
-                    // 将yyyy-MM-dd格式转换为dd-MM-yyyy格式
-                    const formattedDate = formatDateFromHTMLInput(value);
-                    setFormData(prev => ({
-                      ...prev,
-                      expiryDate: formattedDate
-                    }));
-                  } else {
-                    setFormData(prev => ({
-                      ...prev,
-                      expiryDate: ''
-                    }));
-                  }
-                }}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            
+            <Grid container spacing={3}>
               <Grid item xs={12}>
-              <FormControl fullWidth error={!!formErrors.tierName}>
-                <InputLabel>Tier Name</InputLabel>
-                <Select
-                  name="tierName"
-                  value={formData.tierName}
-                  onChange={handleChange}
-                  label="Tier Name"
-                >
-                  <MenuItem value="">
-                    <em>No Tier (General Voucher)</em>
-                  </MenuItem>
-                  {tiers.map((tier) => (
-                    <MenuItem key={tier.id} value={tier.tierName}>
-                      {tier.tierName}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {formErrors.tierName && (
-                  <Typography variant="caption" color="error">
-                    {formErrors.tierName}
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.voucherCode')} *
                   </Typography>
-                )}
-              </FormControl>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder={t('admin.enterVoucherCode')}
+                    name="code"
+                    value={formData.code}
+                    onChange={handleChange}
+                    error={!!formErrors.code}
+                    helperText={formErrors.code}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
             </Grid>
-          </Grid>
+          </Box>
+
+          {/* Discount Configuration Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.voucherInformation')}
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.discountValue')} *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    placeholder={t('admin.enterDiscountValue')}
+                    name="discountValue"
+                    value={formData.discountValue}
+                    onChange={handleChange}
+                    error={!!formErrors.discountValue}
+                    helperText={formErrors.discountValue}
+                    InputProps={{ inputProps: { min: 0, step: 0.01 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.discountType')} *
+                  </Typography>
+                  <FormControl fullWidth error={!!formErrors.discountType}>
+                    <Select
+                      name="discountType"
+                      value={formData.discountType}
+                      onChange={handleChange}
+                      sx={{
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }}
+                    >
+                      <MenuItem value="amount">{t('admin.amount')} (RM)</MenuItem>
+                      <MenuItem value="percentage">{t('admin.percentage')} (%)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Points and Expiry Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.requestPoints')} & {t('admin.expiryDate')}
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.requestPoints')} *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    placeholder={t('admin.enterRequestPoints')}
+                    name="requestPoints"
+                    value={formData.requestPoints}
+                    onChange={handleChange}
+                    error={!!formErrors.requestPoints}
+                    helperText={formErrors.requestPoints}
+                    InputProps={{ inputProps: { min: 0 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    {t('admin.expiryDate')}
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    name="expiryDate"
+                    value={formatDateForHTMLInput(formData.expiryDate)}
+                    onChange={(e) => {
+                      const { value } = e.target;
+                      if (value) {
+                        // 将yyyy-MM-dd格式转换为dd-MM-yyyy格式
+                        const formattedDate = formatDateFromHTMLInput(value);
+                        setFormData(prev => ({
+                          ...prev,
+                          expiryDate: formattedDate
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          expiryDate: ''
+                        }));
+                      }
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Tier Assignment Section */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}>
+              <Box component="span" sx={{
+                width: 8,
+                height: 8,
+                backgroundColor: theme.palette.primary.main,
+                borderRadius: '50%'
+              }} />
+              {t('admin.tierName')} {t('admin.assignment')}
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography component="label" sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    fontSize: '0.95rem',
+                    mb: 1,
+                    display: 'block'
+                  }}>
+                    Tier Name
+                  </Typography>
+                  <FormControl fullWidth error={!!formErrors.tierName}>
+                    <Select
+                      name="tierName"
+                      value={formData.tierName}
+                      onChange={handleChange}
+                      sx={{
+                        borderRadius: '12px',
+                        backgroundColor: '#f9fafb',
+                        '&:focus-within': {
+                          backgroundColor: theme.palette.background.paper,
+                          boxShadow: `0 0 0 4px ${theme.palette.primary.main}20`
+                        }
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>No Tier (General Voucher)</em>
+                      </MenuItem>
+                      {tiers.map((tier) => (
+                        <MenuItem key={tier.id} value={tier.tierName}>
+                          {tier.tierName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {formErrors.tierName && (
+                      <Typography variant="caption" color="error">
+                        {formErrors.tierName}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
         </DialogContent>
-        
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #eee' }}>
-          <Button 
+
+        <DialogActions sx={{ p: 4, pt: 2, gap: 2, justifyContent: 'flex-end' }}>
+          <Button
             onClick={handleCloseDialog}
             variant="outlined"
-            sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main }}
+            sx={{
+              borderRadius: '12px',
+              px: 3,
+              py: 1.5,
+              borderColor: theme.palette.grey[300],
+              color: theme.palette.text.primary,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: theme.palette.primary.main + '10'
+              }
+            }}
           >
-            Cancel
+            {t('admin.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
             variant="contained"
             disabled={loading}
-            sx={{ 
-              backgroundColor: '#8e44ad', 
-              '&:hover': { backgroundColor: '#732d91' },
-              ml: 1
+            sx={{
+              borderRadius: '12px',
+              px: 3,
+              py: 1.5,
+              backgroundColor: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.primary.dark,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : currentVoucher ? 'Update Voucher' : 'Create Voucher'}
+            {loading ? (
+              <CircularProgress size={24} sx={{ color: 'white' }} />
+            ) : (
+              currentVoucher ? t('admin.update') : t('admin.create')
+            )}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1428,24 +2193,24 @@ const VoucherManagementTab = () => {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #eee' }}>
-          <Button 
+          <Button
             onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
             variant="outlined"
             sx={{ color: theme.palette.primary.main, borderColor: theme.palette.primary.main }}
           >
-            Cancel
+            {t('admin.cancel')}
           </Button>
           <Button
             onClick={confirmAction}
             variant="contained"
             disabled={loading}
-            sx={{ 
-              backgroundColor: '#e74c3c', 
+            sx={{
+              backgroundColor: '#e74c3c',
               '&:hover': { backgroundColor: '#c0392b' },
               ml: 1
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Delete'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : t('admin.delete')}
           </Button>
         </DialogActions>
       </Dialog>

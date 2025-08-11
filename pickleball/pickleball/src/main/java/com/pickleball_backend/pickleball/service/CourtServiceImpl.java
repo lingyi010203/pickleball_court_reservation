@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.service;
 
 import com.pickleball_backend.pickleball.dto.CourtDto;
 import com.pickleball_backend.pickleball.dto.CourtPricingDto;
+import com.pickleball_backend.pickleball.dto.CourtDeletePreviewDto;
 import com.pickleball_backend.pickleball.dto.SlotDto;
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.ValidationException;
@@ -73,6 +74,8 @@ public class CourtServiceImpl implements CourtService {
 
     private void generateSlotsForNewCourt(Court court) {
         try {
+            System.out.println("==> generateSlotsForNewCourt called for court " + court.getId());
+            
             if (court.getOpeningTime() == null || court.getClosingTime() == null) {
                 throw new ValidationException("Court operating hours not defined");
             }
@@ -81,14 +84,20 @@ public class CourtServiceImpl implements CourtService {
             if (opening.isAfter(closing)) {
                 throw new ValidationException("Opening time must be before closing time");
             }
+            
             Set<DayOfWeek> operatingDaySet = parseOperatingDays(court.getOperatingDays());
+            System.out.println("==> Operating days set: " + operatingDaySet);
+            
             LocalDate start = LocalDate.now();
             LocalDate end = start.plusMonths(3);
             List<SlotDto> slots = new ArrayList<>();
+            
             for (LocalDate date = start; date.isBefore(end); date = date.plusDays(1)) {
                 if (!operatingDaySet.isEmpty() && !operatingDaySet.contains(date.getDayOfWeek())) {
+                    System.out.println("==> Skipping date " + date + " (not in operating days)");
                     continue;
                 }
+                
                 LocalTime slotStart = opening;
                 while (slotStart.isBefore(closing)) {
                     LocalTime slotEnd = slotStart.plusHours(1);
@@ -106,9 +115,94 @@ public class CourtServiceImpl implements CourtService {
                     slotStart = slotStart.plusHours(1);
                 }
             }
+            
+            System.out.println("==> Generated " + slots.size() + " slots");
+            if (!slots.isEmpty()) {
+                System.out.println("==> First slot: " + slots.get(0).getDate() + " " + slots.get(0).getStartTime() + "-" + slots.get(0).getEndTime());
+                System.out.println("==> Last slot: " + slots.get(slots.size()-1).getDate() + " " + slots.get(slots.size()-1).getStartTime() + "-" + slots.get(slots.size()-1).getEndTime());
+            }
+            
             slotService.createSlots(slots);
+            System.out.println("==> Slots created successfully");
         } catch (DateTimeParseException e) {
             throw new ValidationException("Invalid time format: " + e.getMessage());
+        }
+    }
+
+    private void regenerateSlotsForCourt(Court court) {
+        try {
+            System.out.println("==> regenerateSlotsForCourt called for court " + court.getId());
+            System.out.println("==> Court operating days: " + court.getOperatingDays());
+            System.out.println("==> Court opening time: " + court.getOpeningTime());
+            System.out.println("==> Court closing time: " + court.getClosingTime());
+            
+            LocalDate today = LocalDate.now();
+            
+            // 获取该court的所有未来slots
+            List<Slot> existingSlots = slotRepository.findByCourtIdAndDateGreaterThanEqual(court.getId(), today);
+            System.out.println("==> Found " + existingSlots.size() + " existing future slots");
+            
+            // 解析新的operating days
+            Set<DayOfWeek> newOperatingDays = parseOperatingDays(court.getOperatingDays());
+            System.out.println("==> New operating days: " + newOperatingDays);
+            
+            // 处理已预订的slots
+            List<Slot> bookedSlots = existingSlots.stream()
+                .filter(slot -> {
+                    boolean hasBooking = bookingSlotRepository.existsBySlotIdAndStatusIn(slot.getId(), Arrays.asList("BOOKED", "CONFIRMED"));
+                    if (hasBooking) {
+                        System.out.println("==> Found booked slot: " + slot.getId() + " for date " + slot.getDate() + " (day: " + slot.getDate().getDayOfWeek() + ")");
+                        
+                        // 检查这个slot的日期是否仍然在新的operating days中
+                        boolean isStillOperatingDay = newOperatingDays.contains(slot.getDate().getDayOfWeek());
+                        if (!isStillOperatingDay) {
+                            System.out.println("==> Marking booked slot as SPECIAL_CIRCUMSTANCE: " + slot.getId());
+                            slot.setStatus("SPECIAL_CIRCUMSTANCE");
+                            slotRepository.save(slot);
+                        }
+                    }
+                    return hasBooking;
+                })
+                .collect(Collectors.toList());
+            
+            System.out.println("==> Processed " + bookedSlots.size() + " booked slots");
+            
+            // 过滤出未被预订的slots
+            List<Slot> unbookedSlots = existingSlots.stream()
+                .filter(slot -> {
+                    boolean hasBooking = bookingSlotRepository.existsBySlotIdAndStatusIn(slot.getId(), Arrays.asList("BOOKED", "CONFIRMED"));
+                    return !hasBooking;
+                })
+                .collect(Collectors.toList());
+            
+            // 删除未被预订的slots
+            for (Slot slot : unbookedSlots) {
+                System.out.println("==> Deleting unbooked slot: " + slot.getId() + " for date " + slot.getDate());
+                slotRepository.delete(slot);
+            }
+            
+            System.out.println("==> Deleted " + unbookedSlots.size() + " unbooked slots");
+            
+            // 重新生成slots
+            generateSlotsForNewCourt(court);
+            
+            // 验证新生成的slots
+            List<Slot> newSlots = slotRepository.findByCourtIdAndDateGreaterThanEqual(court.getId(), today);
+            System.out.println("==> After regeneration, found " + newSlots.size() + " slots");
+            
+            // 显示前几个slots的详细信息
+            newSlots.stream().limit(5).forEach(slot -> {
+                System.out.println("==> New slot: ID=" + slot.getId() + 
+                    ", Date=" + slot.getDate() + 
+                    ", Time=" + slot.getStartTime() + "-" + slot.getEndTime() + 
+                    ", Available=" + slot.isAvailable() + 
+                    ", Status=" + slot.getStatus());
+            });
+            
+            System.out.println("==> Regenerated slots for court " + court.getId());
+        } catch (Exception e) {
+            System.err.println("==> Error regenerating slots for court " + court.getId() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -137,6 +231,7 @@ public class CourtServiceImpl implements CourtService {
     @Override
     @Transactional
     public Court updateCourt(Integer id, CourtDto courtDto) {
+        System.out.println("==> updateCourt called, id=" + id + ", dto=" + courtDto);
         Court existingCourt = courtRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Court not found with id: " + id));
 
@@ -147,7 +242,48 @@ public class CourtServiceImpl implements CourtService {
             }
         }
 
-        return saveOrUpdateCourt(existingCourt, courtDto);
+        // 检查是否是恢复DELETED状态的球场
+        boolean isRestoringDeletedCourt = "DELETED".equalsIgnoreCase(existingCourt.getStatus()) && 
+                                        !"DELETED".equalsIgnoreCase(courtDto.getStatus());
+        
+        System.out.println("==> Existing court status: " + existingCourt.getStatus());
+        System.out.println("==> New court status: " + courtDto.getStatus());
+        System.out.println("==> Is restoring deleted court: " + isRestoringDeletedCourt);
+
+        // 检查operating days是否有变化
+        boolean operatingDaysChanged = false;
+        if (existingCourt.getOperatingDays() == null && courtDto.getOperatingDays() != null) {
+            operatingDaysChanged = true;
+        } else if (existingCourt.getOperatingDays() != null && courtDto.getOperatingDays() == null) {
+            operatingDaysChanged = true;
+        } else if (existingCourt.getOperatingDays() != null && courtDto.getOperatingDays() != null) {
+            String existingNormalized = Arrays.stream(existingCourt.getOperatingDays().split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .distinct()
+                .collect(Collectors.joining(","));
+            String newNormalized = Arrays.stream(courtDto.getOperatingDays().split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .distinct()
+                .collect(Collectors.joining(","));
+            operatingDaysChanged = !existingNormalized.equals(newNormalized);
+        }
+
+        Court updatedCourt = saveOrUpdateCourt(existingCourt, courtDto);
+
+        // 如果是恢复DELETED状态的球场，重新生成slots
+        if (isRestoringDeletedCourt) {
+            System.out.println("==> Restoring deleted court, regenerating slots for court " + id);
+            regenerateSlotsForCourt(updatedCourt);
+        }
+        // 如果operating days有变化，重新生成slots
+        else if (operatingDaysChanged) {
+            System.out.println("==> Operating days changed, regenerating slots for court " + id);
+            regenerateSlotsForCourt(updatedCourt);
+        }
+
+        return updatedCourt;
     }
 
     private Court saveOrUpdateCourt(Court court, CourtDto courtDto) {
@@ -156,8 +292,9 @@ public class CourtServiceImpl implements CourtService {
             court.setName(courtDto.getName());
             court.setLocation(courtDto.getLocation());
             
-            // 如果是新建场地，设置场馆
-            if (court.getVenue() == null && courtDto.getVenueId() != null) {
+            // 更新场馆（如果venueId有变化）
+            if (courtDto.getVenueId() != null) {
+                System.out.println("==> Updating venue to ID: " + courtDto.getVenueId());
                 Venue venue = venueRepository.findById(courtDto.getVenueId())
                     .orElseThrow(() -> new EntityNotFoundException("Venue not found with id: " + courtDto.getVenueId()));
                 court.setVenue(venue);
@@ -172,8 +309,10 @@ public class CourtServiceImpl implements CourtService {
                     .map(String::toUpperCase)
                     .distinct()
                     .collect(Collectors.joining(","));
+                System.out.println("==> Updating operating days to: " + normalizedDays);
                 court.setOperatingDays(normalizedDays);
             } else {
+                System.out.println("==> Setting operating days to null");
                 court.setOperatingDays(null);
             }
             court.setPeakHourlyPrice(courtDto.getPeakHourlyPrice());
@@ -181,6 +320,12 @@ public class CourtServiceImpl implements CourtService {
             court.setDailyPrice(courtDto.getDailyPrice());
             court.setPeakStartTime(courtDto.getPeakStartTime());
             court.setPeakEndTime(courtDto.getPeakEndTime());
+            
+            // 更新场地类型
+            if (courtDto.getCourtType() != null) {
+                System.out.println("==> Updating court type to: " + courtDto.getCourtType());
+                court.setCourtType(courtDto.getCourtType());
+            }
 
             validatePeakTimes(courtDto);
             Court saved = courtRepository.save(court);
@@ -221,7 +366,7 @@ public class CourtServiceImpl implements CourtService {
         Court court = courtRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Court not found with id: " + id));
 
-        if (court.getIsArchived() != null && court.getIsArchived()) {
+        if ("DELETED".equalsIgnoreCase(court.getStatus())) {
             throw new IllegalStateException("Court already deleted");
         }
 
@@ -258,9 +403,91 @@ public class CourtServiceImpl implements CourtService {
             }
         }
 
-        // 軟刪除球場
-        courtRepository.softDeleteCourt(id, LocalDateTime.now());
-        log.info("Court {} has been soft deleted", id);
+        // 软删除球场：将状态设为DELETED而不是归档
+        court.setStatus("DELETED");
+        courtRepository.save(court);
+        log.info("Court {} has been soft deleted (status set to DELETED)", id);
+    }
+
+    @Override
+    public CourtDeletePreviewDto getDeletePreview(Integer id) {
+        try {
+            Court court = courtRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Court not found with id: " + id));
+
+            // 检查球场是否已经被删除
+            if ("DELETED".equalsIgnoreCase(court.getStatus())) {
+                throw new IllegalStateException("Court already deleted");
+            }
+
+            CourtDeletePreviewDto preview = new CourtDeletePreviewDto();
+
+            // 获取active bookings
+            List<BookingSlot> activeBookingSlots = bookingSlotRepository.findActiveByCourtId(id);
+            List<Booking> activeBookings = activeBookingSlots.stream()
+                .map(BookingSlot::getBooking)
+                .filter(Objects::nonNull)
+                .filter(b -> !"CANCELLED".equalsIgnoreCase(b.getStatus()) && 
+                            !"COMPLETED".equalsIgnoreCase(b.getStatus()) && 
+                            !"CANCELLED_DUE_TO_COURT_DELETION".equalsIgnoreCase(b.getStatus()))
+                .collect(Collectors.toList());
+
+            List<CourtDeletePreviewDto.AffectedBookingDto> affectedBookings = activeBookings.stream()
+                .map(booking -> {
+                    CourtDeletePreviewDto.AffectedBookingDto dto = new CourtDeletePreviewDto.AffectedBookingDto();
+                    
+                    // 安全获取用户名称
+                    String memberName = "Unknown User";
+                    try {
+                        if (booking.getMember() != null && booking.getMember().getUser() != null) {
+                            memberName = booking.getMember().getUser().getName();
+                            if (memberName == null || memberName.trim().isEmpty()) {
+                                memberName = "Unknown User";
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("Error getting member name for booking {}: {}", booking.getId(), e.getMessage());
+                    }
+                    dto.setMemberName(memberName);
+                    
+                    // 获取slot信息
+                    try {
+                        Slot slot = booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty() 
+                            ? booking.getBookingSlots().get(0).getSlot() : null;
+                        if (slot != null) {
+                            dto.setSlotDate(slot.getDate().toString());
+                            dto.setSlotTime(slot.getStartTime() + " - " + slot.getEndTime());
+                        } else {
+                            dto.setSlotDate("N/A");
+                            dto.setSlotTime("N/A");
+                        }
+                    } catch (Exception e) {
+                        log.warn("Error getting slot info for booking {}: {}", booking.getId(), e.getMessage());
+                        dto.setSlotDate("N/A");
+                        dto.setSlotTime("N/A");
+                    }
+                    
+                    dto.setTotalAmount(booking.getTotalAmount());
+                    dto.setBookingStatus(booking.getStatus() != null ? booking.getStatus() : "UNKNOWN");
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+            preview.setActiveBookings(affectedBookings);
+
+            // 获取friendly matches (这里需要根据你的FriendlyMatch实体结构来调整)
+            // 暂时设置为空列表，你需要根据实际的FriendlyMatch实体来实现
+            List<CourtDeletePreviewDto.AffectedFriendlyMatchDto> affectedMatches = new ArrayList<>();
+            preview.setFriendlyMatches(affectedMatches);
+
+            log.info("Delete preview generated for court {}: {} active bookings, {} friendly matches", 
+                    id, affectedBookings.size(), affectedMatches.size());
+            
+            return preview;
+        } catch (Exception e) {
+            log.error("Error generating delete preview for court {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Failed to generate delete preview: " + e.getMessage(), e);
+        }
     }
 
     private void refundBooking(Booking booking) {
@@ -293,9 +520,9 @@ public class CourtServiceImpl implements CourtService {
 
     private void addCompensationPoints(Member member) {
         int currentPoints = member.getTierPointBalance();
-        member.setTierPointBalance(currentPoints + 200); // 添加200積分作為補償
+        member.setTierPointBalance(currentPoints + 100); // 添加100積分作為補償
         memberRepository.save(member);
-        log.info("Added 200 compensation points to member ID: {}", member.getId());
+        log.info("Added 100 compensation points to member ID: {}", member.getId());
     }
 
     @Override
@@ -343,7 +570,16 @@ public class CourtServiceImpl implements CourtService {
     //slot
     @Override
     public List<Court> getAllCourts() {
-        return courtRepository.findActiveCourts(); // Use the new query
+        // 返回所有球场，包括DELETED状态的，用于Admin管理
+        return courtRepository.findAll();
+    }
+
+    @Override
+    public List<Court> getAllCourtsForMember() {
+        // 返回所有非DELETED状态的球场，用于用户查看
+        return courtRepository.findAll().stream()
+                .filter(court -> !"DELETED".equalsIgnoreCase(court.getStatus()))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -381,8 +617,7 @@ public class CourtServiceImpl implements CourtService {
     public Court getCourtByIdForMember(Integer id) {
         return courtRepository.findById(id)
                 .filter(court ->
-                        court.getIsArchived() == null ||
-                                !court.getIsArchived()
+                        !"DELETED".equalsIgnoreCase(court.getStatus())
                 )
                 .orElse(null);
     }

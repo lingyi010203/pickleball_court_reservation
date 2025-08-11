@@ -4,7 +4,7 @@ import {
   TableHead, TableRow, Paper, Button, IconButton, Dialog,
   DialogTitle, DialogContent, DialogActions, Tooltip, Snackbar, Alert,
   CircularProgress, Grid, Chip, MenuItem, FormControl, InputLabel, Select,
-  TablePagination, TableSortLabel, TextField, Divider, Checkbox,
+  TablePagination, TableSortLabel, TextField, Divider,
   Card, CardContent, Avatar, List, ListItem, ListItemText, TableFooter, useTheme
 } from '@mui/material';
 import {
@@ -17,7 +17,6 @@ import {
   CalendarToday as DateIcon,
   Person as PersonIcon,
   SportsTennis as CourtIcon,
-  Receipt as ReceiptIcon,
   Payment as PaymentIcon,
   Warning as WarningIcon,
   FileDownload as ExportIcon,
@@ -28,9 +27,10 @@ import BookingService from '../../service/BookingService';
 import ModernBookingDetailsDialog from './ModernBookingDetailsDialog';
 import { getStatusChip } from './statusConfig';
 import { usePageTheme } from '../../hooks/usePageTheme';
+import { useLanguage } from '../../context/LanguageContext';
 
 const AdminManageBookings = () => {
-  usePageTheme('admin'); // 设置页面类型为admin
+  const { t } = useLanguage();
   const theme = useTheme();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,10 +57,15 @@ const AdminManageBookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [selectedBookings, setSelectedBookings] = useState([]);
   const [adminRemark, setAdminRemark] = useState('');
   const [processDialogOpen, setProcessDialogOpen] = useState(false);
   const [processAction, setProcessAction] = useState('approve'); // 'approve' 或 'reject'
+
+  // 统计数据状态
+  const [pendingCount, setPendingCount] = useState(0);
+  const [confirmedCount, setConfirmedCount] = useState(0);
+  const [cancellationRequestedCount, setCancellationRequestedCount] = useState(0);
+  const [cancelledCount, setCancelledCount] = useState(0);
 
 
   // 状态选项
@@ -69,12 +74,45 @@ const AdminManageBookings = () => {
     { value: 'CONFIRMED', label: 'Confirmed', color: '#4caf50' },
     { value: 'CANCELLED', label: 'Cancelled', color: '#f44336' },
     { value: 'COMPLETED', label: 'Completed', color: '#2196f3' },
-    { value: 'CANCELLATION_REQUESTED', label: 'Cancel Requested', color: '#9c27b0' }
+    { value: 'CANCELLATION_REQUESTED', label: 'Cancel Requested', color: '#9c27b0' },
+    { value: 'CANCELLED_DUE_TO_COURT_DELETION', label: 'Court Deleted', color: '#ff5722' }
   ];
 
   useEffect(() => {
     fetchBookings();
+    fetchStatistics();
   }, [page, rowsPerPage, order, orderBy, searchTerm, statusFilter, dateRange]);
+
+  // 获取统计数据
+  const fetchStatistics = async () => {
+    try {
+      const params = {
+        search: searchTerm,
+        status: statusFilter,
+        startDate: dateRange.start,
+        endDate: dateRange.end
+      };
+      
+      const data = await BookingService.getAllAdminBookings({ ...params, page: 0, size: 1000 });
+      let allBookings = [];
+      
+      if (data && Array.isArray(data.content)) {
+        allBookings = data.content;
+      } else if (Array.isArray(data)) {
+        allBookings = data;
+      }
+      
+      setPendingCount(allBookings.filter(b => b.status === 'PENDING').length);
+      setConfirmedCount(allBookings.filter(b => b.status === 'CONFIRMED').length);
+      setCancellationRequestedCount(allBookings.filter(b => b.status === 'CANCELLATION_REQUESTED').length);
+      setCancelledCount(allBookings.filter(b => b.status === 'CANCELLED' || b.status === 'CANCELLED_DUE_TO_COURT_DELETION').length);
+      
+      // 更新totalBookings为所有预订的总数
+      setTotalBookings(allBookings.length);
+    } catch (err) {
+      console.error('Failed to fetch statistics:', err);
+    }
+  };
 
   const fetchBookings = async () => {
     try {
@@ -104,10 +142,10 @@ const AdminManageBookings = () => {
       }
       setError('');
     } catch (err) {
-      setError(err.message || 'Failed to fetch bookings');
+      setError(err.message || t('admin.failedToFetchBookings'));
       setSnackbar({
         open: true,
-        message: err.message || 'Failed to fetch bookings',
+        message: err.message || t('admin.failedToFetchBookings'),
         severity: 'error'
       });
     } finally {
@@ -176,7 +214,7 @@ const AdminManageBookings = () => {
     if (!adminRemark.trim()) {
       setSnackbar({
         open: true,
-        message: 'Please provide a remark for this cancellation.',
+        message: t('admin.pleaseProvideRemarkForCancellation'),
         severity: 'warning'
       });
       return;
@@ -186,14 +224,14 @@ const AdminManageBookings = () => {
       await BookingService.cancelBooking(selectedBooking.id, adminRemark);
       setSnackbar({
         open: true,
-        message: `Booking #${selectedBooking.id} cancelled successfully`,
+        message: t('admin.bookingCancelledSuccessfully').replace('#{id}', selectedBooking.id),
         severity: 'success'
       });
       fetchBookings();
     } catch (err) {
       setSnackbar({
         open: true,
-        message: err.message || 'Failed to cancel booking',
+        message: err.message || t('admin.failedToCancelBooking'),
         severity: 'error'
       });
     } finally {
@@ -252,51 +290,7 @@ const AdminManageBookings = () => {
     }
   };
 
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelecteds = bookings.map((b) => b.id);
-      setSelectedBookings(newSelecteds);
-      return;
-    }
-    setSelectedBookings([]);
-  };
 
-  const handleSelectBooking = (event, id) => {
-    const selectedIndex = selectedBookings.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = [...selectedBookings, id];
-    } else {
-      newSelected = selectedBookings.filter((b) => b !== id);
-    }
-
-    setSelectedBookings(newSelected);
-  };
-
-  const handleBatchCancel = async () => {
-    if (selectedBookings.length === 0) return;
-
-    try {
-      setLoading(true);
-      await Promise.all(selectedBookings.map(id => BookingService.cancelBooking(id)));
-      setSnackbar({
-        open: true,
-        message: `${selectedBookings.length} bookings cancelled successfully`,
-        severity: 'success'
-      });
-      setSelectedBookings([]);
-      fetchBookings();
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to cancel some bookings',
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSnackbarClose = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
@@ -385,7 +379,7 @@ const AdminManageBookings = () => {
     return time.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  const isSelected = (id) => selectedBookings.indexOf(id) !== -1;
+
 
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
@@ -404,286 +398,387 @@ const AdminManageBookings = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-            Booking Management
-          </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>
-            Manage and track all court bookings
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={fetchBookings}
-          sx={{ borderColor: '#8e44ad', color: '#8e44ad' }}
-        >
-          Refresh
-        </Button>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          {t('admin.bookingManagement')}
+        </Typography>
       </Box>
 
-      {/* Filter and Search Bar */}
+      {/* Statistics Dashboard */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, 
+        gap: 2, 
+        mb: 3 
+      }}>
+        {/* Total Bookings */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: theme.palette.primary.main }}>
+            {totalBookings}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.totalBookings')}
+          </Typography>
+        </Paper>
+
+        {/* Pending Bookings */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: '#ff9800' }}>
+            {pendingCount}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.pending')}
+          </Typography>
+        </Paper>
+
+        {/* Confirmed Bookings */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: '#4caf50' }}>
+            {confirmedCount}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.confirmed')}
+          </Typography>
+        </Paper>
+
+        {/* Cancellation Requested */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: '#9c27b0' }}>
+            {cancellationRequestedCount}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.cancelRequests')}
+          </Typography>
+        </Paper>
+
+        {/* Cancelled Bookings */}
+        <Paper sx={{ 
+          p: 3, 
+          textAlign: 'center', 
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          border: '1px solid',
+          borderColor: theme.palette.grey[200],
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            borderColor: theme.palette.primary.main
+          }
+        }}>
+          <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1, color: '#f44336' }}>
+            {cancelledCount}
+          </Typography>
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('admin.cancelled')}
+          </Typography>
+        </Paper>
+
+
+      </Box>
+
+      {/* Search and Actions Bar */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Tooltip title={t('admin.searchByBookingIdUserOrCourt')} arrow>
             <TextField
-              fullWidth
+              placeholder={t('admin.search')}
               variant="outlined"
-              placeholder="Search bookings..."
+              size="small"
               value={searchTerm}
               onChange={handleSearchChange}
               InputProps={{
-                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                endAdornment: searchTerm && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSearchChange({ target: { value: '' } })}
+                    sx={{ mr: 1 }}
+                  >
+                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>✕</Typography>
+                  </IconButton>
+                )
               }}
+              sx={{ minWidth: 200 }}
             />
-          </Grid>
+          </Tooltip>
 
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth>
-              <InputLabel shrink>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                onChange={handleStatusFilterChange}
-                displayEmpty
-                renderValue={(selected) => selected || "All Statuses"}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                {statusOptions.map(option => (
-                  <MenuItem key={option.value} value={option.value}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        backgroundColor: option.color,
-                        mr: 1.5
-                      }} />
-                      {option.label}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <TextField
-              fullWidth
-              type="date"
-              label="From Date"
-              InputLabelProps={{ shrink: true }}
-              value={dateRange.start}
-              onChange={handleStartDateChange}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <TextField
-              fullWidth
-              type="date"
-              label="To Date"
-              InputLabelProps={{ shrink: true }}
-              value={dateRange.end}
-              onChange={handleEndDateChange}
-              disabled={!dateRange.start}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={1}>
-            <Button
-              variant="outlined"
-              color="error"
-              fullWidth
-              onClick={() => {
-                setDateRange({ start: '', end: '' });
-                setStatusFilter('');
-                setSearchTerm('');
-              }}
-              sx={{ height: '100%' }}
+          {/* Status Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>{t('admin.status')}</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              label={t('admin.status')}
             >
-              Clear
-            </Button>
-          </Grid>
-        </Grid>
+              <MenuItem value="">{t('admin.allStatuses')}</MenuItem>
+              {statusOptions.map(option => (
+                <MenuItem key={option.value} value={option.value}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      backgroundColor: option.color,
+                      mr: 1.5
+                    }} />
+                    {option.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Date Range Filters */}
+          <TextField
+            type="date"
+            size="small"
+            label={t('admin.fromDate')}
+            value={dateRange.start}
+            onChange={handleStartDateChange}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 150 }}
+          />
+
+          <TextField
+            type="date"
+            size="small"
+            label={t('admin.toDate')}
+            value={dateRange.end}
+            onChange={handleEndDateChange}
+            disabled={!dateRange.start}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 150 }}
+          />
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchBookings}
+            disabled={loading}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+                      >
+            {t('admin.refresh')}
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            onClick={() => {
+              setDateRange({ start: '', end: '' });
+              setStatusFilter('');
+              setSearchTerm('');
+            }}
+            sx={{
+              borderRadius: '8px',
+              px: 2,
+              py: 1,
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }
+            }}
+                      >
+            {t('admin.clear')}
+          </Button>
+        </Box>
       </Paper>
 
-      {/* Batch Operation Bar */}
-      {selectedBookings.length > 0 && (
-        <Paper sx={{ p: 2, mb: 2, borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-            <Typography variant="subtitle1">
-              {selectedBookings.length} booking(s) selected
-            </Typography>
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {/* 添加更多批量操作 */}
-              <Button
-                variant="outlined"
-                startIcon={<ReceiptIcon />}
-                onClick={() => handleExportBookings(selectedBookings)}
-              >
-                Export Selected
-              </Button>
 
-              <Button
-                variant="contained"
-                color="error"
-                startIcon={<CancelIcon />}
-                onClick={handleBatchCancel}
-                disabled={loading}
-              >
-                Cancel Selected
-              </Button>
-            </Box>
-          </Box>
-        </Paper>
-      )}
-
-      <TableContainer component={Paper} sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          borderRadius: '16px', 
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+        }}
+      >
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress size={40} sx={{ color: '#8e44ad' }} />
+            <CircularProgress size={40} sx={{ color: theme.palette.primary.main }} />
           </Box>
         )}
 
         {!loading && bookings.length === 0 ? (
           <Box sx={{ textAlign: 'center', p: 6 }}>
-            <FilterIcon sx={{ fontSize: 60, color: '#e0e0e0', mb: 2 }} />
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              No bookings found
+            <FilterIcon sx={{ fontSize: 60, color: theme.palette.grey[300], mb: 2 }} />
+            <Typography variant="h6" sx={{ mb: 1, color: theme.palette.text.primary }}>
+              {t('admin.noBookingsFound')}
             </Typography>
             <Typography color="textSecondary" sx={{ mb: 3 }}>
-              Try adjusting your search or filter criteria
+              {t('admin.tryAdjustingSearchOrFilterCriteria')}
             </Typography>
-            <Button variant="outlined" onClick={() => {
-              setSearchTerm('');
-              setStatusFilter('');
-              setDateRange({ start: '', end: '' });
-            }}>
-              Clear Filters
+            <Button 
+              variant="outlined" 
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('');
+                setDateRange({ start: '', end: '' });
+              }}
+              sx={{
+                borderRadius: '8px',
+                px: 3,
+                py: 1.5,
+                '&:hover': {
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                }
+              }}
+                          >
+              {t('admin.clearFilters')}
             </Button>
           </Box>
         ) : (
           <Table>
-            <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? '#2a2a2a' : '#f5f5f5' }}>
+            <TableHead sx={{ backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.grey[100] }}>
               <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    indeterminate={
-                      (selectedBookings?.length ?? 0) > 0 &&
-                      (selectedBookings?.length ?? 0) < (bookings?.length ?? 0)
-                    }
-                    checked={
-                      (bookings?.length ?? 0) > 0 &&
-                      (selectedBookings?.length ?? 0) === (bookings?.length ?? 0)
-                    }
-                    onChange={handleSelectAllClick}
-                    disabled={loading}
-                  />
-                </TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, minWidth: '80px', maxWidth: '100px' }}>
                   <TableSortLabel
                     active={orderBy === 'id'}
                     direction={orderBy === 'id' ? order : 'desc'}
                     onClick={() => handleSort('id')}
                   >
-                    Booking ID
+                    {t('admin.bookingId')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, minWidth: '220px' }}>
                   <TableSortLabel
                     active={orderBy === 'bookingDate'}
                     direction={orderBy === 'bookingDate' ? order : 'desc'}
                     onClick={() => handleSort('bookingDate')}
                   >
-                    Court Date & Time
+                    {t('admin.courtDateAndTime')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Member</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Court</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }} align="right">Amount (RM)</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.member')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.court')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, minWidth: '120px' }}>{t('admin.status')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary, minWidth: '120px' }} align="right">{t('admin.amount')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: theme.palette.text.primary }}>{t('admin.actions')}</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
               {(bookings ?? []).length > 0 ? (
                 (bookings ?? []).map((booking) => {
-                  const isItemSelected = isSelected(booking.id);
                   return (
                     <TableRow
                       hover
                       key={booking.id}
-                      selected={isItemSelected}
                       sx={{
                         '&:hover': {
                           backgroundColor: theme.palette.mode === 'dark'
-                            ? 'rgba(187, 134, 252, 0.08)'
-                            : 'rgba(142, 68, 173, 0.05)'
+                            ? 'rgba(25, 118, 210, 0.08)'
+                            : 'rgba(25, 118, 210, 0.04)'
                         }
                       }}
                     >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isItemSelected}
-                          onChange={(event) => handleSelectBooking(event, booking.id)}
-                          disabled={booking.status === 'CANCELLED' || loading}
-                        />
-                      </TableCell>
-                      <TableCell>#{booking.id}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <DateIcon sx={{ color: '#9e9e9e', fontSize: 18, mr: 1 }} />
-                          <Typography variant="body2">
-                            {booking.bookingSlots && booking.bookingSlots.length > 0 
-                              ? (() => {
-                                  // 多 slot 预订：显示时间范围
-                                  const slots = booking.bookingSlots.sort((a, b) => 
-                                    new Date(a.slot.startTime) - new Date(b.slot.startTime)
-                                  );
-                                  const firstSlot = slots[0].slot;
-                                  const lastSlot = slots[slots.length - 1].slot;
-                                  return `${formatSlotDate(firstSlot.date)} ${formatTime(firstSlot.startTime)} - ${formatTime(lastSlot.endTime)} (${slots.length} slot${slots.length > 1 ? 's' : ''})`;
-                                })()
-                              : booking.slotDate && booking.startTime && booking.endTime 
-                              ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
-                              : 'No slot info'
-                            }
-                          </Typography>
-                        </Box>
+                      <TableCell sx={{ px: 1, maxWidth: '100px' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>#{booking.id}</Typography>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1.5, bgcolor: '#8e44ad' }}>
-                            {booking.memberName?.charAt(0) || 'U'}
-                          </Avatar>
-                          <Typography>{booking.memberName || 'Unknown User'}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <CourtIcon sx={{ color: '#4caf50', mr: 1 }} />
-                          <Typography>{booking.courtName}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusChip(booking.status)}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body1" fontWeight="500">
-                          {booking.totalAmount?.toFixed(2) ?? '0.00'}
+                        <Typography variant="body2" sx={{ color: theme.palette.text.primary }}>
+                          {booking.bookingSlots && booking.bookingSlots.length > 0 
+                            ? (() => {
+                                // 多 slot 预订：显示时间范围
+                                const slots = booking.bookingSlots.sort((a, b) => 
+                                  new Date(a.slot.startTime) - new Date(b.slot.startTime)
+                                );
+                                const firstSlot = slots[0].slot;
+                                const lastSlot = slots[slots.length - 1].slot;
+                                return `${formatSlotDate(firstSlot.date)} ${formatTime(firstSlot.startTime)} - ${formatTime(lastSlot.endTime)} (${slots.length} slot${slots.length > 1 ? 's' : ''})`;
+                              })()
+                            : booking.slotDate && booking.startTime && booking.endTime 
+                            ? `${formatSlotDate(booking.slotDate)} ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`
+                            : t('admin.noSlotInfo')
+                          }
                         </Typography>
                       </TableCell>
                       <TableCell>
+                        <Typography sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                          {booking.memberName || t('admin.unknownUser')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 500, color: theme.palette.text.primary }}>
+                          {booking.courtName}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ minWidth: '120px' }}>
+                        {getStatusChip(booking.status)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ px: 2 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                          RM {booking.totalAmount?.toFixed(2) ?? '0.00'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Tooltip title="View details">
+                          <Tooltip title={t('admin.viewDetails')}>
                             <IconButton
                               size="small"
                               onClick={() => handleViewBooking(booking)}
-                              sx={{ color: '#5d3587' }}
+                              sx={{ color: theme.palette.primary.main }}
                             >
                               <ViewIcon />
                             </IconButton>
@@ -692,20 +787,20 @@ const AdminManageBookings = () => {
                           {/* 显示处理按钮当状态为取消请求时 */}
                           {booking.status === 'CANCELLATION_REQUESTED' && (
                             <>
-                              <Tooltip title="Approve cancellation">
+                              <Tooltip title={t('admin.approveCancellation')}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleOpenProcessDialog(booking, 'approve')}
-                                  sx={{ color: '#4caf50' }}
+                                  sx={{ color: theme.palette.success.main }}
                                 >
                                   <CheckCircleIcon />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Reject cancellation">
+                              <Tooltip title={t('admin.rejectCancellation')}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleOpenProcessDialog(booking, 'reject')}
-                                  sx={{ color: '#f44336' }}
+                                  sx={{ color: theme.palette.error.main }}
                                 >
                                   <NotInterestedIcon />
                                 </IconButton>
@@ -717,13 +812,13 @@ const AdminManageBookings = () => {
                           {booking.status !== 'CANCELLED' &&
                             booking.status !== 'COMPLETED' &&
                             booking.status !== 'CANCELLATION_REQUESTED' && (
-                              <Tooltip title="Cancel booking">
+                              <Tooltip title={t('admin.cancelBooking')}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleOpenCancelDialog(booking)}
                                   sx={{
-                                    color: '#f44336',
-                                    '&:hover': { backgroundColor: '#f4433610' }
+                                    color: theme.palette.error.main,
+                                    '&:hover': { backgroundColor: theme.palette.error.main + '10' }
                                   }}
                                 >
                                   <CancelIcon />
@@ -738,7 +833,7 @@ const AdminManageBookings = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={8} align="center">
-                    No bookings found.
+                    {t('admin.noBookingsFound')}.
                   </TableCell>
                 </TableRow>
               )}
@@ -783,20 +878,20 @@ const AdminManageBookings = () => {
         <DialogTitle sx={{ backgroundColor: '#fff8e1', borderBottom: '1px solid #eee' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <WarningIcon sx={{ mr: 1.5, color: '#ff9800' }} />
-            <Typography variant="h6">Cancel Booking</Typography>
+            <Typography variant="h6">{t('admin.cancelBookingTitle')}</Typography>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
           {selectedBooking && (
             <>
               <Typography variant="body1" sx={{ mb: 2 }}>
-                Are you sure you want to cancel booking <b>#{selectedBooking.id}</b>?
+                {t('admin.cancelBookingConfirmation').replace('#{id}', selectedBooking.id)}
               </Typography>
               <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                This action cannot be undone. A cancellation notice will be sent to the member.
+                {t('admin.cancelBookingWarning')}
               </Typography>
               <TextField
-                label="Admin Remark"
+                label={t('admin.adminRemark')}
                 value={adminRemark}
                 onChange={e => setAdminRemark(e.target.value)}
                 fullWidth
@@ -815,7 +910,7 @@ const AdminManageBookings = () => {
             variant="outlined"
             sx={{ color: '#5d3587', borderColor: '#5d3587' }}
           >
-            Keep Booking
+            {t('admin.keepBooking')}
           </Button>
           <Button
             onClick={handleCancelBooking}
@@ -827,7 +922,7 @@ const AdminManageBookings = () => {
               ml: 1
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Confirm Cancellation'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : t('admin.confirmCancellation')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -849,7 +944,7 @@ const AdminManageBookings = () => {
               : <NotInterestedIcon sx={{ mr: 1.5, color: '#f44336' }} />
             }
             <Typography variant="h6">
-              {processAction === 'approve' ? 'Approve' : 'Reject'} Cancellation
+              {processAction === 'approve' ? t('admin.approveCancellationTitle') : t('admin.rejectCancellationTitle')}
             </Typography>
           </Box>
         </DialogTitle>
@@ -858,13 +953,13 @@ const AdminManageBookings = () => {
             <>
               <Typography variant="body1" sx={{ mb: 2 }}>
                 {processAction === 'approve'
-                  ? `Approve cancellation for booking #${selectedBooking.id}?`
-                  : `Reject cancellation request for booking #${selectedBooking.id}?`
+                  ? t('admin.approveCancellationConfirmation').replace('#{id}', selectedBooking.id)
+                  : t('admin.rejectCancellationConfirmation').replace('#{id}', selectedBooking.id)
                 }
               </Typography>
               
               <TextField
-                label="Admin Remark"
+                label={t('admin.adminRemark')}
                 value={adminRemark}
                 onChange={e => setAdminRemark(e.target.value)}
                 fullWidth
@@ -874,8 +969,8 @@ const AdminManageBookings = () => {
                 autoFocus
                 sx={{ mt: 2 }}
                 placeholder={processAction === 'approve' 
-                  ? "Reason for approval (optional)"
-                  : "Reason for rejection"
+                  ? t('admin.reasonForApproval')
+                  : t('admin.reasonForRejection')
                 }
               />
             </>
@@ -887,7 +982,7 @@ const AdminManageBookings = () => {
             variant="outlined"
             sx={{ color: '#5d3587', borderColor: '#5d3587' }}
           >
-            Cancel
+            {t('admin.cancel')}
           </Button>
           <Button
             onClick={handleProcessRequest}
@@ -903,7 +998,7 @@ const AdminManageBookings = () => {
           >
             {loading 
               ? <CircularProgress size={24} color="inherit" /> 
-              : processAction === 'approve' ? 'Approve' : 'Reject'
+              : processAction === 'approve' ? t('admin.approve') : t('admin.reject')
             }
           </Button>
         </DialogActions>

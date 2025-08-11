@@ -452,9 +452,9 @@ function LanguageTab() {
   const theme = useTheme();
 
   const languages = [
-    { value: 'en', label: 'English', flag: '🇺🇸' },
-    { value: 'ms', label: 'Bahasa Melayu', flag: '🇲🇾' },
-    { value: 'zh', label: '简体中文', flag: '🇨🇳' }
+    { value: 'en', label: t('language.english'), flag: '🇺🇸' },
+    { value: 'ms', label: t('language.bahasaMelayu'), flag: '🇲🇾' },
+    { value: 'zh', label: t('language.chinese'), flag: '🇨🇳' }
   ];
 
   const handleLanguageChange = (event) => {
@@ -513,7 +513,6 @@ function LanguageTab() {
 }
 
 const AdminSettings = () => {
-  usePageTheme('admin'); // 设置页面类型为admin
   const [tab, setTab] = useState(0);
   const theme = useMuiTheme();
   const { t } = useLanguage();

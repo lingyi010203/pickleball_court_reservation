@@ -6,10 +6,5 @@ export const usePageTheme = (pageType) => {
 
   useEffect(() => {
     setPageType(pageType);
-    
-    // 清理函数：当组件卸载时重置为user类型
-    return () => {
-      setPageType('user');
-    };
   }, [pageType, setPageType]);
 }; 

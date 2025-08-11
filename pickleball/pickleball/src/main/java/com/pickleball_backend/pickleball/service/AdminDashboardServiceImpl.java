@@ -15,6 +15,7 @@ import com.pickleball_backend.pickleball.repository.WalletRepository;
 import com.pickleball_backend.pickleball.repository.WalletTransactionRepository;
 import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.repository.CancellationRequestRepository;
+import com.pickleball_backend.pickleball.repository.AdminRepository;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ import java.time.format.DateTimeFormatter;
 import com.pickleball_backend.pickleball.dto.DashboardSummaryDto;
 import com.pickleball_backend.pickleball.repository.FeedbackRepository;
 import com.pickleball_backend.pickleball.dto.RecentActivityDto;
+import com.pickleball_backend.pickleball.dto.CourtUtilizationDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -49,6 +51,9 @@ import com.pickleball_backend.pickleball.service.ChartService;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.awt.Color;
+import java.util.Arrays;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +72,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final BookingRepository bookingRepository;
     private final CourtRepository courtRepository;
     private final FeedbackRepository feedbackRepository;
+    private final AdminRepository adminRepository;
     private final ChartService chartService;
 
     @Override
@@ -241,12 +247,9 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         // 当前统计周期：本月
         java.time.LocalDate now = java.time.LocalDate.now();
         java.time.YearMonth thisMonth = java.time.YearMonth.from(now);
-        java.time.YearMonth lastMonth = thisMonth.minusMonths(1);
         java.time.LocalDate startOfThisMonthDate = thisMonth.atDay(1);
-        java.time.LocalDate startOfLastMonthDate = lastMonth.atDay(1);
-        java.time.LocalDate endOfLastMonthDate = startOfThisMonthDate.minusDays(1);
-        java.time.LocalDateTime startOfLastMonth = startOfLastMonthDate.atStartOfDay();
-        java.time.LocalDateTime endOfLastMonth = endOfLastMonthDate.atTime(23, 59, 59);
+        java.time.LocalDateTime startOfThisMonth = startOfThisMonthDate.atStartOfDay();
+        java.time.LocalDateTime endOfThisMonth = now.atTime(23, 59, 59);
 
         // 1. 总用户数
         long totalUsers = userRepository.count();
@@ -261,21 +264,20 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         Double averageRating = feedbackRepository.findAverageRating();
         dto.setAverageRating(averageRating != null ? averageRating : 0.0);
 
-        // 5. 上月数据
-        // 5.1 上月用户数（注册时间在上月）
-        Long lastMonthUsers = userRepository.countByCreatedAtBetween(startOfLastMonth, endOfLastMonth);
-        // 5.2 上月预订数（预订时间在上月）
-        Long lastMonthBookings = bookingRepository.countByBookingDateBetween(startOfLastMonth, endOfLastMonth);
-        // 5.3 上月收入（支付时间在上月）
-        Double lastMonthRevenue = paymentRepository.sumTotalRevenueByDate(startOfLastMonth, endOfLastMonth);
-        // 5.4 上月平均评分（评分时间在上月）
-        Double lastMonthAvgRating = feedbackRepository.findAverageRatingByDate(startOfLastMonth, endOfLastMonth);
-
-        // 6. 变化率计算（环比 = (本月-上月)/上月*100%）
-        dto.setTotalUsersChange(calcChangeRate(totalUsers, lastMonthUsers));
-        dto.setTotalBookingsChange(calcChangeRate(totalBookings, lastMonthBookings));
-        dto.setTotalRevenueChange(calcChangeRate(totalRevenue, lastMonthRevenue));
-        dto.setAverageRatingChange(calcChangeRate(averageRating, lastMonthAvgRating));
+        // 5. 本月新增数据
+        // 5.1 本月新增用户数（注册时间在本月）
+        Long newUsersThisMonth = userRepository.countByCreatedAtBetween(startOfThisMonth, endOfThisMonth);
+        dto.setNewUsersThisMonth(newUsersThisMonth != null ? newUsersThisMonth : 0L);
+        // 5.2 本月新增预订数（预订时间在本月）
+        Long newBookingsThisMonth = bookingRepository.countByBookingDateBetween(startOfThisMonth, endOfThisMonth);
+        dto.setNewBookingsThisMonth(newBookingsThisMonth != null ? newBookingsThisMonth : 0L);
+        // 5.3 本月新增收入（支付时间在本月）
+        Double newRevenueThisMonth = paymentRepository.sumTotalRevenueByDate(startOfThisMonth, endOfThisMonth);
+        dto.setNewRevenueThisMonth(newRevenueThisMonth != null ? newRevenueThisMonth : 0.0);
+        // 5.4 本月新增评价数（评价时间在本月）
+        Long newRatingsThisMonth = feedbackRepository.countByCreatedAtBetween(startOfThisMonth, endOfThisMonth);
+        dto.setNewRatingsThisMonth(newRatingsThisMonth != null ? newRatingsThisMonth : 0L);
+        
         return dto;
     }
 
@@ -384,10 +386,22 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     }
 
     @Override
-    public List<RecentActivityDto> getRecentActivity() {
+    public List<RecentActivityDto> getRecentActivity(String period) {
         List<RecentActivityDto> activities = new ArrayList<>();
+        
+        // 计算时间范围
+        LocalDateTime startTime = null;
+        if ("week".equals(period)) {
+            startTime = LocalDateTime.now().minusWeeks(1);
+        } else {
+            // 默认返回最近的活动（保持原有逻辑）
+            startTime = LocalDateTime.now().minusDays(7);
+        }
+        
         // 最近预订
-        bookingRepository.findTop5ByOrderByBookingDateDesc().forEach(b -> {
+        if ("week".equals(period)) {
+            // 获取近一星期的所有预订
+            bookingRepository.findByBookingDateBetween(startTime, LocalDateTime.now()).forEach(b -> {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("booking");
@@ -415,8 +429,42 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 activities.add(dto);
             } catch (Exception ignore) {}
         });
+        } else {
+            // 默认逻辑：获取最近5条预订
+            bookingRepository.findTop5ByOrderByBookingDateDesc().forEach(b -> {
+                try {
+                    RecentActivityDto dto = new RecentActivityDto();
+                    dto.setType("booking");
+                    String userName = "Unknown User";
+                    if (b.getMember() != null && b.getMember().getUser() != null && b.getMember().getUser().getName() != null && !b.getMember().getUser().getName().trim().isEmpty()) {
+                        userName = b.getMember().getUser().getName();
+                    }
+                    dto.setUser(userName);
+                    // 获取场地名
+                    String courtName = "court";
+                    if (b.getBookingSlots() != null && !b.getBookingSlots().isEmpty()) {
+                        Integer courtId = null;
+                        if (b.getBookingSlots().get(0) != null && b.getBookingSlots().get(0).getSlot() != null) {
+                            courtId = b.getBookingSlots().get(0).getSlot().getCourtId();
+                        }
+                        if (courtId != null) {
+                            try {
+                                courtName = courtRepository.findById(courtId).map(c -> c.getName()).orElse("court");
+                            } catch (Exception ignore) {}
+                        }
+                    }
+                    dto.setDetail("booked " + courtName);
+                    dto.setTimestamp(b.getBookingDate());
+                    dto.setIcon("\uD83D\uDCC5"); // 📅
+                    activities.add(dto);
+                } catch (Exception ignore) {}
+            });
+        }
+        
         // 最近取消预订
-        cancellationRequestRepository.findTop3ByOrderByRequestDateDesc().forEach(cr -> {
+        if ("week".equals(period)) {
+            // 获取近一星期的所有取消请求
+            cancellationRequestRepository.findByRequestDateBetween(startTime, LocalDateTime.now()).forEach(cr -> {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("cancellation");
@@ -447,8 +495,45 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 activities.add(dto);
             } catch (Exception ignore) {}
         });
+        } else {
+            // 默认逻辑：获取最近3条取消请求
+            cancellationRequestRepository.findTop3ByOrderByRequestDateDesc().forEach(cr -> {
+                try {
+                    RecentActivityDto dto = new RecentActivityDto();
+                    dto.setType("cancellation");
+                    String userName = "Unknown User";
+                    if (cr.getBooking() != null && cr.getBooking().getMember() != null &&
+                        cr.getBooking().getMember().getUser() != null &&
+                        cr.getBooking().getMember().getUser().getName() != null && 
+                        !cr.getBooking().getMember().getUser().getName().trim().isEmpty()) {
+                        userName = cr.getBooking().getMember().getUser().getName();
+                    }
+                    dto.setUser(userName);
+                    // 获取场地名
+                    String courtName = "court";
+                    if (cr.getBooking() != null && cr.getBooking().getBookingSlots() != null && !cr.getBooking().getBookingSlots().isEmpty()) {
+                        Integer courtId = null;
+                        if (cr.getBooking().getBookingSlots().get(0) != null && cr.getBooking().getBookingSlots().get(0).getSlot() != null) {
+                            courtId = cr.getBooking().getBookingSlots().get(0).getSlot().getCourtId();
+                        }
+                        if (courtId != null) {
+                            try {
+                                courtName = courtRepository.findById(courtId).map(c -> c.getName()).orElse("court");
+                            } catch (Exception ignore) {}
+                        }
+                    }
+                    dto.setDetail("cancelled " + courtName + " booking");
+                    dto.setTimestamp(cr.getRequestDate());
+                    dto.setIcon("\u274C"); // ❌
+                    activities.add(dto);
+                } catch (Exception ignore) {}
+            });
+        }
+        
         // 最近注册
-        userRepository.findTop3ByOrderByCreatedAtDesc().forEach(u -> {
+        if ("week".equals(period)) {
+            // 获取近一星期的所有用户注册
+            userRepository.findByCreatedAtBetween(startTime, LocalDateTime.now()).forEach(u -> {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("user");
@@ -459,8 +544,25 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 activities.add(dto);
             } catch (Exception ignore) {}
         });
+        } else {
+            // 默认逻辑：获取最近3条用户注册
+            userRepository.findTop3ByOrderByCreatedAtDesc().forEach(u -> {
+                try {
+                    RecentActivityDto dto = new RecentActivityDto();
+                    dto.setType("user");
+                    dto.setUser(u.getName() != null && !u.getName().trim().isEmpty() ? u.getName() : "Unknown User");
+                    dto.setDetail("created an account");
+                    dto.setTimestamp(u.getCreatedAt());
+                    dto.setIcon("\uD83D\uDC64"); // 👤
+                    activities.add(dto);
+                } catch (Exception ignore) {}
+            });
+        }
+        
         // 最近评价
-        feedbackRepository.findTop2ByOrderByCreatedAtDesc().forEach(f -> {
+        if ("week".equals(period)) {
+            // 获取近一星期的所有评价
+            feedbackRepository.findByCreatedAtBetween(startTime, LocalDateTime.now()).forEach(f -> {
             try {
                 RecentActivityDto dto = new RecentActivityDto();
                 dto.setType("review");
@@ -475,12 +577,130 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 activities.add(dto);
             } catch (Exception ignore) {}
         });
-        // 按时间倒序取前10条
-        return activities.stream()
+        } else {
+            // 默认逻辑：获取最近2条评价
+            feedbackRepository.findTop2ByOrderByCreatedAtDesc().forEach(f -> {
+                try {
+                    RecentActivityDto dto = new RecentActivityDto();
+                    dto.setType("review");
+                    String reviewer = "Unknown User";
+                    if (f.getUser() != null && f.getUser().getName() != null && !f.getUser().getName().trim().isEmpty()) {
+                        reviewer = f.getUser().getName();
+                    }
+                    dto.setUser(reviewer);
+                    dto.setDetail("rated a venue " + (f.getRating() != null ? f.getRating() : "") + " stars");
+                    dto.setTimestamp(f.getCreatedAt());
+                    dto.setIcon("\u2B50"); // ⭐
+                    activities.add(dto);
+                } catch (Exception ignore) {}
+            });
+        }
+        
+        // 按时间倒序排序
+        List<RecentActivityDto> sortedActivities = activities.stream()
                 .filter(a -> a.getTimestamp() != null)
                 .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
-                .limit(10)
                 .collect(Collectors.toList());
+        
+        // 如果是获取一周数据，返回所有；否则限制为10条
+        if ("week".equals(period)) {
+            return sortedActivities;
+        } else {
+            return sortedActivities.stream().limit(10).collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    public CourtUtilizationDto getCourtUtilization(String period) {
+        CourtUtilizationDto dto = new CourtUtilizationDto();
+        dto.setPeriod(period);
+        
+        // 计算时间范围
+        LocalDateTime startTime;
+        LocalDateTime endTime = LocalDateTime.now();
+        
+        if ("30d".equals(period)) {
+            startTime = LocalDateTime.now().minusDays(30);
+        } else {
+            // 默认7天
+            startTime = LocalDateTime.now().minusDays(7);
+        }
+        
+        List<CourtUtilizationDto.CourtUtilizationData> courtUtilizations = new ArrayList<>();
+        Map<String, Double> timeSlotUtilizations = new HashMap<>();
+        
+        // 获取所有场地
+        List<Court> courts = courtRepository.findAll();
+        
+        for (Court court : courts) {
+            CourtUtilizationDto.CourtUtilizationData courtData = new CourtUtilizationDto.CourtUtilizationData();
+            courtData.setCourtId(court.getId());
+            courtData.setCourtName(court.getName());
+            courtData.setCourtType(court.getCourtType() != null ? court.getCourtType().name() : "STANDARD");
+            
+            // 计算该场地的总时段数
+            long totalSlots = slotRepository.countByCourtIdAndDateBetween(
+                court.getId(), 
+                startTime.toLocalDate(), 
+                endTime.toLocalDate()
+            );
+            
+            // 计算已预订的时段数
+            long bookedSlots = bookingSlotRepository.countBySlotCourtIdAndSlotDateBetween(
+                court.getId(),
+                startTime.toLocalDate(),
+                endTime.toLocalDate()
+            );
+            
+            courtData.setTotalSlots(totalSlots);
+            courtData.setBookedSlots(bookedSlots);
+            courtData.setAvailableSlots(totalSlots - bookedSlots);
+            
+            // 计算利用率
+            double utilizationRate = totalSlots > 0 ? (double) bookedSlots / totalSlots * 100 : 0.0;
+            courtData.setUtilizationRate(Math.round(utilizationRate * 100.0) / 100.0); // 保留两位小数
+            
+            courtUtilizations.add(courtData);
+        }
+        
+        // 计算时段利用率（用于促销分析）
+        // 分析不同时段的利用率，找出最空闲的时段
+        // 由于slot是每小时的，我们按小时段来分析
+        List<String> timeSlots = Arrays.asList("09:00-10:00", "10:00-11:00", "11:00-12:00", "12:00-13:00", 
+                                              "13:00-14:00", "14:00-15:00", "15:00-16:00", "16:00-17:00", 
+                                              "17:00-18:00", "18:00-19:00", "19:00-20:00", "20:00-21:00");
+        
+        for (String timeSlot : timeSlots) {
+            String[] times = timeSlot.split("-");
+            LocalTime startTimeSlot = LocalTime.parse(times[0]);
+            LocalTime endTimeSlot = LocalTime.parse(times[1]);
+            
+            // 计算该小时段的总时段数
+            long totalSlotsInTimeSlot = slotRepository.countByDateBetweenAndStartTimeBetweenAndEndTimeBetween(
+                startTime.toLocalDate(),
+                endTime.toLocalDate(),
+                startTimeSlot,
+                endTimeSlot
+            );
+            
+            // 计算该小时段已预订的时段数
+            long bookedSlotsInTimeSlot = bookingSlotRepository.countBySlotDateBetweenAndSlotStartTimeBetweenAndSlotEndTimeBetween(
+                startTime.toLocalDate(),
+                endTime.toLocalDate(),
+                startTimeSlot,
+                endTimeSlot
+            );
+            
+            // 计算该小时段的利用率
+            double timeSlotUtilization = totalSlotsInTimeSlot > 0 ? 
+                (double) bookedSlotsInTimeSlot / totalSlotsInTimeSlot * 100 : 0.0;
+            timeSlotUtilizations.put(timeSlot, Math.round(timeSlotUtilization * 100.0) / 100.0);
+        }
+        
+        dto.setCourtUtilizations(courtUtilizations);
+        dto.setTimeSlotUtilizations(timeSlotUtilizations);
+        
+        return dto;
     }
 
     @Override
@@ -1163,6 +1383,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 dto.setTier(member.getTier().getTierName()); // 移除了 .name()
             }
         }
+
+        // 设置Admin position
+        if ("ADMIN".equalsIgnoreCase(user.getUserType())) {
+            adminRepository.findByUserId(user.getId()).ifPresent(admin -> {
+                dto.setPosition(admin.getPosition());
+            });
+        }
+
         return dto;
     }
 

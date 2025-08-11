@@ -87,6 +87,8 @@ public class SlotServiceImpl implements SlotService {
     @Override
     @Transactional
     public void createSlots(List<SlotDto> slotDtos) {
+        System.out.println("==> createSlots called with " + slotDtos.size() + " slots");
+        
         slotDtos.forEach(dto -> {
             if (dto.getStartTime() == null) {
                 throw new ValidationException("Start time is required for slot creation");
@@ -101,14 +103,22 @@ public class SlotServiceImpl implements SlotService {
             slot.setStartTime(dto.getStartTime());
             slot.setEndTime(dto.getEndTime());
             slot.setAvailable(dto.isAvailable());
+            slot.setStatus("AVAILABLE"); // 确保新创建的slots状态为AVAILABLE
 
             // 设置持续时间（如果提供）
             if (dto.getDurationHours() != null) {
                 slot.setDurationHours(dto.getDurationHours());
             }
 
-            slotRepository.save(slot);
+            Slot savedSlot = slotRepository.save(slot);
+            System.out.println("==> Created slot: ID=" + savedSlot.getId() + 
+                ", Date=" + savedSlot.getDate() + 
+                ", Time=" + savedSlot.getStartTime() + "-" + savedSlot.getEndTime() + 
+                ", Status=" + savedSlot.getStatus() + 
+                ", Available=" + savedSlot.isAvailable());
         });
+        
+        System.out.println("==> All slots created successfully");
     }
 
     @Override
@@ -144,6 +154,21 @@ public class SlotServiceImpl implements SlotService {
                     ", Status: " + slot.getStatus());
             }
         }
+        
+        // 显示SPECIAL_CIRCUMSTANCE slots
+        List<Slot> specialSlots = allSlots.stream()
+            .filter(slot -> "SPECIAL_CIRCUMSTANCE".equals(slot.getStatus()))
+            .collect(Collectors.toList());
+        
+        if (!specialSlots.isEmpty()) {
+            System.out.println("SPECIAL_CIRCUMSTANCE slots found:");
+            for (Slot slot : specialSlots) {
+                System.out.println("  - Slot ID: " + slot.getId() + 
+                    ", Date: " + slot.getDate() + 
+                    ", Time: " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                    ", Status: " + slot.getStatus() + " (Booked but outside new operating days)");
+            }
+        }
         System.out.println("=== End Debug ===");
 
         // 查詢所有未取消的 class session
@@ -153,9 +178,14 @@ public class SlotServiceImpl implements SlotService {
             endDate.atTime(23, 59, 59)
         ).stream().filter(s -> !"CANCELLED".equalsIgnoreCase(s.getStatus())).toList();
 
-        return slots.stream().filter(slot -> {
+        System.out.println("=== Filtering slots ===");
+        System.out.println("Total slots to filter: " + slots.size());
+        System.out.println("Class sessions found: " + filteredSessions.size());
+        
+        List<SlotResponseDto> availableSlots = slots.stream().filter(slot -> {
             LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
             LocalDateTime slotEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+            
             // 只要有任何 class session 時間重疊，該 slot 就不能預約
             boolean overlap = filteredSessions.stream().anyMatch(s ->
                 slotStart.isBefore(s.getEndTime()) && slotEnd.isAfter(s.getStartTime())
@@ -164,7 +194,19 @@ public class SlotServiceImpl implements SlotService {
             // 檢查是否有已預訂的 BookingSlot
             boolean isBooked = bookingSlotRepository.existsBySlotIdAndStatus(slot.getId(), "BOOKED");
             
-            return !overlap && !isBooked; // 只有沒有課程重疊且未預訂的時段才可用
+            if (overlap) {
+                System.out.println("Slot " + slot.getId() + " overlaps with class session");
+            }
+            if (isBooked) {
+                System.out.println("Slot " + slot.getId() + " is booked");
+            }
+            
+            boolean isAvailable = !overlap && !isBooked;
+            if (isAvailable) {
+                System.out.println("Slot " + slot.getId() + " is available: " + slot.getDate() + " " + slot.getStartTime() + "-" + slot.getEndTime());
+            }
+            
+            return isAvailable; // 只有沒有課程重疊且未預訂的時段才可用
         }).map(slot -> {
             SlotResponseDto dto = new SlotResponseDto();
             dto.setId(slot.getId());
@@ -178,6 +220,10 @@ public class SlotServiceImpl implements SlotService {
             dto.setCourtLocation(court.getLocation());
             return dto;
         }).collect(Collectors.toList());
+        
+        System.out.println("=== Final result ===");
+        System.out.println("Available slots: " + availableSlots.size());
+        return availableSlots;
     }
 
     public List<SlotResponseDto> getAllSlotsByCourt(Integer courtId, LocalDate startDate, LocalDate endDate) {

@@ -13,5 +13,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Intege
     Optional<UserAccount> findByResetPasswordToken(String token);
     Optional<UserAccount> findByUser_Id(Integer userId);
     List<UserAccount> findByUser_IdIn(List<Integer> userIds);
+    
+    // Add missing method for username existence check
+    boolean existsByUsername(String username);
+    
+    // Add missing method for counting by status
+    long countByStatus(String status);
 
 }
