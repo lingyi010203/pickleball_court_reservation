@@ -4,7 +4,7 @@ import {
   CircularProgress, Alert, Grow, useTheme, alpha
 } from '@mui/material';
 import { ConfirmationNumber as VoucherIcon } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 import { formatVoucherExpiryDate } from '../../utils/dateUtils';
 
@@ -20,12 +20,7 @@ const ActiveVouchers = ({ onSuccess, onError }) => {
   useEffect(() => {
     const fetchActiveVouchers = async () => {
       try {
-        const token = UserService.getToken();
-        if (!token) return;
-
-        const response = await axios.get('http://localhost:8081/api/voucher-redemption/my-active-redemptions', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/voucher-redemption/my-active-redemptions');
 
         setActiveVouchers(response.data);
       } catch (err) {
@@ -46,14 +41,7 @@ const ActiveVouchers = ({ onSuccess, onError }) => {
     setSuccess('');
     
     try {
-      const token = UserService.getToken();
-      if (!token) return;
-
-      const response = await axios.post(
-        `http://localhost:8081/api/voucher-redemption/use/${redemptionId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.post(`/voucher-redemption/use/${redemptionId}`, {});
 
       if (response.data) {
         const successMsg = `Successfully used voucher: ${response.data.voucherCode}`;

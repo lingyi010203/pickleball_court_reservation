@@ -12,7 +12,7 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import axios from 'axios';
+import api from '../../service/api';
 import UserService from '../../service/UserService';
 
 const NotificationPreferences = ({ profile, onSave, onCancel }) => {
@@ -47,12 +47,7 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const token = UserService.getToken();
-      await axios.put(
-        'http://localhost:8081/api/preferences',
-        preferences,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.put('/preferences', preferences);
       
       onSave(preferences);
       setSnackbar({
