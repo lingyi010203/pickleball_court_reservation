@@ -1,5 +1,6 @@
 package com.pickleball_backend.pickleball.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.ToString;
@@ -32,11 +33,13 @@ public class JoinRequest {
     @ManyToOne
     @JoinColumn(name = "member_id")
     @ToString.Exclude
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Member member;
 
     @ManyToOne
     @JoinColumn(name = "match_id", nullable = false)
     @ToString.Exclude
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private FriendlyMatch friendlyMatch;
 
     public enum Status {

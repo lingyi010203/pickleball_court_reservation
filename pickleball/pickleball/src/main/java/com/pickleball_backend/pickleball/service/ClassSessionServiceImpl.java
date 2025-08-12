@@ -361,19 +361,22 @@ public class ClassSessionServiceImpl implements ClassSessionService {
         
         double total = sessionTotal + equipmentTotal;
         
-        // 使用託管帳戶系統處理支付（只扣一次）
+        logger.info("Class session registration - User: {}, Sessions: {}, Session Total: RM{}, Equipment Total: RM{}, Total: RM{}", 
+                userId, sessionIds.size(), sessionTotal, equipmentTotal, total);
+        
+        // 使用託管帳戶系統處理支付
         if ("wallet".equalsIgnoreCase(paymentMethod)) {
             // 為每個課程創建託管支付記錄
             for (ClassSession session : sessions) {
                 escrowAccountService.depositToEscrow(user, session.getPrice(), session);
             }
-            // 如果有設備費用，也創建託管記錄
+            // 如果有設備費用，創建設備費用的託管記錄
             if (equipmentTotal > 0) {
-                // 創建一個虛擬的 session 來處理設備費用
                 escrowAccountService.depositToEscrow(user, equipmentTotal, null);
             }
         } else {
             // 其他付款方式可擴充
+            logger.info("Payment method {} not yet implemented for class sessions", paymentMethod);
         }
         // 為每個 session 建立報名記錄
         for (ClassSession session : sessions) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   AppBar,
+  Badge,
   Toolbar,
   Typography,
   Button,
@@ -47,6 +48,7 @@ function Navbar() {
   const [profileImage, setProfileImage] = useState(null);
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const isMobile = useMediaQuery('(max-width:900px)');
   const theme = useTheme();
   const customTheme = useCustomTheme();
@@ -57,6 +59,29 @@ function Navbar() {
 
   const getUsernameInitial = () => {
     return username ? username.charAt(0).toUpperCase() : '';
+  };
+
+  // 獲取未讀訊息數量
+  const fetchUnreadMessages = async () => {
+    if (!isLoggedIn) return;
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:8081/api/messages/previews', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const unreadCount = data.reduce((total, preview) => total + (preview.unreadCount || 0), 0);
+        setUnreadMessages(unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching unread messages:', error);
+    }
   };
 
   useEffect(() => {
@@ -89,6 +114,16 @@ function Navbar() {
   useEffect(() => {
     setProfileImage(currentUser?.profileImage || null);
   }, [currentUser]);
+
+  // Fetch unread messages when user is logged in
+  useEffect(() => {
+    fetchUnreadMessages();
+    
+    // Set up interval to refresh unread messages every 30 seconds
+    const interval = setInterval(fetchUnreadMessages, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     handleCloseMenu();
@@ -188,55 +223,74 @@ function Navbar() {
         const isPrivateItem = ['messages', 'create-event', 'admin', 'coaching'].includes(item.id);
         
         const button = (
-          <Button
-            key={item.id}
-            startIcon={!isMobile && item.icon}
-            onClick={() => navigateTo(item.path, item.id)}
-            disabled={!isLoggedIn && isPrivateItem}
-            sx={{
-              mx: 1,
-              px: 2,
-              color: activeTab === item.id
-                ? theme.palette.primary.main
-                : theme.palette.text.primary,
-              fontWeight: activeTab === item.id ? 'bold' : 'normal',
-              position: 'relative',
-              transition: 'color 0.2s ease, font-weight 0.2s ease',
-              opacity: !isLoggedIn && isPrivateItem ? 0.6 : 1,
-              '&:after': {
-                content: '""',
-                position: 'absolute',
-                bottom: '-10px',
-                left: 0,
-                right: 0,
-                height: activeTab === item.id ? '3px' : 0,
-                borderRadius: '3px',
-                backgroundColor: theme.palette.primary.main,
-                transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)',
-                transition: 'height 0.3s ease, transform 0.3s ease',
-              },
-              '&:hover': {
-                color: theme.palette.primary.main,
-                backgroundColor: 'transparent',
+          <Box key={item.id} sx={{ position: 'relative', display: 'inline-block' }}>
+            <Button
+              startIcon={!isMobile && item.icon}
+              onClick={() => navigateTo(item.path, item.id)}
+              disabled={!isLoggedIn && isPrivateItem}
+              sx={{
+                mx: 1,
+                px: 2,
+                color: activeTab === item.id
+                  ? theme.palette.primary.main
+                  : theme.palette.text.primary,
+                fontWeight: activeTab === item.id ? 'bold' : 'normal',
+                position: 'relative',
+                transition: 'color 0.2s ease, font-weight 0.2s ease',
+                opacity: !isLoggedIn && isPrivateItem ? 0.6 : 1,
                 '&:after': {
-                  height: '2px',
-                  backgroundColor: theme.palette.primary.main
-                }
-              },
-              '&:disabled': {
-                color: theme.palette.text.disabled,
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-10px',
+                  left: 0,
+                  right: 0,
+                  height: activeTab === item.id ? '3px' : 0,
+                  borderRadius: '3px',
+                  backgroundColor: theme.palette.primary.main,
+                  transform: activeTab === item.id ? 'scaleX(1)' : 'scaleX(0.8)',
+                  transition: 'height 0.3s ease, transform 0.3s ease',
+                },
                 '&:hover': {
+                  color: theme.palette.primary.main,
                   backgroundColor: 'transparent',
                   '&:after': {
                     height: '2px',
-                    backgroundColor: theme.palette.text.disabled
+                    backgroundColor: theme.palette.primary.main
+                  }
+                },
+                '&:disabled': {
+                  color: theme.palette.text.disabled,
+                  '&:hover': {
+                    backgroundColor: 'transparent',
+                    '&:after': {
+                      height: '2px',
+                      backgroundColor: theme.palette.text.disabled
+                    }
                   }
                 }
-              }
-            }}
-          >
-            {item.label}
-          </Button>
+              }}
+            >
+              {item.label}
+            </Button>
+            {/* Unread messages badge for Messages button */}
+            {item.id === 'messages' && unreadMessages > 0 && (
+              <Badge
+                badgeContent={unreadMessages > 99 ? '99+' : unreadMessages}
+                color="error"
+                sx={{
+                  position: 'absolute',
+                  top: -8,
+                  right: 8,
+                  '& .MuiBadge-badge': {
+                    fontSize: '0.7rem',
+                    minWidth: 18,
+                    height: 18,
+                    fontWeight: 'bold'
+                  }
+                }}
+              />
+            )}
+          </Box>
         );
 
         // 为未登录用户显示工具提示
@@ -370,24 +424,7 @@ function Navbar() {
               </>
             ) : (
               <>
-                {/* Help Button */}
-                <Tooltip title="Help & Support" placement="bottom">
-                  <Button
-                    onClick={() => navigate('/helpdesk')}
-                    sx={{
-                      mx: 1,
-                      color: theme.palette.text.primary,
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      fontSize: '0.875rem',
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      }
-                    }}
-                  >
-                    HELP
-                  </Button>
-                </Tooltip>
+
                 
                 <Box
                   onClick={handleOpenMenu}
@@ -471,6 +508,7 @@ function Navbar() {
           navigate={navigate}
           mobileOpen={mobileOpen}
           handleDrawerToggle={handleDrawerToggle}
+          unreadMessages={unreadMessages}
         />
       )}
 

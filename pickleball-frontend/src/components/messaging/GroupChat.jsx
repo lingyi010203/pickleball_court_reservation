@@ -12,12 +12,15 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import GroupIcon from '@mui/icons-material/Group';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PeopleIcon from '@mui/icons-material/People';
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 
 const GroupChat = ({ group, onBack }) => {
   const theme = useTheme();
@@ -32,6 +35,7 @@ const GroupChat = ({ group, onBack }) => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteMemberDialog, setShowDeleteMemberDialog] = useState(false);
   const [showDeleteGroupDialog, setShowDeleteGroupDialog] = useState(false);
+  const [showQuitGroupDialog, setShowQuitGroupDialog] = useState(false);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,7 +151,8 @@ const GroupChat = ({ group, onBack }) => {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSendMessage();
     }
   };
@@ -395,6 +400,40 @@ const GroupChat = ({ group, onBack }) => {
     onBack();
   };
 
+  const handleQuitGroup = () => {
+    setShowQuitGroupDialog(true);
+    handleMenuClose();
+  };
+
+  const handleConfirmQuitGroup = () => {
+    // Remove current user from group members
+    const updatedGroup = {
+      ...group,
+      members: group.members?.filter(m => m.username !== currentUser?.username) || [],
+      memberCount: (group.memberCount || 1) - 1
+    };
+    
+    // Update group in localStorage
+    const userGroups = JSON.parse(localStorage.getItem('userGroups') || '[]');
+    const updatedGroups = userGroups.map(g => 
+      g.id === group.id ? updatedGroup : g
+    );
+    localStorage.setItem('userGroups', JSON.stringify(updatedGroups));
+    
+    // Remove group from current user's groups list
+    const currentUserGroups = JSON.parse(localStorage.getItem('userGroups') || '[]');
+    const filteredGroups = currentUserGroups.filter(g => g.id !== group.id);
+    localStorage.setItem('userGroups', JSON.stringify(filteredGroups));
+    
+    setShowQuitGroupDialog(false);
+    alert('You have successfully left the group!');
+    onBack();
+  };
+
+  const handleCancelQuitGroup = () => {
+    setShowQuitGroupDialog(false);
+  };
+
   const handleCancelDeleteGroup = () => {
     setShowDeleteGroupDialog(false);
   };
@@ -448,8 +487,10 @@ const GroupChat = ({ group, onBack }) => {
               {group.memberCount} members
             </Typography>
           </Box>
+
+          {/* Group Actions Menu */}
           <IconButton
-            onClick={handleMenuOpen}
+            onClick={(e) => setMenuAnchorEl(e.currentTarget)}
             size="small"
             sx={{
               color: theme.palette.text.secondary,
@@ -722,7 +763,7 @@ const GroupChat = ({ group, onBack }) => {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type a message... (Ctrl+Enter to send)"
+              placeholder="Type a message..."
               variant="outlined"
               size="small"
               InputProps={{
@@ -761,9 +802,6 @@ const GroupChat = ({ group, onBack }) => {
               <SendIcon />
             </IconButton>
           </Box>
-          <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mt: 1, display: 'block' }}>
-            Press Ctrl+Enter to send message
-          </Typography>
         </Box>
       </Paper>
 
@@ -787,7 +825,7 @@ const GroupChat = ({ group, onBack }) => {
       >
         <MenuItem onClick={handleShowMembers}>
           <ListItemIcon>
-            <GroupAddIcon fontSize="small" />
+            <PeopleIcon fontSize="small" />
           </ListItemIcon>
           View Members
         </MenuItem>
@@ -813,6 +851,13 @@ const GroupChat = ({ group, onBack }) => {
             </MenuItem>
           </>
         )}
+        <Divider />
+        <MenuItem onClick={handleQuitGroup} sx={{ color: theme.palette.warning.main }}>
+          <ListItemIcon>
+            <ExitToAppIcon fontSize="small" sx={{ color: theme.palette.warning.main }} />
+          </ListItemIcon>
+          Quit Group
+        </MenuItem>
       </Menu>
 
       {/* Members Dialog */}
@@ -1077,6 +1122,56 @@ const GroupChat = ({ group, onBack }) => {
              disabled={selectedUsers.length === 0}
            >
              Add {selectedUsers.length} Member{selectedUsers.length !== 1 ? 's' : ''}
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Quit Group Confirmation Dialog */}
+       <Dialog
+         open={showQuitGroupDialog}
+         onClose={handleCancelQuitGroup}
+         maxWidth="sm"
+         fullWidth
+       >
+         <DialogTitle>
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+             <ExitToAppIcon sx={{ color: theme.palette.warning.main }} />
+             <Typography variant="h6">Quit Group</Typography>
+           </Box>
+         </DialogTitle>
+         <DialogContent>
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+             <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
+               <GroupIcon />
+             </Avatar>
+             <Box>
+               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                 {group.name}
+               </Typography>
+               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                 {group.memberCount} members
+               </Typography>
+             </Box>
+           </Box>
+           <Typography variant="body1">
+             Are you sure you want to leave this group? You will no longer be able to see group messages or participate in the conversation.
+           </Typography>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelQuitGroup}>
+             Cancel
+           </Button>
+           <Button 
+             onClick={handleConfirmQuitGroup}
+             variant="contained"
+             sx={{ 
+               bgcolor: theme.palette.warning.main,
+               '&:hover': {
+                 bgcolor: theme.palette.warning.dark
+               }
+             }}
+           >
+             Quit Group
            </Button>
          </DialogActions>
        </Dialog>

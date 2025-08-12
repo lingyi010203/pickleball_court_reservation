@@ -3948,7 +3948,7 @@ export default function CoachingDashboard() {
                   >
                     <CardContent>
                       <Typography variant="h6" fontWeight="bold" gutterBottom>
-                        {courseGroup.title || '課程'}
+                        {courseGroup.title || 'Course'}
                       </Typography>
                       
                       <Typography variant="body2" color="text.secondary" gutterBottom>

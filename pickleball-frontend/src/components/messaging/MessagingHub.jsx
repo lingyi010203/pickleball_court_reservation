@@ -1,6 +1,6 @@
 // src/components/messaging/MessagingHub.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Tabs, Tab, Paper, List, ListItem, ListItemAvatar, Avatar, ListItemText, Typography, TextField, InputAdornment, IconButton, Badge, Menu, MenuItem, ListItemIcon } from '@mui/material';
+import { Box, Tabs, Tab, Paper, List, ListItem, ListItemAvatar, Avatar, ListItemText, Typography, TextField, InputAdornment, IconButton, Badge, Menu, MenuItem, ListItemIcon, Dialog, DialogTitle, DialogContent, DialogActions, Chip, Button } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import FriendList from './FriendList';
 import FriendRequestList from './FriendRequestList';
@@ -10,15 +10,17 @@ import GroupList from './GroupList';
 import Conversation from './Conversation';
 import GroupChat from './GroupChat';
 import { useAuth } from '../../context/AuthContext';
+import GroupService from '../../service/GroupService';
 import { useTheme, alpha } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+
 // Removed status dot icon
 import AddIcon from '@mui/icons-material/Add';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import GroupIcon from '@mui/icons-material/Group';
 
 export default function MessagingHub() {
   const theme = useTheme();
@@ -36,6 +38,11 @@ export default function MessagingHub() {
   const [addMenuAnchor, setAddMenuAnchor] = useState(null);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [groupView, setGroupView] = useState('default'); // 'default', 'addFriend', 'friendRequests', 'createGroup'
+  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
+  const [selectedGroupForAddMember, setSelectedGroupForAddMember] = useState(null);
+  const [addMemberSearchQuery, setAddMemberSearchQuery] = useState('');
+  const [addMemberSearchResults, setAddMemberSearchResults] = useState([]);
+  const [selectedUsersForAdd, setSelectedUsersForAdd] = useState([]);
   // Removed online/offline status for users
   const [unreadCounts, setUnreadCounts] = useState({}); // Track unread message counts
   const location = useLocation();
@@ -310,33 +317,33 @@ export default function MessagingHub() {
             const coachData = await response.json();
             console.log('Coach data from backend:', coachData);
 
-            // 檢查是否有有效的 username
-            const username = coachData.userAccount?.username || coachData.email;
+            // Check if we have a valid username
+            const username = coachData.userAccount?.username || coachData.email || coachData.username || coachData.name;
             if (!username) {
               console.error('No valid username found for coach:', coachData);
-              alert('教練信息不完整，無法發送消息。請聯繫管理員。');
+              alert('Coach information is incomplete. Cannot send message. Please contact administrator.');
               return;
             }
 
-            // 創建教練對象，使用實際的用戶信息
+            // Create coach user object with actual user information
             const coachUser = {
               id: parseInt(coachId),
               name: decodeURIComponent(coachName),
               username: username,
               userType: 'COACH',
-              email: coachData.email
+              email: coachData.email || coachData.userAccount?.email
             };
             console.log('Created coach user object:', coachUser);
             setSelectedConversation(coachUser);
           } else {
             console.error('Failed to fetch coach info:', response.status);
-            // 如果無法獲取教練信息，顯示錯誤
-            alert('無法獲取教練信息，請稍後再試或聯繫管理員。');
+            // If unable to get coach information, show error
+            alert('Unable to get coach information. Please try again later or contact administrator.');
           }
         } catch (error) {
           console.error('Error fetching coach info:', error);
-          // 如果出錯，顯示錯誤
-          alert('無法獲取教練信息，請稍後再試或聯繫管理員。');
+          // If error occurs, show error
+          alert('Unable to get coach information. Please try again later or contact administrator.');
         }
       };
 
@@ -409,8 +416,165 @@ export default function MessagingHub() {
   };
 
   const handleAddMember = (group) => {
-    // For now, just show an alert - this could be expanded to show a user search modal
-    alert(`Add member functionality for group "${group.name}" will be implemented soon!`);
+    setSelectedGroupForAddMember(group);
+    setAddMemberSearchQuery('');
+    setAddMemberSearchResults([]);
+    setSelectedUsersForAdd([]);
+    setShowAddMemberDialog(true);
+  };
+
+  const handleSearchUsersForAdd = async () => {
+    if (!addMemberSearchQuery.trim()) {
+      setAddMemberSearchResults([]);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:8081/api/users/search?query=${encodeURIComponent(addMemberSearchQuery)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Filter out users who are already in the group
+        const existingUsernames = [
+          selectedGroupForAddMember.creator?.username,
+          ...(selectedGroupForAddMember.members?.map(m => m.username) || [])
+        ];
+        const filteredResults = data.filter(user => 
+          !existingUsernames.includes(user.username) &&
+          user.username !== currentUser?.username
+        );
+        setAddMemberSearchResults(filteredResults);
+      } else {
+        console.error('Failed to search users');
+        setAddMemberSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setAddMemberSearchResults([]);
+    }
+  };
+
+  const handleSelectUserForAdd = (user) => {
+    const isSelected = selectedUsersForAdd.some(u => u.username === user.username);
+    if (isSelected) {
+      setSelectedUsersForAdd(prev => prev.filter(u => u.username !== user.username));
+    } else {
+      setSelectedUsersForAdd(prev => [...prev, user]);
+    }
+  };
+
+  const handleRemoveSelectedUserForAdd = (username) => {
+    setSelectedUsersForAdd(prev => prev.filter(u => u.username !== username));
+  };
+
+  const handleConfirmAddMembers = async () => {
+    if (selectedUsersForAdd.length === 0 || !selectedGroupForAddMember) return;
+
+    try {
+      // Send invitation emails
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:8081/api/groups/send-invitations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          groupName: selectedGroupForAddMember.name,
+          memberUsernames: selectedUsersForAdd.map(user => user.username)
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Invitation emails sent:', result);
+        
+        // Update group members in localStorage
+        setNewGroups(prev => {
+          const updated = prev.map(g => {
+            if (g.id === selectedGroupForAddMember.id) {
+              const updatedMembers = [...(g.members || []), ...selectedUsersForAdd];
+              return {
+                ...g,
+                members: updatedMembers,
+                memberCount: updatedMembers.length + 1 // +1 for creator
+              };
+            }
+            return g;
+          });
+          localStorage.setItem('userGroups', JSON.stringify(updated));
+          return updated;
+        });
+
+        // Close dialog and show success message
+        setShowAddMemberDialog(false);
+        setSelectedUsersForAdd([]);
+        setAddMemberSearchQuery('');
+        setAddMemberSearchResults([]);
+        
+        if (result.emailsSent > 0) {
+          alert(`Successfully added ${selectedUsersForAdd.length} member(s) to the group! Invitation emails sent to ${result.emailsSent} members.`);
+        } else {
+          alert(`Successfully added ${selectedUsersForAdd.length} member(s) to the group!`);
+        }
+        
+        if (result.emailsFailed > 0) {
+          console.warn('Some invitation emails failed:', result.failedEmails);
+        }
+      } else {
+        console.error('Failed to send invitation emails');
+        alert(`Successfully added ${selectedUsersForAdd.length} member(s) to the group! (Email invitations failed)`);
+      }
+    } catch (error) {
+      console.error('Error adding members:', error);
+      alert(`Successfully added ${selectedUsersForAdd.length} member(s) to the group! (Email invitations failed)`);
+    }
+  };
+
+  const handleCancelAddMembers = () => {
+    setShowAddMemberDialog(false);
+    setSelectedUsersForAdd([]);
+    setAddMemberSearchQuery('');
+    setAddMemberSearchResults([]);
+  };
+
+  const handleEditGroup = (group) => {
+    // For now, just show an alert - this could be expanded to show an edit modal
+    const newName = prompt(`Edit group name for "${group.name}":`, group.name);
+    if (newName && newName.trim() !== '' && newName !== group.name) {
+      setNewGroups(prev => {
+        const updated = prev.map(g => 
+          g.id === group.id ? { ...g, name: newName.trim() } : g
+        );
+        // Update localStorage
+        localStorage.setItem('userGroups', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
+
+  const handleViewMembers = (group) => {
+    // Show actual members list
+    const members = group.members || [];
+    const creator = group.creator;
+    
+    let membersList = `Creator: ${creator?.name || creator?.username || 'Unknown'}\n\nMembers:`;
+    
+    if (members.length === 0) {
+      membersList += '\nNo additional members';
+    } else {
+      members.forEach(member => {
+        membersList += `\n• ${member.name || member.username}`;
+      });
+    }
+    
+    alert(`Members of "${group.name}":\n\n${membersList}`);
   };
 
   // Removed toggle user online status
@@ -423,18 +587,68 @@ export default function MessagingHub() {
     }));
   };
 
-  // Load groups from localStorage on component mount
+  // Load groups from backend API on component mount
   useEffect(() => {
-    const savedGroups = localStorage.getItem('userGroups');
-    if (savedGroups) {
+    const fetchUserGroups = async () => {
+      if (!currentUser) return;
+      
       try {
-        const parsedGroups = JSON.parse(savedGroups);
-        setNewGroups(parsedGroups);
+        const groups = await GroupService.getUserGroups();
+        console.log('Fetched groups from backend:', groups);
+        
+        // Transform backend groups to frontend format
+        const transformedGroups = groups.map(group => ({
+          id: group.id,
+          name: group.name,
+          description: group.description,
+          memberCount: group.members ? group.members.length : 0,
+          lastMessage: null,
+          lastMessageTime: group.updatedAt ? new Date(group.updatedAt) : new Date(),
+          unreadCount: 0,
+          creator: {
+            username: group.creator?.userAccount?.username || group.creator?.username,
+            name: group.creator?.name || group.creator?.userAccount?.username
+          },
+          members: group.members ? group.members.map(member => ({
+            username: member.user?.userAccount?.username || member.user?.username,
+            name: member.user?.name || member.user?.userAccount?.username,
+            id: member.user?.id
+          })) : []
+        }));
+        
+        setNewGroups(transformedGroups);
       } catch (error) {
-        console.error('Error loading groups from localStorage:', error);
+        console.error('Error fetching groups:', error);
+        // Fallback to localStorage if backend fails
+        const savedGroups = localStorage.getItem('userGroups');
+        if (savedGroups) {
+          try {
+            const parsedGroups = JSON.parse(savedGroups);
+            // Filter groups to only show groups where current user is a member
+            const userGroups = parsedGroups.filter(group => {
+              // Check if current user is the creator
+              if (group.creator?.username === currentUser?.username) {
+                return true;
+              }
+              // Check if current user is in the members list
+              if (group.members && Array.isArray(group.members)) {
+                return group.members.some(member => 
+                  member.username === currentUser?.username || 
+                  member.id === currentUser?.id
+                );
+              }
+              return false;
+            });
+            setNewGroups(userGroups);
+          } catch (error) {
+            console.error('Error loading groups from localStorage:', error);
+          }
+        }
       }
-    }
-  }, []);
+    };
+
+    fetchUserGroups();
+  }, [currentUser]);
 
   // Filter conversations based on search query
   const filteredStudents = studentsWithChats.filter(student => 
@@ -799,25 +1013,7 @@ export default function MessagingHub() {
                              {/* Removed unread indicator dot */}
                           </Box>
                           
-                          {/* Student Actions Menu */}
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Clear unread if present (status feature removed)
-                              if (unreadCounts[student.id] > 0) {
-                                clearUnreadMessages(student.id);
-                              }
-                            }}
-                            sx={{
-                              color: theme.palette.text.secondary,
-                              '&:hover': {
-                                color: theme.palette.primary.main,
-                              }
-                            }}
-                          >
-                            <MoreVertIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
+
                         </ListItem>
                       ))}
                     </List>
@@ -940,25 +1136,7 @@ export default function MessagingHub() {
                              {/* Removed unread indicator dot */}
                           </Box>
                           
-                          {/* Coach Actions Menu */}
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Clear unread if present (status feature removed)
-                              if (unreadCounts[coach.id] > 0) {
-                                clearUnreadMessages(coach.id);
-                              }
-                            }}
-                            sx={{
-                              color: theme.palette.text.secondary,
-                              '&:hover': {
-                                color: theme.palette.primary.main,
-                              }
-                            }}
-                          >
-                            <MoreVertIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
+
                         </ListItem>
                       ))}
                     </List>
@@ -1041,15 +1219,13 @@ export default function MessagingHub() {
                               ) : (
                  <Box>
                    {/* Group List */}
-                   <GroupList 
-                     ref={groupListRef}
-                     onSelectGroup={handleSelectGroup} 
-                     selectedGroup={selectedGroup}
-                     searchQuery={searchQuery}
-                     newGroups={newGroups}
-                     onDeleteGroup={handleDeleteGroup}
-                     onAddMember={handleAddMember}
-                   />
+                           <GroupList
+          ref={groupListRef}
+          onSelectGroup={handleSelectGroup}
+          selectedGroup={selectedGroup}
+          searchQuery={searchQuery}
+          newGroups={newGroups}
+        />
                  </Box>
                )}
             </Box>
@@ -1129,6 +1305,133 @@ export default function MessagingHub() {
           </Box>
         )}
       </Box>
+
+      {/* Add Member Dialog */}
+      <Dialog
+        open={showAddMemberDialog}
+        onClose={handleCancelAddMembers}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GroupIcon />
+            <Typography variant="h6">Add Members to {selectedGroupForAddMember?.name}</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {/* Search Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>
+              Search Users
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                fullWidth
+                placeholder="Search by username or name"
+                value={addMemberSearchQuery}
+                onChange={(e) => setAddMemberSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchUsersForAdd()}
+                size="small"
+              />
+              <Button
+                variant="contained"
+                onClick={handleSearchUsersForAdd}
+                disabled={!addMemberSearchQuery.trim()}
+                sx={{ minWidth: 80 }}
+              >
+                Search
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Selected Users */}
+          {selectedUsersForAdd.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>
+                Selected Users ({selectedUsersForAdd.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {selectedUsersForAdd.map((user) => (
+                  <Chip
+                    key={user.username}
+                    avatar={
+                      <Avatar sx={{ width: 20, height: 20 }}>
+                        {(user.name || user.username).charAt(0).toUpperCase()}
+                      </Avatar>
+                    }
+                    label={user.name || user.username}
+                    onDelete={() => handleRemoveSelectedUserForAdd(user.username)}
+                    size="small"
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Search Results */}
+          {addMemberSearchResults.length > 0 && (
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>
+                Search Results
+              </Typography>
+              <List sx={{ p: 0 }}>
+                {addMemberSearchResults.map((user) => {
+                  const isSelected = selectedUsersForAdd.some(u => u.username === user.username);
+                  return (
+                    <ListItem
+                      key={user.id}
+                      onClick={() => handleSelectUserForAdd(user)}
+                      sx={{
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        mb: 1,
+                        backgroundColor: isSelected ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                        }
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ width: 32, height: 32 }}>
+                          {(user.name || user.username).charAt(0).toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={user.name || user.username}
+                        secondary={user.username}
+                      />
+                      {isSelected && (
+                        <Chip label="Selected" size="small" color="primary" />
+                      )}
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Box>
+          )}
+
+          {addMemberSearchQuery && addMemberSearchResults.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                No users found matching "{addMemberSearchQuery}"
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelAddMembers}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmAddMembers}
+            variant="contained"
+            disabled={selectedUsersForAdd.length === 0}
+          >
+            Add {selectedUsersForAdd.length} Member{selectedUsersForAdd.length !== 1 ? 's' : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

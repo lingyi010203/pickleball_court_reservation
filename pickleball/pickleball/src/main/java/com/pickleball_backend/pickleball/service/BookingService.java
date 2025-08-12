@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -185,9 +186,22 @@ public class BookingService {
             if (wallet.getBalance() < amount) {
                 throw new ValidationException("Insufficient wallet balance. Available: " + wallet.getBalance());
             }
+            
+            // 記錄支付前的餘額
+            double balanceBefore = wallet.getBalance();
+            
             wallet.setBalance(wallet.getBalance() - amount);
             wallet.setTotalSpent(wallet.getTotalSpent() + amount); // 更新總支出
             walletRepository.save(wallet);
+            
+            // 創建錢包交易記錄
+            createWalletTransaction(wallet, "PAYMENT", amount, balanceBefore, wallet.getBalance(),
+                "BOOKING", null, 
+                "Court Booking Payment - " + request.getPurpose() + 
+                (request.getNumPaddles() > 0 ? " (Paddles: " + request.getNumPaddles() + ")" : "") +
+                (request.getBuyBallSet() != null && request.getBuyBallSet() ? " (Ball Set)" : "") +
+                (discountAmount > 0 ? " (Voucher: -RM" + discountAmount + ")" : ""));
+            
             payment.setPaymentMethod("WALLET");
             payment.setStatus("COMPLETED");
         } else {
@@ -458,7 +472,20 @@ public class BookingService {
             // 8. 更新支付状态
             Payment payment = booking.getPayment();
             if (payment != null) {
+                // 創建退款記錄（50%）
+                Payment refundPayment = new Payment();
+                refundPayment.setAmount(refund); // 50% 退款金額
+                refundPayment.setPaymentType("REFUND");
+                refundPayment.setPaymentMethod("WALLET_REFUND");
+                refundPayment.setStatus("COMPLETED");
+                refundPayment.setTransactionId("REF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                refundPayment.setReferenceId(payment.getTransactionId());
+                refundPayment.setProcessedAt(LocalDateTime.now());
+                paymentRepository.save(refundPayment);
+                
+                // 更新原始 payment 狀態
                 payment.setStatus("REFUNDED");
+                payment.setRefundDate(LocalDateTime.now());
                 paymentRepository.save(payment);
             }
 

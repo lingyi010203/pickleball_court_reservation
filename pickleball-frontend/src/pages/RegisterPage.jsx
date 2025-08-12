@@ -20,7 +20,11 @@ import {
   Fade,
   Slide,
   CircularProgress,
-  Link
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Visibility,
@@ -59,6 +63,8 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [focusedField, setFocusedField] = useState('');
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDialogMessage, setErrorDialogMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -88,6 +94,32 @@ const RegisterPage = () => {
     if (!formData.password) newErrors.password = 'Password is required';
     if (!formData.confirmPassword) newErrors.confirmPassword = 'Confirm Password is required';
     
+    // Phone number validation
+    if (formData.phone) {
+      const phoneRegex = /^\+60\s?\d{1,2}-\d{3}\s?\d{4}$/;
+      if (!phoneRegex.test(formData.phone)) {
+        newErrors.phone = 'Please enter a valid phone number';
+      }
+    }
+    
+    // Date of birth validation
+    if (formData.dob) {
+      const selectedDate = new Date(formData.dob);
+      const today = new Date();
+      let age = today.getFullYear() - selectedDate.getFullYear();
+      const monthDiff = today.getMonth() - selectedDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < selectedDate.getDate())) {
+        age--;
+      }
+      
+      if (age < 13) {
+        newErrors.dob = 'You must be at least 13 years old to register';
+      } else if (age > 120) {
+        newErrors.dob = 'Please enter a valid date of birth';
+      }
+    }
+    
     if (formData.password && formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
@@ -97,7 +129,11 @@ const RegisterPage = () => {
     }
     
     setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) return;
+    if (Object.keys(newErrors).length > 0) {
+      setErrorDialogMessage('Please fix the following errors:\n\n' + Object.values(newErrors).join('\n'));
+      setShowErrorDialog(true);
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -126,7 +162,8 @@ const RegisterPage = () => {
         3. Check server logs for errors`;
       }
       
-      setMessage(errorMsg);
+      setErrorDialogMessage(errorMsg);
+      setShowErrorDialog(true);
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +175,11 @@ const RegisterPage = () => {
 
   const toggleConfirmPasswordVisibility = () => {
     setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleCloseErrorDialog = () => {
+    setShowErrorDialog(false);
+    setErrorDialogMessage('');
   };
 
   return (
@@ -416,7 +458,7 @@ const RegisterPage = () => {
                             <TextField
                               fullWidth
                               variant="outlined"
-                              placeholder="+1234567890"
+                              placeholder="+60 12-345 6789"
                               name="phone"
                               value={formData.phone}
                               onChange={handleChange}
@@ -468,6 +510,8 @@ const RegisterPage = () => {
                               onChange={handleChange}
                               onFocus={() => setFocusedField('dob')}
                               onBlur={() => setFocusedField('')}
+                              error={!!errors.dob}
+                              helperText={errors.dob}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
@@ -752,17 +796,64 @@ const RegisterPage = () => {
                             Sign in here
                           </Link>
                         </Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Fade>
-              </Box>
-            </Box>
-          </Slide>
-        </Container>
-      </Box>
-    </Box>
-  );
-};
+                                             </Box>
+                     </Box>
+                   </Paper>
+                 </Fade>
+               </Box>
+             </Box>
+           </Slide>
+         </Container>
+       </Box>
+
+       {/* Error Dialog */}
+       <Dialog
+         open={showErrorDialog}
+         onClose={handleCloseErrorDialog}
+         maxWidth="sm"
+         fullWidth
+         PaperProps={{
+           sx: {
+             borderRadius: '16px',
+             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+           }
+         }}
+       >
+         <DialogTitle sx={{ 
+           color: 'error.main', 
+           fontWeight: 600,
+           display: 'flex',
+           alignItems: 'center',
+           gap: 1
+         }}>
+           ⚠️ Error
+         </DialogTitle>
+         <DialogContent>
+           <Typography sx={{ 
+             whiteSpace: 'pre-line',
+             lineHeight: 1.6,
+             color: 'text.primary'
+           }}>
+             {errorDialogMessage}
+           </Typography>
+         </DialogContent>
+         <DialogActions sx={{ p: 3, pt: 1 }}>
+           <Button 
+             onClick={handleCloseErrorDialog}
+             variant="contained"
+             sx={{
+               borderRadius: '8px',
+               textTransform: 'none',
+               fontWeight: 600,
+               px: 3
+             }}
+           >
+             OK
+           </Button>
+         </DialogActions>
+       </Dialog>
+     </Box>
+   );
+ };
 
 export default RegisterPage;

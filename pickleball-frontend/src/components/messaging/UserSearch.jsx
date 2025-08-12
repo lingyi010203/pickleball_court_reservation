@@ -8,7 +8,7 @@ import { Alert } from '@mui/material';
 import friendService from '../../service/FriendService';
 import UserService from '../../service/UserService';
 import { useAuth } from '../../context/AuthContext';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+
 
 export default function UserSearch() {
   const theme = useTheme();
@@ -201,29 +201,16 @@ export default function UserSearch() {
                   }}
                 >
                   <ListItemAvatar sx={{ minWidth: 48 }}>
-                    <Badge
-                      overlap="circular"
-                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                      badgeContent={
-                        <FiberManualRecordIcon 
-                          sx={{ 
-                            fontSize: 12, 
-                            color: theme.palette.success.main 
-                          }} 
-                        />
-                      }
+                    <Avatar 
+                      src={user.profileImage} 
+                      sx={{ 
+                        width: 40, 
+                        height: 40,
+                        boxShadow: theme.shadows[2]
+                      }}
                     >
-                      <Avatar 
-                        src={user.profileImage} 
-                        sx={{ 
-                          width: 40, 
-                          height: 40,
-                          boxShadow: theme.shadows[2]
-                        }}
-                      >
-                        {(user.name || user.username || 'U').substring(0, 2).toUpperCase()}
-                      </Avatar>
-                    </Badge>
+                      {(user.name || user.username || 'U').substring(0, 2).toUpperCase()}
+                    </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={

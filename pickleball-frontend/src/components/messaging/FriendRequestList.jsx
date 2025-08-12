@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import friendService from '../../service/FriendService';
 import { useTheme, alpha } from '@mui/material/styles';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+
 
 export default function FriendRequestList() {
   const theme = useTheme();
@@ -88,29 +88,16 @@ export default function FriendRequestList() {
           }}
         >
           <ListItemAvatar sx={{ minWidth: 48 }}>
-            <Badge
-              overlap="circular"
-              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-              badgeContent={
-                <FiberManualRecordIcon 
-                  sx={{ 
-                    fontSize: 12, 
-                    color: theme.palette.warning.main 
-                  }} 
-                />
-              }
+            <Avatar 
+              src={request.senderProfileImage} 
+              sx={{ 
+                width: 40, 
+                height: 40,
+                boxShadow: theme.shadows[2]
+              }}
             >
-              <Avatar 
-                src={request.senderProfileImage} 
-                sx={{ 
-                  width: 40, 
-                  height: 40,
-                  boxShadow: theme.shadows[2]
-                }}
-              >
-                {(request.senderName || request.senderUsername || 'R').substring(0, 2).toUpperCase()}
-              </Avatar>
-            </Badge>
+              {(request.senderName || request.senderUsername || 'R').substring(0, 2).toUpperCase()}
+            </Avatar>
           </ListItemAvatar>
           <ListItemText
             primary={

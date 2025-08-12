@@ -571,5 +571,38 @@ public class EmailService {
         sendEmail(coachEmail, subject, content);
     }
 
+    public void sendGroupInvitationEmail(String toEmail, String groupName, String creatorName, String creatorUsername) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("🎾 You've been invited to join a Pickleball Group: " + groupName);
+        
+        String content = String.format(
+            "Dear Picklefy User,\n\n" +
+            "🎉 You've been invited to join a new pickleball group!\n\n" +
+            "📋 Group Details:\n" +
+            "• Group Name: %s\n" +
+            "• Created by: %s (@%s)\n\n" +
+            "💬 This group is ready for messaging and coordination.\n\n" +
+            "🔗 To join the group and start chatting:\n" +
+            "1. Open the Picklefy app\n" +
+            "2. Go to Messages section\n" +
+            "3. Look for the group \"%s\" in your Groups tab\n" +
+            "4. Click on it to start chatting!\n\n" +
+            "🏓 Get ready to coordinate games, share tips, and connect with fellow pickleball enthusiasts!\n\n" +
+            "Best regards,\nThe Picklefy Team",
+            groupName, creatorName, creatorUsername, groupName
+        );
+        
+        message.setText(content);
+        
+        try {
+            javaMailSender.send(message);
+            log.info("Group invitation email sent to: {}", toEmail);
+        } catch (MailException e) {
+            log.error("Failed to send group invitation email to {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Failed to send group invitation email");
+        }
+    }
+
 }
 

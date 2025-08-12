@@ -45,13 +45,15 @@ const PaymentPage = () => {
   const session = location.state?.session;
   const eventDetails = location.state?.eventDetails;
   const paymentType = location.state?.paymentType;
+  const matchDetails = location.state?.matchDetails;
+  const matchId = location.state?.matchId;
 
   // 檢查是否有 replacement session 支付數據
   const replacementSessionPayment = localStorage.getItem('replacementSessionPayment');
   const replacementData = replacementSessionPayment ? JSON.parse(replacementSessionPayment) : null;
 
   // 確定支付數據來源
-  const paymentData = bookingDetails || sessionGroup || session || replacementData || eventDetails;
+  const paymentData = bookingDetails || sessionGroup || session || replacementData || eventDetails || matchDetails;
 
   // 調試信息
   console.log('=== PaymentPage Debug ===');
@@ -61,6 +63,8 @@ const PaymentPage = () => {
   console.log('session:', session);
   console.log('eventDetails:', eventDetails);
   console.log('paymentType:', paymentType);
+  console.log('matchDetails:', matchDetails);
+  console.log('matchId:', matchId);
   console.log('replacementData:', replacementData);
   console.log('paymentData:', paymentData);
 
@@ -97,6 +101,13 @@ const PaymentPage = () => {
   }
 
   const [paymentMethod, setPaymentMethod] = useState('wallet');
+
+  // Set default payment method for friendly matches (but allow user to change)
+  useEffect(() => {
+    if (matchDetails) {
+      setPaymentMethod('wallet');
+    }
+  }, [matchDetails]);
   const [walletBalance, setWalletBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -105,7 +116,7 @@ const PaymentPage = () => {
   const [availableVouchers, setAvailableVouchers] = useState([]);
   const [selectedVoucherId, setSelectedVoucherId] = useState(null);
 
-  // Class session 設備選項
+  // Class session 和 friendly match 設備選項
   const [numPaddles, setNumPaddles] = useState(0);
   const [buyBallSet, setBuyBallSet] = useState(false);
 
@@ -131,13 +142,16 @@ const PaymentPage = () => {
     } else if (eventDetails) {
       // 對於事件註冊，使用事件費用
       baseAmount = eventDetails.feeAmount || 0;
+    } else if (matchDetails) {
+      // 對於 friendly match，使用 match 價格
+      baseAmount = matchDetails.price || 0;
     } else if (paymentData) {
       // 對於其他情況，使用 price 或 amount
       baseAmount = paymentData.price || paymentData.amount || 0;
     }
 
-    // 添加設備費用（只在 class session 時）
-    if (sessionGroup || session) {
+    // 添加設備費用（class session 和 friendly match）
+    if (sessionGroup || session || matchDetails) {
       const paddleCost = numPaddles * PADDLE_PRICE;
       const ballCost = buyBallSet ? BALL_SET_PRICE : 0;
       baseAmount += paddleCost + ballCost;
@@ -214,7 +228,7 @@ const PaymentPage = () => {
     } else {
       setDiscountedAmount(getInitialAmount());
     }
-  }, [useVoucher, selectedVoucherId, availableVouchers, sessionGroup, session, replacementData, paymentData, numPaddles, buyBallSet]);
+  }, [useVoucher, selectedVoucherId, availableVouchers, sessionGroup, session, replacementData, paymentData, matchDetails, numPaddles, buyBallSet]);
 
   const handlePayment = async () => {
     if (!paymentData) {
@@ -244,11 +258,25 @@ const PaymentPage = () => {
         if (sessionGroup) {
           // 對於 sessionGroup，使用批量註冊端點
           apiEndpoint = '/class-sessions/register-multi';
+          
+          // 確保 sessionIds 是有效的整數數組
+          const sessionIds = sessionGroup
+            .map(s => s.id)
+            .filter(id => id != null && !isNaN(parseInt(id)))
+            .map(id => parseInt(id));
+          
+          console.log('SessionGroup IDs:', sessionIds);
+          console.log('SessionGroup length:', sessionGroup.length);
+          
+          if (sessionIds.length === 0) {
+            throw new Error('No valid session IDs found');
+          }
+          
           requestData = {
-            sessionIds: sessionGroup.map(s => s.id),
+            sessionIds: sessionIds,
             paymentMethod: paymentMethod === 'wallet' ? 'wallet' : 'card',
-            numPaddles: numPaddles,
-            buyBallSet: buyBallSet
+            numPaddles: numPaddles || 0,
+            buyBallSet: buyBallSet || false
           };
         } else {
           // 對於單個 session
@@ -267,6 +295,17 @@ const PaymentPage = () => {
         requestData = {
           eventId: eventDetails.id,
           useWallet: paymentMethod === 'wallet'
+        };
+      } else if (matchDetails) {
+        // Friendly match payment
+        apiEndpoint = `/friendly-matches/${matchId}/pay`;
+        requestData = {
+          numPaddles: numPaddles,
+          buyBallSet: buyBallSet,
+          totalPrice: discountedAmount,
+          paymentMethod: paymentMethod === 'wallet' ? 'WALLET' : 'CREDIT_CARD',
+          useVoucher: useVoucher,
+          voucherRedemptionId: selectedVoucherId
         };
       } else {
         // Regular court booking
@@ -343,6 +382,26 @@ const PaymentPage = () => {
             paymentStatus: 'COMPLETED'
           }
         });
+      } else if (matchDetails) {
+        // Friendly match payment - 導航到確認頁面
+        navigate('/booking/confirmation', {
+          state: {
+            type: 'friendly-match',
+            matchDetails: matchDetails,
+            paymentResult: response.data,
+            totalAmount: response.data.totalAmount || matchDetails.price,
+            paymentMethod: paymentMethod === 'wallet' ? 'WALLET' : 'CREDIT_CARD',
+            paymentStatus: 'COMPLETED',
+            // 添加 voucher 相關信息
+            voucherUsed: useVoucher && selectedVoucherId,
+            originalAmount: getInitialAmount(),
+            discountAmount: useVoucher && selectedVoucherId ? (getInitialAmount() - discountedAmount) : 0,
+            voucherCode: useVoucher && selectedVoucherId ? availableVouchers.find(v => v.id === selectedVoucherId)?.code : null,
+            // 添加設備信息
+            numPaddles: numPaddles,
+            buyBallSet: buyBallSet
+          }
+        });
       } else {
         // Regular court booking
         navigate('/booking/confirmation', {
@@ -370,12 +429,31 @@ const PaymentPage = () => {
         });
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Payment failed. Please try again.';
+      console.error('Payment error:', err);
+      console.error('Error response:', err.response);
+      
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
 
       if (errorMessage.includes('Insufficient wallet balance')) {
         setError('Your wallet balance is insufficient. Please switch to credit card payment or top up your wallet.');
         // 自動切換到信用卡支付
         setPaymentMethod('card');
+      } else if (errorMessage.includes('Session IDs cannot be null or empty')) {
+        setError('Invalid session data. Please try selecting the sessions again.');
+      } else if (errorMessage.includes('Payment method is required')) {
+        setError('Please select a payment method.');
+      } else if (errorMessage.includes('Session is full')) {
+        setError('One or more sessions are full. Please try different sessions.');
+      } else if (errorMessage.includes('Already registered')) {
+        setError('You are already registered for one or more sessions.');
       } else {
         setError(errorMessage);
       }
@@ -429,8 +507,8 @@ const PaymentPage = () => {
                 📋 {eventDetails ? 'Event Registration Summary' : 'Booking Summary'}
               </Typography>
 
-              {/* Court & Venue Info - 只在非 class session 且非 event 時顯示 */}
-              {!sessionGroup && !session && !eventDetails && (
+              {/* Court & Venue Info - 只在非 class session 且非 event 且非 friendly match 時顯示 */}
+              {!sessionGroup && !session && !eventDetails && !matchDetails && (
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <SportsIcon sx={{ color: '#1976d2', mr: 1, fontSize: 28 }} />
                   <Box>
@@ -446,8 +524,8 @@ const PaymentPage = () => {
                 </Box>
               )}
 
-              {/* Date & Time - 只在非 class session 且非 event 時顯示 */}
-              {!sessionGroup && !session && !eventDetails && (
+              {/* Date & Time - 只在非 class session 且非 event 且非 friendly match 時顯示 */}
+              {!sessionGroup && !session && !eventDetails && !matchDetails && (
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <AccessTimeIcon sx={{ color: '#1976d2', mr: 1, fontSize: 28 }} />
                   <Box>
@@ -464,8 +542,8 @@ const PaymentPage = () => {
                 </Box>
               )}
 
-              {/* Players & Equipment - 只在 court booking 時顯示，不包括 event */}
-              {!replacementData && !sessionGroup && !session && !eventDetails && (
+              {/* Players & Equipment - 只在 court booking 時顯示，不包括 event 和 friendly match */}
+              {!replacementData && !sessionGroup && !session && !eventDetails && !matchDetails && (
                 <>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#424242' }}>
@@ -686,6 +764,128 @@ const PaymentPage = () => {
                 </>
               )}
 
+              {/* Friendly Match Details - 只在 friendly match 時顯示 */}
+              {matchDetails && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#424242' }}>
+                    🏓 Friendly Match Details
+                  </Typography>
+
+                  <Box sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                      {matchDetails.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Organized by {matchDetails.organizer}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <AccessTimeIcon sx={{ fontSize: 16, mr: 1, color: '#666' }} />
+                      <Typography variant="body2">
+                        {matchDetails.date} {matchDetails.startTime} - {matchDetails.endTime}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <LocationOnIcon sx={{ fontSize: 16, mr: 1, color: '#666' }} />
+                      <Typography variant="body2">
+                        {matchDetails.courtName} at {matchDetails.venueName}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <GroupIcon sx={{ fontSize: 16, mr: 1, color: '#666' }} />
+                      <Typography variant="body2">
+                        Players: {matchDetails.currentPlayers}/{matchDetails.maxPlayers}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <LocalOfferIcon sx={{ fontSize: 16, mr: 1, color: '#666' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                        Cost: RM{matchDetails.price || 0}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Friendly Match 設備選項 */}
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#424242' }}>
+                    🏓 Equipment Options
+                  </Typography>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                          Paddles (RM{PADDLE_PRICE} each)
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant={numPaddles > 0 ? "contained" : "outlined"}
+                            onClick={() => setNumPaddles(Math.max(0, numPaddles - 1))}
+                          >
+                            -
+                          </Button>
+                          <Typography sx={{ minWidth: 30, textAlign: 'center' }}>
+                            {numPaddles}
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => setNumPaddles(numPaddles + 1)}
+                          >
+                            +
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                          Ball Set (RM{BALL_SET_PRICE})
+                        </Typography>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={buyBallSet}
+                              onChange={(e) => setBuyBallSet(e.target.checked)}
+                              color="primary"
+                            />
+                          }
+                          label="Add ball set"
+                        />
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* 設備費用摘要 */}
+                  {(numPaddles > 0 || buyBallSet) && (
+                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#e3f2fd', borderRadius: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                        Equipment Summary:
+                      </Typography>
+                      {numPaddles > 0 && (
+                        <Typography variant="body2">
+                          Paddles: {numPaddles} × RM{PADDLE_PRICE} = RM{(numPaddles * PADDLE_PRICE).toFixed(2)}
+                        </Typography>
+                      )}
+                      {buyBallSet && (
+                        <Typography variant="body2">
+                          Ball Set: RM{BALL_SET_PRICE.toFixed(2)}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', mt: 1 }}>
+                        Total Equipment: RM{((numPaddles * PADDLE_PRICE) + (buyBallSet ? BALL_SET_PRICE : 0)).toFixed(2)}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+
               {/* Replacement Session Info - 只在 replacement session 時顯示 */}
               {replacementData && (
                 <>
@@ -741,12 +941,14 @@ const PaymentPage = () => {
                   </Typography>
                 </Box>
 
-                {/* 費用明細 - 只在 class session 時顯示 */}
-                {(sessionGroup || session) && (
+                {/* 費用明細 - class session 和 friendly match */}
+                {(sessionGroup || session || matchDetails) && (
                   <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
                     <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                      <span>Class Fee:</span>
-                      <span>RM{(sessionGroup ? sessionGroup.reduce((sum, sess) => sum + (sess.price || 0), 0) : session.price || 0).toFixed(2)}</span>
+                      <span>{sessionGroup || session ? 'Class Fee:' : 'Match Fee:'}</span>
+                      <span>RM{(sessionGroup ? sessionGroup.reduce((sum, sess) => sum + (sess.price || 0), 0) : 
+                        session ? session.price || 0 : 
+                        matchDetails ? matchDetails.price || 0 : 0).toFixed(2)}</span>
                     </Typography>
                     {numPaddles > 0 && (
                       <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
@@ -760,6 +962,18 @@ const PaymentPage = () => {
                         <span>RM{BALL_SET_PRICE.toFixed(2)}</span>
                       </Typography>
                     )}
+                    {useVoucher && selectedVoucherId && (
+                      <>
+                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, color: '#1976d2' }}>
+                          <span>Voucher Discount:</span>
+                          <span>-RM{(getInitialAmount() - discountedAmount).toFixed(2)}</span>
+                        </Typography>
+                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, fontWeight: 'bold' }}>
+                          <span>Final Amount:</span>
+                          <span>RM{discountedAmount.toFixed(2)}</span>
+                        </Typography>
+                      </>
+                    )}
                   </Box>
                 )}
                 {useVoucher && selectedVoucherId && (
@@ -768,7 +982,7 @@ const PaymentPage = () => {
                       Original Price:
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                      RM{(paymentData?.price || paymentData?.amount || 0).toFixed(2)}
+                      RM{getInitialAmount().toFixed(2)}
                     </Typography>
                   </Box>
                 )}
@@ -832,7 +1046,9 @@ const PaymentPage = () => {
                       label={
                         <Box sx={{ display: 'flex', alignItems: 'center', p: 1 }}>
                           <CreditCardIcon sx={{ color: '#1976d2', mr: 1 }} />
-                          <Typography sx={{ fontWeight: 'bold' }}>Credit/Debit Card</Typography>
+                          <Typography sx={{ fontWeight: 'bold' }}>
+                            Credit/Debit Card
+                          </Typography>
                         </Box>
                       }
                       sx={{ p: 2, width: '100%' }}
@@ -841,8 +1057,8 @@ const PaymentPage = () => {
                 </RadioGroup>
               </FormControl>
 
-                             {/* Voucher Selection - 只在 court booking 時顯示，不包括 event */}
-               {!replacementData && !sessionGroup && !session && !eventDetails && (
+                                                           {/* Voucher Selection - 只在 court booking 和 friendly match 時顯示，不包括 event */}
+                              {!replacementData && !sessionGroup && !session && !eventDetails && (
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#424242' }}>
                     <LocalOfferIcon sx={{ mr: 1, color: '#ff9800' }} />
@@ -986,6 +1202,8 @@ const PaymentPage = () => {
                  </Box>
                )}
 
+
+
                {/* Replacement Session Notice - 只在 replacement session 時顯示 */}
                {replacementData && (
                  <Box sx={{ mb: 3 }}>
@@ -1006,19 +1224,21 @@ const PaymentPage = () => {
                       : `Insufficient wallet balance. You need RM${(discountedAmount - walletBalance).toFixed(2)} more.`
                     }
                   </Typography>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => navigate('/wallet/topup')}
-                    sx={{
-                      backgroundColor: '#ff9800',
-                      '&:hover': {
-                        backgroundColor: '#f57c00'
-                      }
-                    }}
-                  >
-                    Top Up Wallet
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => navigate('/wallet/topup')}
+                      sx={{
+                        backgroundColor: '#ff9800',
+                        '&:hover': {
+                          backgroundColor: '#f57c00'
+                        }
+                      }}
+                    >
+                      Top Up Wallet
+                    </Button>
+                  </Box>
                 </Alert>
               )}
 
@@ -1036,12 +1256,12 @@ const PaymentPage = () => {
                   fullWidth
                   size="large"
                   onClick={handlePayment}
-                  disabled={
-                    isProcessing ||
-                    (paymentMethod === 'wallet' && (walletBalance < discountedAmount || walletBalance === 0)) ||
-                    isLoading ||
-                    (!replacementData && !sessionGroup && !session && !eventDetails && useVoucher && !selectedVoucherId)
-                  }
+                                     disabled={
+                     isProcessing ||
+                     (paymentMethod === 'wallet' && (walletBalance < discountedAmount || walletBalance === 0)) ||
+                     isLoading ||
+                     (!replacementData && !sessionGroup && !session && !eventDetails && useVoucher && !selectedVoucherId)
+                   }
                   sx={{
                     py: 2,
                     backgroundColor: '#4caf50',

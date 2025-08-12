@@ -28,7 +28,6 @@ const Footer = () => {
   ];
 
   const supportLinks = [
-    { text: 'Help Center', path: '/helpdesk' },
     { text: 'About Us', path: '/about' },
     { text: 'Contact', path: '/contact' },
     { text: 'Privacy Policy', path: '/privacy' },

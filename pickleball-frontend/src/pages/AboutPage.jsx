@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Container, 
@@ -12,7 +12,8 @@ import {
   Chip,
   Stack,
   Fade,
-  Slide
+  Slide,
+  CircularProgress
 } from '@mui/material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import { useTheme } from '../context/ThemeContext';
@@ -26,16 +27,64 @@ import {
   Email,
   ArrowForward
 } from '@mui/icons-material';
+import AboutUsService from '../service/AboutUsService';
 
 const AboutPage = () => {
   const muiTheme = useMuiTheme();
   const { theme: themeMode, getPrimaryColor } = useTheme();
+  
+  const [statistics, setStatistics] = useState({
+    activeCourts: 0,
+    totalMembers: 0,
+    averageRating: 0.0,
+    matchesPlayed: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await AboutUsService.getAboutUsStatistics();
+        setStatistics(data);
+      } catch (error) {
+        console.error('Error fetching statistics:', error);
+        setError('Failed to load statistics. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatistics();
+  }, []);
 
   const stats = [
-    { icon: <SportsTennis />, label: 'Active Courts', value: '50+', color: getPrimaryColor() },
-    { icon: <Group />, label: 'Community Members', value: '10,000+', color: '#4CAF50' },
-    { icon: <Star />, label: 'Average Rating', value: '4.8/5', color: '#FFD700' },
-    { icon: <TrendingUp />, label: 'Matches Played', value: '25,000+', color: '#FF9800' }
+    { 
+      icon: <SportsTennis />, 
+      label: 'Active Courts', 
+      value: loading ? '...' : `${statistics.activeCourts || 0}+`, 
+      color: getPrimaryColor() 
+    },
+    { 
+      icon: <Group />, 
+      label: 'Total Members', 
+      value: loading ? '...' : `${(statistics.totalMembers || 0).toLocaleString()}+`, 
+      color: '#4CAF50' 
+    },
+    { 
+      icon: <Star />, 
+      label: 'Average Rating', 
+      value: loading ? '...' : `${(statistics.averageRating || 0).toFixed(1)}/5`, 
+      color: '#FFD700' 
+    },
+    { 
+      icon: <TrendingUp />, 
+      label: 'Matches Played', 
+      value: loading ? '...' : `${(statistics.matchesPlayed || 0).toLocaleString()}+`, 
+      color: '#FF9800' 
+    }
   ];
 
   return (
@@ -162,9 +211,19 @@ const AboutPage = () => {
                       <Box sx={{ color: stat.color, mb: 2 }}>
                         {React.cloneElement(stat.icon, { sx: { fontSize: 48 } })}
                       </Box>
-                      <Typography variant="h3" fontWeight="bold" gutterBottom>
-                        {stat.value}
-                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 60 }}>
+                        {loading ? (
+                          <CircularProgress size={40} sx={{ color: stat.color }} />
+                        ) : error ? (
+                          <Typography variant="h6" color="error" sx={{ textAlign: 'center' }}>
+                            Error
+                          </Typography>
+                        ) : (
+                          <Typography variant="h3" fontWeight="bold" gutterBottom>
+                            {stat.value}
+                          </Typography>
+                        )}
+                      </Box>
                       <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
                         {stat.label}
                       </Typography>

@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import MessageIcon from '@mui/icons-material/Message';
+import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import CloseIcon from '@mui/icons-material/Close';
 import HelpIcon from '@mui/icons-material/Help';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -43,20 +44,24 @@ const FloatingMessageButton = () => {
   const handleClick = () => {
     setIsOpen(!isOpen);
     if (!isOpen && messages.length === 0) {
-      const username = currentUser?.username || 'there';
+      const isLoggedIn = currentUser?.username;
+      const username = isLoggedIn || 'Guest';
+      
       // Initialize chat when opening
       setMessages([
         {
           id: Date.now(),
           sender: 'ai',
-          content: `Hello ${username}! Welcome to the Pickleball Court Reservation app! How can I assist you today? Do you need help with making a reservation, checking availability, or something else?`,
+          content: isLoggedIn 
+            ? `Hello ${username}! Welcome to the Pickleball Court Reservation app! How can I assist you today? Do you need help with making a reservation, checking availability, or something else?`
+            : `Hello there! Welcome to the Pickleball Court Reservation app! I'm here to help you learn about our services. You can ask me about court availability, pricing, rules, or how to get started. Would you like to know more about anything specific?`,
           timestamp: new Date().toISOString()
         },
         {
           id: Date.now() + 1,
           sender: 'ai',
           type: 'quick_replies',
-          options: QUICK_REPLIES,
+          options: isLoggedIn ? QUICK_REPLIES : GUEST_QUICK_REPLIES,
           timestamp: new Date().toISOString()
         }
       ]);
@@ -100,18 +105,32 @@ const FloatingMessageButton = () => {
     setIsLoading(true);
 
     try {
-      const response = await HelpdeskService.askQuestion(message);
-
-      const aiMessage = {
-        id: response.id,
-        content: response.aiResponse,
-        sender: 'ai',
-        timestamp: response.timestamp || new Date().toISOString(),
-        queryId: response.id,
-        escalated: response.escalated
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
+      // Check if user is logged in
+      const isLoggedIn = currentUser?.username;
+      
+      if (isLoggedIn) {
+        // For logged in users, use the backend service
+        const response = await HelpdeskService.askQuestion(message);
+        const aiMessage = {
+          id: response.id,
+          content: response.aiResponse,
+          sender: 'ai',
+          timestamp: response.timestamp || new Date().toISOString(),
+          queryId: response.id,
+          escalated: response.escalated
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // For non-logged in users, provide local responses
+        const localResponse = getLocalResponse(message);
+        const aiMessage = {
+          id: Date.now(),
+          content: localResponse,
+          sender: 'ai',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      }
     } catch (err) {
       const errorMessage = {
         id: Date.now(),
@@ -151,6 +170,145 @@ const FloatingMessageButton = () => {
       .replace(/<br><br>/g, '<br>');
   };
 
+  const getLocalResponse = (message) => {
+    const lowerMessage = message.toLowerCase();
+    
+    // Court Information
+    if (lowerMessage.includes('court') || lowerMessage.includes('court information')) {
+      return `**Court Information**
+
+### Available Courts
+We have multiple indoor and outdoor pickleball courts available for booking. * All courts are well-maintained and meet professional standards. * Courts are equipped with proper lighting and ventilation.
+
+### Court Types
+* **Indoor Courts**: Climate-controlled environment, perfect for year-round play
+* **Outdoor Courts**: Natural lighting, great for daytime sessions
+* **Premium Courts**: Enhanced facilities with additional amenities
+
+### Equipment Provided
+* Pickleball paddles and balls are available for rent
+* You can also bring your own equipment
+* Court shoes are recommended for better performance`;
+    }
+    
+    // Pricing
+    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('rate')) {
+      return `**Pricing Information**
+
+### Court Rental Rates
+* **Peak Hours** (6:00 PM - 10:00 PM): RM 55/hour
+* **Off-Peak Hours** (8:00 AM - 6:00 PM): RM 30/hour
+* **Weekend Rates**: RM 45/hour
+
+### Discounts Available
+* **Student Discount**: 20% off with valid student ID
+* **Senior Citizen Discount**: 15% off for ages 60+
+* **Package Deals**: 10% off for bookings of 3+ hours
+
+### Payment Methods
+* Credit/Debit cards
+* Digital wallets
+* Cash payments accepted`;
+    }
+    
+    // Registration
+    if (lowerMessage.includes('register') || lowerMessage.includes('sign up') || lowerMessage.includes('account')) {
+      return `**How to Register**
+
+### Registration Process
+* Click the "Register" button in the top right corner
+* Fill in your basic information (name, email, password)
+* Verify your email address
+* Complete your profile with additional details
+
+### Registration Benefits
+* Free account creation
+* Access to court booking system
+* Member discounts and rewards
+* Booking history tracking
+
+### Required Information
+* Full name
+* Email address
+* Phone number
+* Password (minimum 6 characters)`;
+    }
+    
+    // Rules
+    if (lowerMessage.includes('rule') || lowerMessage.includes('guideline') || lowerMessage.includes('policy')) {
+      return `**Court Rules & Guidelines**
+
+### General Rules
+* Arrive 10 minutes before your booking time
+* Wear appropriate sports attire and court shoes
+* Respect other players and maintain good sportsmanship
+* Keep the courts clean and tidy
+
+### Cancellation Policy
+* Free cancellation up to 24 hours before booking
+* 50% refund for cancellations 2-24 hours before
+* No refund for cancellations less than 2 hours before
+
+### Equipment Rules
+* You can bring your own equipment
+* Rental equipment is available on-site
+* Please return rental equipment in good condition`;
+    }
+    
+    // Location
+    if (lowerMessage.includes('location') || lowerMessage.includes('address') || lowerMessage.includes('where')) {
+      return `**Location & Hours**
+
+### Address
+Kuala Lumpur, Malaysia
+* Easy access via public transportation
+* Ample parking available
+* Wheelchair accessible facilities
+
+### Operating Hours
+* **Monday - Friday**: 8:00 AM - 10:00 PM
+* **Saturday - Sunday**: 7:00 AM - 11:00 PM
+* **Public Holidays**: 8:00 AM - 10:00 PM
+
+### Facilities
+* Changing rooms and showers
+* Equipment rental counter
+* Vending machines
+* Seating areas for spectators`;
+    }
+    
+    // Contact
+    if (lowerMessage.includes('contact') || lowerMessage.includes('phone') || lowerMessage.includes('email')) {
+      return `**Contact Information**
+
+### Customer Service
+* **Phone**: +60 12-345 6789
+* **Email**: support@pickleball.com
+* **WhatsApp**: +60 12-345 6789
+
+### Service Hours
+* **Monday - Friday**: 9:00 AM - 6:00 PM
+* **Saturday**: 9:00 AM - 4:00 PM
+* **Sunday**: 10:00 AM - 2:00 PM
+
+### Visit Us
+You're welcome to visit our facility during operating hours to see the courts and meet our staff. No appointment necessary!`;
+    }
+    
+    // Default response
+    return `Thank you for your question! I'm here to help you learn about our pickleball court reservation system. 
+
+You can ask me about:
+* **Court Information** - Available courts and facilities
+* **Pricing** - Rates and payment options  
+* **Registration** - How to create an account
+* **Rules & Guidelines** - Court policies and procedures
+* **Location & Hours** - Address and operating times
+* **Contact Information** - How to reach us
+
+Feel free to ask any specific questions about these topics!`;
+  };
+
   const helpTopics = [
     { icon: <SportsTennisIcon />, text: 'Court/Reservation', color: '#4CAF50' },
     { icon: <PaymentIcon />, text: 'Payment', color: '#2196F3' },
@@ -167,6 +325,15 @@ const FloatingMessageButton = () => {
     { label: "Event", value: "event" },
     { label: "Profile", value: "profile" },
     { label: "Membership", value: "membership" }
+  ];
+
+  const GUEST_QUICK_REPLIES = [
+    { label: "Court Information", value: "court_info" },
+    { label: "Pricing", value: "pricing" },
+    { label: "How to Register", value: "registration" },
+    { label: "Rules & Guidelines", value: "rules" },
+    { label: "Location & Hours", value: "location" },
+    { label: "Contact Us", value: "contact" }
   ];
 
   const TOPIC_QUESTIONS = {
@@ -211,6 +378,49 @@ const FloatingMessageButton = () => {
       "What are the benefits of membership?",
       "How do I upgrade my membership?",
       "What are the membership tier levels?"
+    ],
+    // Guest user questions
+    court_info: [
+      "What types of courts do you have?",
+      "Are the courts indoor or outdoor?",
+      "What equipment is provided?",
+      "How many courts are available?",
+      "Are the courts well-maintained?"
+    ],
+    pricing: [
+      "What are your court rental rates?",
+      "Do you offer any discounts?",
+      "Are there peak and off-peak rates?",
+      "Do you offer package deals?",
+      "What payment methods do you accept?"
+    ],
+    registration: [
+      "How do I create an account?",
+      "Is registration free?",
+      "What information do I need to register?",
+      "Can I book without registering?",
+      "How long does registration take?"
+    ],
+    rules: [
+      "What are the court rules?",
+      "Are there dress code requirements?",
+      "What is the cancellation policy?",
+      "Can I bring my own equipment?",
+      "Are there age restrictions?"
+    ],
+    location: [
+      "Where are you located?",
+      "What are your operating hours?",
+      "Is there parking available?",
+      "Are you accessible by public transport?",
+      "Do you have changing rooms?"
+    ],
+    contact: [
+      "How can I contact you?",
+      "What is your phone number?",
+      "Do you have an email address?",
+      "What are your customer service hours?",
+      "Can I visit without booking?"
     ]
   };
 
@@ -551,18 +761,30 @@ Platinum tier provides maximum benefits and exclusive perks. * Requires 5000 poi
 
   const handleQuickReply = (value) => {
     setCurrentTopic(value);
+    const isLoggedIn = currentUser?.username;
     const topicQuestions = TOPIC_QUESTIONS[value] || [];
     
-    const topicMessage = {
-      id: Date.now(),
-      sender: 'ai',
-      type: 'topic_questions',
-      content: `Here are some common questions about ${value.replace('_', ' ')}:`,
-      options: topicQuestions,
-      timestamp: new Date().toISOString()
-    };
-    
-    setMessages(prev => [...prev, topicMessage]);
+    if (isLoggedIn) {
+      const topicMessage = {
+        id: Date.now(),
+        sender: 'ai',
+        type: 'topic_questions',
+        content: `Here are some common questions about ${value.replace('_', ' ')}:`,
+        options: topicQuestions,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, topicMessage]);
+    } else {
+      // For non-logged in users, provide immediate response
+      const response = getLocalResponse(value.replace('_', ' '));
+      const aiMessage = {
+        id: Date.now(),
+        sender: 'ai',
+        content: response,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    }
   };
 
   const handleTopicQuestion = (question) => {
@@ -628,7 +850,7 @@ Platinum tier provides maximum benefits and exclusive perks. * Requires 5000 poi
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <HelpIcon sx={{ fontSize: 20 }} />
+              <HeadsetMicIcon sx={{ fontSize: 20 }} />
               <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
                 Help & Support
               </Typography>
@@ -922,8 +1144,8 @@ Platinum tier provides maximum benefits and exclusive perks. * Requires 5000 poi
           aria-label="help and support"
           onClick={handleClick}
           sx={{
-            width: 56,
-            height: 56,
+            width: 64,
+            height: 64,
             boxShadow: theme.shadows[8],
             '&:hover': {
               boxShadow: theme.shadows[12],
@@ -933,7 +1155,7 @@ Platinum tier provides maximum benefits and exclusive perks. * Requires 5000 poi
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
           }}
         >
-          <MessageIcon sx={{ fontSize: 24 }} />
+          <HeadsetMicIcon sx={{ fontSize: 28 }} />
         </Fab>
       </Tooltip>
     </Box>

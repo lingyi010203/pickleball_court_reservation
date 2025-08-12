@@ -7,7 +7,7 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import MessageBubble from './MessageBubble';
 import messageService from '../../service/MessageService';
@@ -179,6 +179,7 @@ export default function Conversation({ otherUser, onBack }) {
       .filter(msg =>
         !msg.delivered &&
         msg.senderUsername &&
+        otherUser?.username &&
         msg.senderUsername.toLowerCase() === otherUser.username.toLowerCase()
       )
       .map(msg => msg.id)
@@ -410,6 +411,7 @@ export default function Conversation({ otherUser, onBack }) {
       .filter(msg =>
         !msg.read &&
         msg.senderUsername &&
+        otherUser?.username &&
         msg.senderUsername.toLowerCase() === otherUser.username.toLowerCase()
       )
       .map(msg => msg.id)
@@ -494,6 +496,31 @@ export default function Conversation({ otherUser, onBack }) {
           sx={{ borderRadius: 2 }}
         >
           {retrying ? 'Retrying...' : 'Retry'}
+        </Button>
+      </Box>
+    );
+  }
+
+  // Check if otherUser is properly defined - after all hooks
+  if (!otherUser || !otherUser.username) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100%',
+        p: 4
+      }}>
+        <Typography variant="body1" sx={{ color: theme.palette.error.main, mb: 2, textAlign: 'center' }}>
+          Invalid user information. Please try again.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={onBack}
+          sx={{ borderRadius: 2 }}
+        >
+          Go Back
         </Button>
       </Box>
     );
@@ -656,7 +683,7 @@ export default function Conversation({ otherUser, onBack }) {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Type a message... (Ctrl+Enter to send)"
+          placeholder="Type a message..."
           value={newMessage}
           onChange={(e) => {
             console.log('Input changed:', e.target.value);

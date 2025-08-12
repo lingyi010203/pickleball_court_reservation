@@ -10,12 +10,14 @@ import com.pickleball_backend.pickleball.dto.FriendlyMatchPaymentDto;
 import com.pickleball_backend.pickleball.dto.BookingResponseDto;
 import com.pickleball_backend.pickleball.dto.JoinRequestDto;
 import com.pickleball_backend.pickleball.dto.FriendlyMatchResponseDto;
+import com.pickleball_backend.pickleball.dto.JoinRequestResponseDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import com.pickleball_backend.pickleball.repository.FriendlyMatchRepository;
@@ -95,12 +97,13 @@ public class FriendlyMatchController {
 
     @PostMapping("/{matchId}/join")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<JoinRequest> sendJoinRequest(
+    public ResponseEntity<JoinRequestResponseDto> sendJoinRequest(
             @PathVariable Integer matchId,
             Principal principal) {
 
         Member member = getCurrentMember(principal);
-        return ResponseEntity.ok(friendlyMatchService.sendJoinRequest(matchId, member.getId()));
+        JoinRequest joinRequest = friendlyMatchService.sendJoinRequest(matchId, member.getId());
+        return ResponseEntity.ok(JoinRequestResponseDto.fromEntity(joinRequest));
     }
 
     @DeleteMapping("/requests/{requestId}")
@@ -129,9 +132,10 @@ public class FriendlyMatchController {
 
     @PostMapping("/invitation/{matchId}/join")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<JoinRequest> joinInvitation(@PathVariable Integer matchId, Principal principal) {
+    public ResponseEntity<JoinRequestResponseDto> joinInvitation(@PathVariable Integer matchId, Principal principal) {
         Member member = getCurrentMember(principal);
-        return ResponseEntity.ok(friendlyMatchService.joinInvitation(matchId, member.getId()));
+        JoinRequest joinRequest = friendlyMatchService.joinInvitation(matchId, member.getId());
+        return ResponseEntity.ok(JoinRequestResponseDto.fromEntity(joinRequest));
     }
 
     // 新增：為 match 付款
@@ -168,6 +172,55 @@ public class FriendlyMatchController {
             return ResponseEntity.ok().body(bookingResponse);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Payment failed: " + e.getMessage());
+        }
+    }
+
+    // 新增：取消 match 付款
+    @PostMapping("/{id}/cancel-payment")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> cancelMatchPayment(@PathVariable Integer id, Principal principal) {
+        try {
+            Member member = getCurrentMember(principal);
+            if (member == null) {
+                return ResponseEntity.badRequest().body("Member not found");
+            }
+            
+            FriendlyMatch match = friendlyMatchRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Match not found"));
+            
+            // 檢查是否為 organizer
+            if (!match.getOrganizer().getId().equals(member.getId())) {
+                return ResponseEntity.badRequest().body("Only organizer can cancel payment for the match");
+            }
+            
+            // 檢查是否已付款
+            if (!"PAID".equals(match.getPaymentStatus())) {
+                return ResponseEntity.badRequest().body("Match is not paid yet");
+            }
+            
+            // 處理取消付款和退款
+            String result = friendlyMatchService.cancelMatchPayment(match, member);
+            
+            return ResponseEntity.ok().body(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Payment cancellation failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 獲取可用用戶的玩家數量統計
+     * @return 包含各種用戶統計信息的Map
+     */
+    @GetMapping("/statistics/available-users")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'EVENTORGANIZER')")
+    public ResponseEntity<Map<String, Object>> getAvailableUserPlayerStatistics() {
+        try {
+            Map<String, Object> statistics = friendlyMatchService.getAvailableUserPlayerStatistics();
+            return ResponseEntity.ok(statistics);
+        } catch (Exception e) {
+            System.err.println("Error getting available user player statistics: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
         }
     }
 

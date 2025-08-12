@@ -123,27 +123,14 @@ const FriendlyMatchPage = () => {
   const [messageError, setMessageError] = useState('');
   const [messageSuccess, setMessageSuccess] = useState('');
   const [cancelConfirmDialogOpen, setCancelConfirmDialogOpen] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
   const handleOpenUserProfile = async (username) => {
     try {
       const token = localStorage.getItem('authToken');
-      const res = await fetch(`http://localhost:8081/api/users/profile/${username}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/users/profile/${username}`);
       
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedUserProfile(data);
-      } else {
-        // 如果 API 調用失敗，顯示基本資料
-        setSelectedUserProfile({
-          username: username,
-          name: 'User',
-          email: 'Contact info not available',
-          phone: 'Contact info not available',
-          userType: 'User'
-        });
-      }
+      setSelectedUserProfile(res.data);
       setUserProfileDialogOpen(true);
     } catch (err) {
       console.error('Failed to fetch user profile:', err);
@@ -268,6 +255,7 @@ const FriendlyMatchPage = () => {
     try {
       // 获取所有开放的比赛（包括邀请类型和独立类型）
       const res = await api.get('/friendly-matches/all');
+
       setInvitations(res.data);
     } catch (err) {
       console.error('Failed to load matches:', err);
@@ -307,18 +295,43 @@ const FriendlyMatchPage = () => {
         setSubmitting(false);
         return;
       }
-      await api.post('/friendly-matches/invitation', {
+            const createResponse = await api.post('/friendly-matches/invitation', {
         maxPlayers: capacity,
         currentPlayers,
         matchRules: note,
         startTime: booking?.bookingDate,
         status: 'OPEN',
       }, { params: { bookingId: selectedBooking } });
+ 
       setCreateSuccess('Invitation created successfully!');
       setSelectedBooking('');
       setCurrentPlayers(1);
       setNote('');
-      fetchInvitations();
+      
+      // Instead of fetching all invitations again, add the new match to the local state
+      // This ensures the organizer information is immediately available
+      const newMatch = {
+        id: createResponse.data.id,
+        maxPlayers: capacity,
+        currentPlayers: currentPlayers,
+        matchRules: note,
+        status: 'OPEN',
+        isInvitation: true,
+        paymentStatus: 'CONFIRMED',
+        organizerUsername: currentUser?.username, // Set the current user as organizer
+        organizerId: currentUser?.id,
+        bookingId: selectedBooking,
+        // Add other necessary fields
+        slotDate: booking?.bookingDate,
+        startTime: booking?.startTime,
+        endTime: booking?.endTime,
+        courtName: booking?.courtName,
+        venueName: booking?.venueName,
+        courtLocation: booking?.courtLocation,
+        joinRequests: []
+      };
+      
+      setInvitations(prevInvitations => [newMatch, ...prevInvitations]);
     } catch (err) {
       if (err.response && err.response.data && typeof err.response.data === 'string' && err.response.data.includes('already exists')) {
         setMatchExistsError('A match for this booking/time already exists. Please select another booking or time.');
@@ -343,15 +356,17 @@ const FriendlyMatchPage = () => {
       await api.post(`/friendly-matches/invitation/${id}/join`);
       setJoinStatus('confirmed'); // 直接設為已加入
       setJoinSuccess('Successfully joined the match!');
+      
       // 立即在前端更新 invitations，讓 UI 立即反映
       setInvitations(prevInvitations => prevInvitations.map(invite => {
         if (invite.id === id) {
-          // 檢查是否已經有 joinRequests
-          const alreadyJoined = invite.joinRequests && invite.joinRequests.some(req => req.status === 'APPROVED' && (
+          // 檢查是否已經有 joinRequests 或是 organizer
+          const alreadyJoined = invite.organizerUsername === currentUser?.username ||
+            (invite.joinRequests && invite.joinRequests.some(req => req.status === 'APPROVED' && (
             req.memberId === currentUser?.id ||
             req.memberName === currentUser?.name ||
             req.username === currentUser?.username
-          ));
+            )));
           if (!alreadyJoined) {
             const newCurrentPlayers = (invite.currentPlayers || 0) + 1;
             const isFull = newCurrentPlayers >= invite.maxPlayers;
@@ -381,7 +396,11 @@ const FriendlyMatchPage = () => {
         }
         return invite;
       }));
-      // 也可選擇 fetchInvitations(); // 但這樣會有延遲
+      
+      // 顯示成功對話框
+      console.log('Setting success dialog to open'); // Debug log
+      setSuccessDialogOpen(true);
+      
     } catch (err) {
       setError('Failed to join invitation');
     } finally {
@@ -502,7 +521,7 @@ const FriendlyMatchPage = () => {
   const handleCancelPayment = async () => {
     if (!viewInvite) return;
     try {
-      await api.post(`/friendly-matches/invitation/${viewInvite.id}/cancel-payment`);
+      await FriendlyMatchService.cancelPayment(viewInvite.id);
       setJoinStatus('not_joined'); // 取消付款後，狀態回到未加入
       setJoinSuccess('Payment cancelled successfully!');
       fetchInvitations(); // 立即刷新
@@ -529,7 +548,7 @@ const FriendlyMatchPage = () => {
     setDeletingId(matchId);
     try {
       console.log('Attempting to delete match:', matchId);
-      const response = await api.delete(`/friendly-matches/${matchId}`);
+      const response = await FriendlyMatchService.deleteMatch(matchId);
       console.log('Delete response:', response);
       
       if (response.status === 200) {
@@ -643,7 +662,7 @@ const FriendlyMatchPage = () => {
 
     setIsSearching(true);
     try {
-      const response = await api.get(`/users/search?query=${encodeURIComponent(searchQuery.trim())}`);
+      const response = await api.get(`/api/users/search?query=${encodeURIComponent(searchQuery.trim())}`);
       setSearchResults(response.data);
       setShowSearchResults(true);
     } catch (error) {
@@ -978,13 +997,19 @@ Click here to join: [Friendly Match #${match.id}]`;
                 <CircularProgress size={48} />
               </Box>
             ) : (
-              <Grid container spacing={3}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 3,
+                justifyContent: 'flex-start'
+              }}>
                 {invitations.filter(invite => invite.status === 'OPEN' || invite.status === 'FULL' || invite.status === 'REMOVED').map((invite, index) => (
-                  <Grid item xs={12} md={6} key={invite.id}>
-                    <Fade in timeout={300 + index * 100}>
+                <Fade in timeout={300 + index * 100} key={invite.id}>
                       <Card 
                         elevation={2}
                         sx={{ 
+                        width: 400,
+                        minHeight: 320,
                           borderRadius: 3,
                           transition: 'all 0.3s ease',
                           bgcolor: invite.status === 'REMOVED' ? 'grey.100' : 'white',
@@ -992,6 +1017,10 @@ Click here to join: [Friendly Match #${match.id}]`;
                           '&:hover': invite.status === 'REMOVED' ? {} : {
                             transform: 'translateY(-4px)',
                             boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                        },
+                        '@media (max-width: 600px)': {
+                          width: '100%',
+                          minHeight: 280
                           }
                         }}
                       >
@@ -1184,20 +1213,23 @@ Click here to join: [Friendly Match #${match.id}]`;
                                   >
                                     💳 Make Payment
                                   </Button>
-                                ) : (
-                                  <Button
-                                    variant="outlined"
-                                    disabled
-                                    sx={{ 
-                                      py: 1.5,
-                                      borderRadius: 2,
-                                      textTransform: 'none',
-                                      flex: 1
-                                    }}
-                                  >
-                                    You're the organizer
-                                  </Button>
-                                )}
+                                                                 ) : (
+                                   <Button
+                                     onClick={() => handleView(invite)}
+                                     variant="contained"
+                                     color="primary"
+                                     sx={{ 
+                                       py: 1.5,
+                                       borderRadius: 2,
+                                       textTransform: 'none',
+                                       flex: 1,
+                                       background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                                       fontWeight: 'medium'
+                                     }}
+                                   >
+                                     View Match (Organizer)
+                                   </Button>
+                                 )}
                                 {/* 分享按鈕 - 只有 organizer 且不是 END 狀態才顯示 */}
                                 {(() => {
                                   console.log('Share button debug:', {
@@ -1256,18 +1288,12 @@ Click here to join: [Friendly Match #${match.id}]`;
                               </Stack>
                             ) : (
                               <Button
-                                onClick={() => handleJoin(invite.id)}
+                                onClick={() => handleView(invite)}
                                 disabled={(() => {
-                                  const hasJoined = invite.joinRequests && invite.joinRequests.some(
-                                    req => req.status === 'APPROVED' &&
-                                      req.memberName && req.memberName.toLowerCase() === ((currentUser?.name || currentUser?.username || '')).toLowerCase()
-                                  );
                                   return joiningId === invite.id || 
-                                         invite.currentPlayers >= invite.maxPlayers || 
                                          invite.bookingStatus === 'CANCELLED' || 
                                          invite.status === 'END' || 
-                                         invite.status === 'CLOSED' ||
-                                         hasJoined;
+                                         invite.status === 'CLOSED';
                                 })()}
                                 variant="contained"
                                 fullWidth
@@ -1275,10 +1301,11 @@ Click here to join: [Friendly Match #${match.id}]`;
                                   py: 1.5,
                                   borderRadius: 2,
                                   background: (() => {
-                                    const hasJoined = invite.joinRequests && invite.joinRequests.some(
+                                    const hasJoined = invite.organizerUsername === currentUser?.username ||
+                                      (invite.joinRequests && invite.joinRequests.some(
                                       req => req.status === 'APPROVED' &&
-                                        req.memberName && req.memberName.toLowerCase() === ((currentUser?.name || currentUser?.username || '')).toLowerCase()
-                                    );
+                                        req.username && req.username === currentUser?.username
+                                      ));
                                     if (hasJoined) {
                                       return 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)';
                                     }
@@ -1289,10 +1316,11 @@ Click here to join: [Friendly Match #${match.id}]`;
                                 }}
                               >
                                 {(() => {
-                                  const hasJoined = invite.joinRequests && invite.joinRequests.some(
+                                  const hasJoined = invite.organizerUsername === currentUser?.username ||
+                                    (invite.joinRequests && invite.joinRequests.some(
                                     req => req.status === 'APPROVED' &&
-                                      req.memberName && req.memberName.toLowerCase() === ((currentUser?.name || currentUser?.username || '')).toLowerCase()
-                                  );
+                                      req.username && req.username === currentUser?.username
+                                    ));
                                   if (hasJoined) {
                                     return (
                                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1306,40 +1334,21 @@ Click here to join: [Friendly Match #${match.id}]`;
                                       'Booking Cancelled'
                                     ) : invite.status === 'END' || invite.status === 'CLOSED' ? (
                                       'Match Ended'
-                                    ) : joiningId === invite.id ? (
-                                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                                        Joining...
-                                      </Box>
                                     ) : invite.currentPlayers >= invite.maxPlayers ? (
                                       'Match Full'
                                     ) : (
-                                      'Join Match'
+                                      'View & Join'
                                     )
                                   );
                                 })()}
                               </Button>
                             )}
-                            
-                            <Tooltip title="View Details">
-                              <IconButton 
-                                onClick={() => handleView(invite)}
-                                sx={{ 
-                                  border: 1,
-                                  borderColor: 'divider',
-                                  borderRadius: 2
-                                }}
-                              >
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
                           </Stack>
                         </CardActions>
                       </Card>
                     </Fade>
-                  </Grid>
                 ))}
-              </Grid>
+              </Box>
             )}
 
             {!loading && invitations.length === 0 && (
@@ -1486,14 +1495,39 @@ Click here to join: [Friendly Match #${match.id}]`;
                   </Box>
                 )}
 
-                {viewInvite.joinRequests && viewInvite.joinRequests.length > 0 && (
                   <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Join Members
                     </Typography>
                     <Stack spacing={1}>
-                      {viewInvite.joinRequests
-                        .filter(req => req.status === 'APPROVED')
+                                         {/* Always show the organizer first */}
+                     {viewInvite.organizerUsername && (
+                       <Box 
+                         sx={{ 
+                           display: 'flex', 
+                           alignItems: 'center',
+                           p: 2,
+                           border: 1,
+                           borderColor: 'divider',
+                           borderRadius: 2,
+                           bgcolor: 'white',
+                           borderColor: 'primary.main'
+                         }}
+                       >
+                         <Typography 
+                           variant="body2" 
+                           fontWeight="medium"
+                           sx={{ color: 'primary.main', cursor: 'pointer', textDecoration: 'underline' }}
+                           onClick={() => handleOpenUserProfile(viewInvite.organizerUsername)}
+                         >
+                           {viewInvite.organizerUsername} (Organizer)
+                         </Typography>
+                       </Box>
+                     )}
+                    
+                    {/* Show other approved join requests */}
+                    {viewInvite.joinRequests && viewInvite.joinRequests
+                      .filter(req => req.status === 'APPROVED' && req.username !== viewInvite.organizerUsername)
                         .map(req => (
                           <Box 
                             key={req.id}
@@ -1517,28 +1551,24 @@ Click here to join: [Friendly Match #${match.id}]`;
                           </Box>
                         ))}
                     </Stack>
-                  </Box>
+                  
+                  {/* Show message if no other members have joined */}
+                  {(!viewInvite.joinRequests || viewInvite.joinRequests.filter(req => req.status === 'APPROVED' && req.username !== viewInvite.organizerUsername).length === 0) && (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mt: 1 }}>
+                      No other members have joined yet.
+                    </Typography>
                 )}
+                </Box>
 
-                {/* 如果沒有 joinRequests 或為空，顯示提示 */}
-                {(!viewInvite.joinRequests || viewInvite.joinRequests.length === 0) && (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Join Members
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                      No members have joined yet.
-                    </Typography>
-                  </Box>
-                )}
-                {joinStatus === 'confirmed' && (
-                  <Alert severity="success" sx={{ mb: 3 }} icon={<Info />}>You have successfully joined this match!</Alert>
-                )}
                 <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
                   {(() => {
                     // 強化判斷：memberId 轉字串比對，並 fallback 比對 name/username
-                    const hasJoined = viewInvite && viewInvite.joinRequests && viewInvite.joinRequests.some(
+                    const hasJoined = viewInvite && (
+                      // Check if user is organizer OR has an approved join request
+                      viewInvite.organizerUsername === currentUser?.username ||
+                      (viewInvite.joinRequests && viewInvite.joinRequests.some(
                       req => req.status === 'APPROVED' && req.username && req.username === currentUser?.username
+                      ))
                     );
                     const isFull = viewInvite.currentPlayers >= viewInvite.maxPlayers;
                     const isOrganizer = viewInvite.organizerUsername === currentUser?.username;
@@ -1912,6 +1942,72 @@ Click here to join: [Friendly Match #${match.id}]`;
               color="error"
             >
               Yes, Cancel Join
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Success Dialog */}
+        <Dialog 
+          open={successDialogOpen} 
+          onClose={() => setSuccessDialogOpen(false)} 
+          maxWidth="sm" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+            }
+          }}
+        >
+          <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+              <CheckIcon sx={{ color: 'success.main', fontSize: 48, mr: 2 }} />
+            </Box>
+            Successfully Joined!
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  mb: 2, 
+                  fontWeight: 500,
+                  color: '#000000',
+                  fontSize: '1rem',
+                  lineHeight: 1.5,
+                  display: 'block',
+                  visibility: 'visible'
+                }}
+              >
+                You have successfully joined the friendly match!
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{
+                  color: '#666666',
+                  fontSize: '0.875rem',
+                  lineHeight: 1.4,
+                  display: 'block',
+                  visibility: 'visible'
+                }}
+              >
+                You will receive notifications about match updates and can view the match details anytime.
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+            <Button 
+              onClick={() => setSuccessDialogOpen(false)} 
+              variant="contained" 
+              color="primary"
+              sx={{ 
+                minWidth: 120,
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                fontWeight: 'medium'
+              }}
+            >
+              Got it!
             </Button>
           </DialogActions>
         </Dialog>

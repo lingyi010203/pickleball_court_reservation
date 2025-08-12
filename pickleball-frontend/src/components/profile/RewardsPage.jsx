@@ -341,7 +341,7 @@ const RewardsPage = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
                   {pointsToNext > 0 && (
                     <Chip
-                      label={`还需 ${pointsToNext} 分升级到 ${nextTier?.name || ''}`}
+                      label={`Need ${pointsToNext} more points to upgrade to ${nextTier?.name || ''}`}
                       size="small"
                       sx={{
                         background: alpha(currentTier.color, 0.12),
@@ -353,7 +353,7 @@ const RewardsPage = () => {
                   )}
                   {pointsToNext <= 0 && memberTier.toUpperCase() === 'VIP' && (
                     <Chip
-                      label="已达最高等级"
+                      label="Reached highest level"
                       size="small"
                       sx={{
                         background: alpha(theme.palette.success.main, 0.12),

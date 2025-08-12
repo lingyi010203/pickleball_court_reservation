@@ -45,6 +45,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import LeaveRequestService from '../../service/LeaveRequestService';
 import ClassSessionService from '../../service/ClassSessionService';
+import FriendService from '../../service/FriendService';
 
 const MyClassSessions = () => {
   const { currentUser } = useAuth();
@@ -390,7 +391,7 @@ const MyClassSessions = () => {
       setLeaveDialog({ open: false, session: null });
       setLeaveData({ reason: '' });
       
-      alert('請假請求已保存為草稿！請點擊 "ARRANGE MAKEUP" 來選擇替補課程或發送消息給教練。');
+      alert('Leave request saved as draft! Please click "ARRANGE MAKEUP" to select replacement course or send message to coach.');
     } catch (error) {
       console.error('Error submitting leave request:', error);
       setError(`Failed to submit leave request: ${error.message}`);
@@ -415,6 +416,18 @@ const MyClassSessions = () => {
       return;
     }
     
+                // 自动添加教练为朋友
+                try {
+                  const coachEmailForFriend = await getCoachEmail(coachId);
+                  if (coachEmailForFriend) {
+                    await FriendService.sendRequest(coachEmailForFriend);
+                    console.log(`Successfully sent friend request to ${coachName}`);
+                  }
+                } catch (friendError) {
+                  console.error('Failed to send friend request:', friendError);
+                  // 继续执行，因为教练可能允许非朋友用户发送消息
+                }
+    
                 // 更新現有的 LeaveRequest 狀態為 MESSAGE_SENT
                 const session = makeupDialog.session;
                 
@@ -424,7 +437,7 @@ const MyClassSessions = () => {
                 );
                 
                 if (!existingRequest) {
-                  alert('找不到請假請求，請先提交請假請求。');
+                  alert('Leave request not found. Please submit a leave request first.');
                   return;
                 }
                 
@@ -444,7 +457,7 @@ const MyClassSessions = () => {
                 if (!updateResponse.ok) {
                   const errorText = await updateResponse.text();
                   console.error('Failed to update leave request:', errorText);
-                  alert('更新請假請求失敗，請稍後再試。');
+                  alert('Failed to update leave request. Please try again later.');
                   return;
                 }
                 
@@ -473,7 +486,7 @@ const MyClassSessions = () => {
                 const coachEmail = await getCoachEmail(coachId);
                 if (!coachEmail) {
                   console.error('Could not find coach email');
-                  alert('無法獲取教練信息，請稍後再試。');
+                  alert('Unable to get coach information. Please try again later.');
                   return;
                 }
                 
@@ -492,7 +505,7 @@ const MyClassSessions = () => {
                 
                 if (response.ok) {
                   console.log('Message sent successfully');
-                  alert('補課請求已發送給教練！');
+                  alert('Makeup request sent to coach!');
                   
                   // 關閉對話框
                   setMakeupDialog({ open: false, session: null });
@@ -503,11 +516,11 @@ const MyClassSessions = () => {
                 } else {
                   const errorData = await response.json();
                   console.error('Failed to send message:', errorData);
-                  alert(`發送訊息失敗: ${errorData.message || '未知錯誤'}`);
+                  alert(`Failed to send message: ${errorData.message || 'Unknown error'}`);
                 }
               } catch (error) {
                 console.error('Error sending message to coach:', error);
-                alert('發送訊息時發生錯誤，請稍後再試。');
+                alert('Error occurred while sending message. Please try again later.');
               }
             };
   

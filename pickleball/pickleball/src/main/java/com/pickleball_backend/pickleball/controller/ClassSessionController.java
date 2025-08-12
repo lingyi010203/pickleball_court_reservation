@@ -131,13 +131,24 @@ public class ClassSessionController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> registerForMultipleSessions(@RequestBody com.pickleball_backend.pickleball.dto.RegisterMultiSessionRequest request, Principal principal) {
         try {
+            // 驗證請求數據
+            if (request.getSessionIds() == null || request.getSessionIds().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Session IDs cannot be null or empty"));
+            }
+            
+            if (request.getPaymentMethod() == null || request.getPaymentMethod().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Payment method is required"));
+            }
+            
             String username = principal.getName();
             User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new com.pickleball_backend.pickleball.exception.ResourceNotFoundException("User not found"));
             Integer userId = user.getId();
+            
             Map<String, Object> result = classSessionService.registerUserForMultipleSessions(userId, request.getSessionIds(), request.getPaymentMethod(), request.getNumPaddles(), request.getBuyBallSet());
             return ResponseEntity.ok(result);
         } catch (Exception e) {
+            e.printStackTrace(); // 添加詳細錯誤日誌
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

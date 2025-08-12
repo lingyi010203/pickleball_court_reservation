@@ -551,7 +551,7 @@ const AdminManageCourts = () => {
     console.log('Current court:', currentCourt);
     
     if (!currentCourt || !currentCourt.id) {
-      alert('请先保存球场基本信息，再上传图片');
+      alert('Please save court basic information first, then upload image');
       return;
     }
     
@@ -564,7 +564,7 @@ const AdminManageCourts = () => {
         console.log('Upload result:', result);
       } catch (err) {
         console.error('Upload error:', err);
-        alert('图片上传失败: ' + err.message);
+        alert('Image upload failed: ' + err.message);
       }
     }
     

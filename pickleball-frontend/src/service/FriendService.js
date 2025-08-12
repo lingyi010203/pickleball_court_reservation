@@ -1,5 +1,5 @@
 // src/services/friendService.js
-import api from './api';
+import api from '../api/axiosConfig';
 
 export default {
   getPendingRequests: async () => {

@@ -87,6 +87,12 @@ const BookingConfirmationPage = () => {
   const isEventRegistration = paymentType === 'event-registration';
   const data = isFriendlyMatch ? matchDetails : (isEventRegistration ? eventDetails : booking);
   
+  // 對於 friendly match，從 location.state 獲取 voucher 信息
+  const voucherUsed = isFriendlyMatch ? location.state?.voucherUsed : booking?.voucherUsed;
+  const originalAmount = isFriendlyMatch ? location.state?.originalAmount : booking?.originalAmount;
+  const discountAmount = isFriendlyMatch ? location.state?.discountAmount : booking?.discountAmount;
+  const voucherCode = isFriendlyMatch ? location.state?.voucherCode : booking?.voucherCode;
+  
   // 計算 duration（小時）
   const calculateDuration = () => {
     if (isFriendlyMatch && data?.startTime && data?.endTime) {
@@ -104,10 +110,10 @@ const BookingConfirmationPage = () => {
   const numPlayers = isFriendlyMatch 
     ? (data?.maxPlayers || 4) 
     : (booking?.numberOfPlayers || 2);
-  const numPaddles = isFriendlyMatch ? (data?.numPaddles || 0) : (booking?.numPaddles || 0);
-  const buyBallSet = isFriendlyMatch ? !!data?.buyBallSet : !!booking?.buyBallSet;
+  const numPaddles = isFriendlyMatch ? (location.state?.numPaddles || 0) : (booking?.numPaddles || 0);
+  const buyBallSet = isFriendlyMatch ? !!(location.state?.buyBallSet) : !!booking?.buyBallSet;
   const total = isFriendlyMatch
-    ? (data?.totalPrice || data?.price || 0)
+    ? (voucherUsed ? (originalAmount - discountAmount) : (data?.totalPrice || data?.price || 0))
     : isEventRegistration
     ? (location.state?.totalAmount || data?.feeAmount || 0)
     : (booking?.voucherUsed 
@@ -480,21 +486,21 @@ Let's play! 🏓`;
   
             <Card variant="outlined" sx={{ mb: 2 }}>
               <CardContent>
-                {booking?.voucherUsed ? (
+                {voucherUsed ? (
                   <>
                     <SummaryRow
                       label="Original Amount"
-                      value={`RM${Number(booking.originalAmount).toFixed(2)}`}
+                      value={`RM${Number(originalAmount).toFixed(2)}`}
                       color="#757575"
                     />
                     <SummaryRow
                       label="Voucher Applied"
-                      value={booking.voucherCode}
+                      value={voucherCode}
                       color="#ff9800"
                     />
                     <SummaryRow
                       label="Discount Amount"
-                      value={`-RM${Number(booking.discountAmount).toFixed(2)}`}
+                      value={`-RM${Number(discountAmount).toFixed(2)}`}
                       color="#4caf50"
                     />
                     <SummaryRow

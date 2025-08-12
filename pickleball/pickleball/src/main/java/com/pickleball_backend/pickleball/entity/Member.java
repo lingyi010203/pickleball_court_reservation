@@ -36,7 +36,7 @@ public class Member {
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
-    @JsonIgnoreProperties({"member", "userAccount", "sentMessages", "receivedMessages", "coachSessions"})
+    @JsonIgnoreProperties({"member", "userAccount", "sentMessages", "receivedMessages", "coachSessions", "hibernateLazyInitializer", "handler"})
     private User user;
 
     @ManyToOne

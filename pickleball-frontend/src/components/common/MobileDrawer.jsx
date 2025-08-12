@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { 
   Box, Typography, Divider, List, ListItem, ListItemIcon, 
-  ListItemText, Button, Avatar, Drawer, Tooltip
+  ListItemText, Button, Avatar, Drawer, Tooltip, Badge
 } from '@mui/material';
 import { ExitToApp as LogoutIcon } from '@mui/icons-material';
 import PropTypes from 'prop-types';
@@ -20,7 +20,8 @@ const MobileDrawer = ({
   handleLogout,
   navigate,
   mobileOpen,
-  handleDrawerToggle
+  handleDrawerToggle,
+  unreadMessages = 0
 }) => {
   const theme = useTheme();
   const handleItemClick = useCallback((path, id) => {
@@ -88,6 +89,22 @@ const MobileDrawer = ({
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText primary={item.label} />
+                {/* Unread messages badge for Messages */}
+                {item.id === 'messages' && unreadMessages > 0 && (
+                  <Badge
+                    badgeContent={unreadMessages > 99 ? '99+' : unreadMessages}
+                    color="error"
+                    sx={{
+                      ml: 'auto',
+                      '& .MuiBadge-badge': {
+                        fontSize: '0.7rem',
+                        minWidth: 16,
+                        height: 16,
+                        fontWeight: 'bold'
+                      }
+                    }}
+                  />
+                )}
               </ListItem>
             );
 
@@ -195,7 +212,8 @@ MobileDrawer.propTypes = {
   handleLogout: PropTypes.func.isRequired,
   navigate: PropTypes.func.isRequired,
   mobileOpen: PropTypes.bool.isRequired,
-  handleDrawerToggle: PropTypes.func.isRequired
+  handleDrawerToggle: PropTypes.func.isRequired,
+  unreadMessages: PropTypes.number
 };
 
 export default MobileDrawer;

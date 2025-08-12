@@ -56,6 +56,12 @@ const ClassSessionService = {
     return res.data;
   },
 
+  // 獲取批量課程詳情 (別名，保持向後兼容)
+  getSessionDetailsBatch: async (sessionIds) => {
+    const res = await api.post('/class-sessions/details-batch', sessionIds);
+    return res.data;
+  },
+
   // 獲取課程學生列表
   getSessionStudents: async (sessionId) => {
     const res = await api.get(`/class-sessions/${sessionId}/students`);

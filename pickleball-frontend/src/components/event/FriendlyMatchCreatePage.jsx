@@ -18,14 +18,28 @@ import {
   IconButton,
   Snackbar,
   Alert,
-  Paper
+  Paper,
+  Chip,
+  Avatar,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
   SportsTennis as TennisIcon,
   LocationOn as LocationIcon,
   Schedule as ScheduleIcon,
-  Group as GroupIcon
+  Group as GroupIcon,
+  Add as AddIcon,
+  CheckCircle as CheckIcon,
+  Event as EventIcon,
+  People as PeopleIcon,
+  Edit as EditIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../court/DateUtils';
@@ -36,12 +50,14 @@ import api from '../../api/axiosConfig';
 import dayjs from 'dayjs';
 
 const FriendlyMatchCreatePage = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
 
   // Form states
   const [selectedState, setSelectedState] = useState('');
@@ -62,8 +78,24 @@ const FriendlyMatchCreatePage = () => {
   const [slots, setSlots] = useState([]);
   const [availableDates, setAvailableDates] = useState([]);
 
-
-
+  // Steps configuration
+  const steps = [
+    {
+      label: 'Location',
+      description: 'Select state, venue, and court',
+      icon: <LocationIcon />
+    },
+    {
+      label: 'Schedule',
+      description: 'Choose date and time slots',
+      icon: <ScheduleIcon />
+    },
+    {
+      label: 'Details',
+      description: 'Set players and rules',
+      icon: <PeopleIcon />
+    }
+  ];
 
   useEffect(() => {
     fetchInitialData();
@@ -86,8 +118,6 @@ const FriendlyMatchCreatePage = () => {
       fetchAvailableSlots(selectedCourt, selectedDate);
     }
   }, [selectedCourt, selectedDate]);
-
-
 
   const fetchInitialData = async () => {
     try {
@@ -210,6 +240,14 @@ const FriendlyMatchCreatePage = () => {
     setSelectedSlot(slotObj);
   };
 
+  const handleNext = () => {
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  };
+
+  const handleBack = () => {
+    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+  };
+
   const handleCreateMatch = async () => {
     if (!selectedState || !selectedVenue || !selectedCourt || !selectedDate || !selectedSlots.length || !maxPlayers) {
       setError('Please fill in all required fields');
@@ -313,8 +351,6 @@ const FriendlyMatchCreatePage = () => {
     }
   };
 
-
-
   const renderTimeSlots = () => {
     if (!selectedDate) return null;
 
@@ -345,13 +381,30 @@ const FriendlyMatchCreatePage = () => {
     const availableSlotSet = new Set(availableSlots.map(s => s.startTime + '-' + s.endTime));
 
     return (
-      <Card sx={{ mb: 3, borderRadius: 3 }}>
+      <Card sx={{ 
+        mb: 3, 
+        borderRadius: 3,
+        background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.light, 0.05)})`,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+      }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <ScheduleIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            <Typography variant="h6" fontWeight="bold">
-              Available Time Slots - {selectedDate.format('dddd, MMMM D, YYYY')}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Avatar sx={{ 
+              bgcolor: theme.palette.primary.main, 
+              mr: 2,
+              width: 40,
+              height: 40
+            }}>
+              <ScheduleIcon />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" fontWeight="bold" color="primary">
+                Available Time Slots
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedDate.format('dddd, MMMM D, YYYY')}
+              </Typography>
+            </Box>
           </Box>
 
           <Grid container spacing={1.5}>
@@ -373,17 +426,36 @@ const FriendlyMatchCreatePage = () => {
                         py: 1.5,
                         borderRadius: '12px',
                         fontWeight: 600,
+                        minHeight: 60,
                         ...(isSelected ? {
-                          background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
+                          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                           color: 'white',
-                          boxShadow: '0 4px 8px rgba(37, 117, 252, 0.3)'
-                        } : {}),
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                          '&:hover': {
+                            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                            transform: 'translateY(-2px)',
+                            boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
+                          }
+                        } : {
+                          borderColor: alpha(theme.palette.primary.main, 0.3),
+                          color: theme.palette.primary.main,
+                          '&:hover': {
+                            borderColor: theme.palette.primary.main,
+                            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                            transform: 'translateY(-1px)'
+                          }
+                        }),
                         ...(!isAvailable ? {
-                          borderColor: '#aaa',
-                          color: '#aaa',
-                          background: '#f5f5f5',
-                          opacity: 0.7
-                        } : {})
+                          borderColor: theme.palette.grey[300],
+                          color: theme.palette.grey[500],
+                          background: theme.palette.grey[50],
+                          opacity: 0.7,
+                          '&:hover': {
+                            transform: 'none',
+                            backgroundColor: theme.palette.grey[50]
+                          }
+                        } : {}),
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
                     >
                       <Box sx={{ textAlign: 'center' }}>
@@ -472,32 +544,54 @@ const FriendlyMatchCreatePage = () => {
         position: 'sticky',
         top: 20,
         borderRadius: 3,
-        boxShadow: 3,
-        mb: 4
+        boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
+        mb: 4,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+        background: `linear-gradient(145deg, ${theme.palette.background.paper}, ${alpha(theme.palette.primary.main, 0.02)})`
       }}>
         <CardContent>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Match Summary
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Avatar sx={{ 
+              bgcolor: theme.palette.success.main, 
+              mr: 2,
+              width: 40,
+              height: 40
+            }}>
+              <CheckIcon />
+            </Avatar>
+            <Typography variant="h6" fontWeight="bold" color="success.main">
+              Match Summary
+            </Typography>
+          </Box>
 
-          <Stack spacing={2}>
+          <Stack spacing={2.5}>
             {selectedState && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   State
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography variant="body1" fontWeight={600} color="primary">
                   {selectedState}
                 </Typography>
               </Box>
             )}
 
             {selectedVenueData && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   Venue
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography variant="body1" fontWeight={600} color="primary">
                   {selectedVenueData.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -507,33 +601,48 @@ const FriendlyMatchCreatePage = () => {
             )}
 
             {selectedCourtData && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   Court
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography variant="body1" fontWeight={600} color="primary">
                   {selectedCourtData.name}
                 </Typography>
               </Box>
             )}
 
             {selectedDate && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   Date
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography variant="body1" fontWeight={600} color="primary">
                   {selectedDate.format('MMM DD, YYYY')}
                 </Typography>
               </Box>
             )}
 
             {selectedSlots.length > 0 && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   Time
                 </Typography>
-                <Typography variant="body1" fontWeight={600}>
+                <Typography variant="body1" fontWeight={600} color="primary">
                   {formatTime(selectedSlots[0].startTime)} - {formatTime(selectedSlots[selectedSlots.length - 1].endTime)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -542,18 +651,28 @@ const FriendlyMatchCreatePage = () => {
               </Box>
             )}
 
-            <Box>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: alpha(theme.palette.primary.main, 0.05),
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                 Max Players
               </Typography>
-              <Typography variant="body1" fontWeight={600}>
+              <Typography variant="body1" fontWeight={600} color="primary">
                 {maxPlayers} players
               </Typography>
             </Box>
 
             {totalPrice > 0 && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
+              <Box sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: alpha(theme.palette.success.main, 0.1),
+                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                   Total Amount
                 </Typography>
                 <Typography variant="h6" fontWeight={600} color="success.main">
@@ -597,11 +716,25 @@ const FriendlyMatchCreatePage = () => {
             disabled={submitting || !selectedState || !selectedVenue || !selectedCourt || !selectedDate || !selectedSlots.length || !maxPlayers}
             onClick={handleCreateMatch}
             sx={{
-              py: 1.5,
+              py: 2,
               borderRadius: 2,
-              background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               fontWeight: 'bold',
-              textTransform: 'none'
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+              '&:hover': {
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                transform: 'translateY(-2px)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[300],
+                color: theme.palette.grey[500],
+                boxShadow: 'none',
+                transform: 'none'
+              },
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
             {submitting ? (
@@ -620,9 +753,9 @@ const FriendlyMatchCreatePage = () => {
 
   if (loading) {
     return (
-      <Container sx={{ py: 4, textAlign: 'center' }}>
-        <CircularProgress size={48} />
-        <Typography variant="h6" sx={{ mt: 2 }}>
+      <Container sx={{ py: 8, textAlign: 'center' }}>
+        <CircularProgress size={48} color="primary" />
+        <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
           Loading venues and courts...
         </Typography>
       </Container>
@@ -631,6 +764,7 @@ const FriendlyMatchCreatePage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header */}
       <Button
         variant="text"
         onClick={() => navigate('/friendly-matches')}
@@ -640,9 +774,9 @@ const FriendlyMatchCreatePage = () => {
           alignItems: 'center',
           textTransform: 'none',
           fontWeight: 500,
-          color: '#1976d2',
+          color: theme.palette.primary.main,
           '&:hover': {
-            backgroundColor: 'transparent',
+            backgroundColor: alpha(theme.palette.primary.main, 0.05),
             textDecoration: 'underline'
           }
         }}
@@ -651,163 +785,444 @@ const FriendlyMatchCreatePage = () => {
         Back to Friendly Matches
       </Button>
 
+      {/* Hero Section */}
       <Paper 
         elevation={0}
         sx={{ 
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
           color: 'white',
           p: 4,
           mb: 4,
-          borderRadius: 3
+          borderRadius: 3,
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '200px',
+            height: '200px',
+            background: `radial-gradient(circle, ${alpha('#fff', 0.1)} 0%, transparent 70%)`,
+            borderRadius: '50%',
+            transform: 'translate(50%, -50%)'
+          }
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <TennisIcon sx={{ fontSize: 48, mr: 2 }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, position: 'relative', zIndex: 1 }}>
+          <Avatar sx={{ 
+            bgcolor: alpha('#fff', 0.2), 
+            mr: 3,
+            width: 60,
+            height: 60
+          }}>
+            <TennisIcon sx={{ fontSize: 32 }} />
+          </Avatar>
           <Box>
-            <Typography variant="h3" component="h1" fontWeight="bold">
+            <Typography variant="h3" component="h1" fontWeight="bold" sx={{ mb: 1 }}>
               Create Friendly Match
             </Typography>
-            <Typography variant="h6" sx={{ opacity: 0.9 }}>
+            <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400 }}>
               Reserve a court for a friendly match (no payment required)
             </Typography>
           </Box>
         </Box>
       </Paper>
 
+      {/* Stepper */}
+      <Card sx={{ mb: 4, borderRadius: 3, p: 3 }}>
+        <Stepper activeStep={activeStep} orientation="horizontal">
+          {steps.map((step, index) => (
+            <Step key={step.label}>
+              <StepLabel
+                StepIconComponent={() => (
+                  <Avatar sx={{ 
+                    bgcolor: index <= activeStep ? theme.palette.primary.main : theme.palette.grey[300],
+                    color: index <= activeStep ? 'white' : theme.palette.grey[600],
+                    width: 32,
+                    height: 32
+                  }}>
+                    {step.icon}
+                  </Avatar>
+                )}
+              >
+                <Typography variant="subtitle2" fontWeight="bold">
+                  {step.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {step.description}
+                </Typography>
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Card>
+
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
-          {/* State Selection */}
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
+          {/* Step 1: Location Selection */}
+          <Card sx={{ 
+            mb: 3, 
+            borderRadius: 3,
+            background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.light, 0.05)})`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+          }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Select State
-              </Typography>
-              <FormControl fullWidth>
-                <InputLabel>State</InputLabel>
-                <Select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  label="State"
-                  sx={{ borderRadius: 2 }}
-                >
-                  {states.map(state => (
-                    <MenuItem key={state} value={state}>
-                      {state}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Avatar sx={{ 
+                  bgcolor: theme.palette.primary.main, 
+                  mr: 2,
+                  width: 40,
+                  height: 40
+                }}>
+                  <LocationIcon />
+                </Avatar>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  Location Details
+                </Typography>
+              </Box>
+
+              <Grid container spacing={3}>
+                {/* State Selection */}
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>State</InputLabel>
+                    <Select
+                      value={selectedState}
+                      onChange={(e) => setSelectedState(e.target.value)}
+                      label="State"
+                      renderValue={(value) => (
+                        <Typography variant="body1" sx={{ 
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          width: '100%'
+                        }}>
+                          {value}
+                        </Typography>
+                      )}
+                      sx={{ 
+                        borderRadius: 2,
+                        minHeight: 56,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(theme.palette.primary.main, 0.3)
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        }
+                      }}
+                    >
+                      {states.map(state => (
+                        <MenuItem key={state} value={state} sx={{ minHeight: 48 }}>
+                          <Typography variant="body1" sx={{ 
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            width: '100%'
+                          }}>
+                            {state}
+                          </Typography>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {/* Venue Selection */}
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth disabled={!selectedState}>
+                    <InputLabel>Venue</InputLabel>
+                    <Select
+                      value={selectedVenue}
+                      onChange={(e) => setSelectedVenue(e.target.value)}
+                      label="Venue"
+                      renderValue={(value) => {
+                        const venue = venues.find(v => v.id === Number(value));
+                        return venue ? (
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" fontWeight="medium" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {venue.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {venue.location}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body1">Select Venue</Typography>
+                        );
+                      }}
+                      sx={{ 
+                        borderRadius: 2,
+                        minHeight: 56,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(theme.palette.primary.main, 0.3)
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        }
+                      }}
+                    >
+                      {venues.map(venue => (
+                        <MenuItem key={venue.id} value={venue.id} sx={{ minHeight: 48 }}>
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" fontWeight="medium" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {venue.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {venue.location}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {/* Court Selection */}
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth disabled={!selectedVenue}>
+                    <InputLabel>Court</InputLabel>
+                    <Select
+                      value={selectedCourt}
+                      onChange={(e) => setSelectedCourt(e.target.value)}
+                      label="Court"
+                      renderValue={(value) => {
+                        const court = courts.find(c => c.id === Number(value));
+                        return court ? (
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" fontWeight="medium" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {court.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {court.location}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body1">Select Court</Typography>
+                        );
+                      }}
+                      sx={{ 
+                        borderRadius: 2,
+                        minHeight: 56,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(theme.palette.primary.main, 0.3)
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: theme.palette.primary.main
+                        }
+                      }}
+                    >
+                      {courts.map(court => (
+                        <MenuItem key={court.id} value={court.id} sx={{ minHeight: 48 }}>
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="body1" fontWeight="medium" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {court.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              width: '100%'
+                            }}>
+                              {court.location}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
 
-          {/* Venue Selection */}
-          {selectedState && (
-            <Card sx={{ mb: 3, borderRadius: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Select Venue
-                </Typography>
-                <FormControl fullWidth>
-                  <InputLabel>Venue</InputLabel>
-                  <Select
-                    value={selectedVenue}
-                    onChange={(e) => setSelectedVenue(e.target.value)}
-                    label="Venue"
-                    sx={{ borderRadius: 2 }}
-                  >
-                    {venues.map(venue => (
-                      <MenuItem key={venue.id} value={venue.id}>
-                        <Box>
-                          <Typography variant="body1" fontWeight="medium">
-                            {venue.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {venue.location}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Court Selection */}
-          {selectedVenue && (
-            <Card sx={{ mb: 3, borderRadius: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Select Court
-                </Typography>
-                <FormControl fullWidth>
-                  <InputLabel>Court</InputLabel>
-                  <Select
-                    value={selectedCourt}
-                    onChange={(e) => setSelectedCourt(e.target.value)}
-                    label="Court"
-                    sx={{ borderRadius: 2 }}
-                  >
-                    {courts.map(court => (
-                      <MenuItem key={court.id} value={court.id}>
-                        <Box>
-                          <Typography variant="body1" fontWeight="medium">
-                            {court.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {court.location}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Max Players Selection */}
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
+          {/* Step 2: Schedule Selection */}
+          <Card sx={{ 
+            mb: 3, 
+            borderRadius: 3,
+            background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.light, 0.05)})`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+          }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Number of Players
-              </Typography>
-              <TextField
-                fullWidth
-                label="Maximum Players"
-                type="number"
-                value={maxPlayers}
-                onChange={(e) => setMaxPlayers(Math.max(2, Math.min(8, parseInt(e.target.value) || 4)))}
-                inputProps={{ min: 2, max: 8 }}
-                helperText="Select between 2-8 players"
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Avatar sx={{ 
+                  bgcolor: theme.palette.primary.main, 
+                  mr: 2,
+                  width: 40,
+                  height: 40
+                }}>
+                  <EventIcon />
+                </Avatar>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  Schedule Details
+                </Typography>
+              </Box>
+
+              <Grid container spacing={3}>
+                {/* Date Selection */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Match Date"
+                    value={selectedDate.format('YYYY-MM-DD')}
+                    onChange={(e) => handleDateSelect(e.target.value)}
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton size="small">
+                          <ScheduleIcon />
+                        </IconButton>
+                      )
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        minHeight: 56,
+                        '& fieldset': {
+                          borderColor: alpha(theme.palette.primary.main, 0.3)
+                        },
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '& input': {
+                          minHeight: '24px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }
+                      }
+                    }}
+                  />
+                </Grid>
+
+                {/* Max Players Selection */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Maximum Players"
+                    type="number"
+                    value={maxPlayers}
+                    onChange={(e) => setMaxPlayers(Math.max(2, Math.min(8, parseInt(e.target.value) || 4)))}
+                    inputProps={{ min: 2, max: 8 }}
+                    helperText="Select between 2-8 players"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        minHeight: 56,
+                        '& fieldset': {
+                          borderColor: alpha(theme.palette.primary.main, 0.3)
+                        },
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: theme.palette.primary.main
+                        },
+                        '& input': {
+                          minHeight: '24px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
 
-          {/* Date Selection */}
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
+          {/* Step 3: Match Details */}
+          <Card sx={{ 
+            mb: 3, 
+            borderRadius: 3,
+            background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.light, 0.05)})`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+          }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Date
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Avatar sx={{ 
+                  bgcolor: theme.palette.primary.main, 
+                  mr: 2,
+                  width: 40,
+                  height: 40
+                }}>
+                  <InfoIcon />
+                </Avatar>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  Match Details
+                </Typography>
+              </Box>
+
               <TextField
                 fullWidth
-                type="date"
-                value={selectedDate.format('YYYY-MM-DD')}
-                onChange={(e) => handleDateSelect(e.target.value)}
-                InputProps={{
-                  endAdornment: (
-                    <IconButton size="small">
-                      <ScheduleIcon />
-                    </IconButton>
-                  )
-                }}
+                label="Match Rules & Notes"
+                value={matchRules}
+                onChange={(e) => setMatchRules(e.target.value)}
+                multiline
+                rows={3}
+                placeholder="e.g., Friendly doubles, all levels welcome, bring your own equipment..."
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
-                    '&.Mui-focused': {
-                      borderColor: '#1976d2'
+                    minHeight: 120,
+                    '& fieldset': {
+                      borderColor: alpha(theme.palette.primary.main, 0.3)
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: theme.palette.primary.main
+                    },
+                    '& textarea': {
+                      minHeight: '80px',
+                      resize: 'none'
                     }
                   }
                 }}
@@ -815,64 +1230,8 @@ const FriendlyMatchCreatePage = () => {
             </CardContent>
           </Card>
 
-          {/* Match Rules */}
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Match Rules & Notes
-              </Typography>
-              <TextField
-                fullWidth
-                label="Rules and Notes"
-                value={matchRules}
-                onChange={(e) => setMatchRules(e.target.value)}
-                multiline
-                rows={3}
-                placeholder="e.g., Friendly doubles, all levels welcome, bring your own equipment..."
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-              />
-            </CardContent>
-          </Card>
-
-
-
           {/* Time Slots */}
           {renderTimeSlots()}
-
-          {/* Debug Info */}
-          {process.env.NODE_ENV === 'development' && (
-            <Card sx={{ mb: 3, borderRadius: 3 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Debug Info
-                </Typography>
-                <Typography variant="body2">
-                  Available Slots Count: {availableSlots.length}
-                </Typography>
-                <Typography variant="body2">
-                  Selected Court: {selectedCourt}
-                </Typography>
-                <Typography variant="body2">
-                  Selected Date: {selectedDate ? selectedDate.format('YYYY-MM-DD') : 'None'}
-                </Typography>
-                <Typography variant="body2">
-                  Selected Slots: {selectedSlots.length > 0 ? selectedSlots.map(s => `${s.startTime}-${s.endTime}`).join(', ') : 'None'}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    if (selectedCourt && selectedDate) {
-                      fetchAvailableSlots(selectedCourt, selectedDate);
-                    }
-                  }}
-                  sx={{ mt: 1 }}
-                >
-                  Refresh Slots
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </Grid>
 
         <Grid item xs={12} md={4}>

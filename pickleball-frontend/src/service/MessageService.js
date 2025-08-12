@@ -1,5 +1,5 @@
 // src/service/MessageService.js
-import api from './api';
+import api from '../api/axiosConfig';
 
 const MessageService = {
   /**
@@ -80,7 +80,13 @@ const MessageService = {
       let errorMessage = 'Failed to send message';
       if (error.response) {
         if (error.response.status === 403) {
-          errorMessage = 'You can only message friends';
+          // 檢查是否是教練相關的消息
+          const recipientUsername = error.config?.params?.recipient;
+          if (recipientUsername && recipientUsername.toLowerCase().includes('coach')) {
+            errorMessage = 'Unable to send message to coach. Please try again.';
+          } else {
+            errorMessage = 'You can only message friends';
+          }
         } else if (error.response.status === 404) {
           errorMessage = 'User not found';
         } else {

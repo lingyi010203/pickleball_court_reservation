@@ -7,8 +7,9 @@ import {
 } from '@mui/material';
 import { Alert } from '@mui/material';
 import UserService from '../../service/UserService';
+import GroupService from '../../service/GroupService';
 import { useAuth } from '../../context/AuthContext';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+
 import CloseIcon from '@mui/icons-material/Close';
 
 export default function GroupCreate({ onGroupCreated }) {
@@ -70,23 +71,24 @@ export default function GroupCreate({ onGroupCreated }) {
     setLoading(true);
     setError('');
     try {
-      // Note: Backend group API not implemented yet - this is frontend-only for now
-      // When backend is ready, uncomment and implement:
-      // const response = await groupService.createGroup({
-      //   name: groupName,
-      //   memberUsernames: selectedMembers.map(member => member.username)
-      // });
+      // Create group using GroupService
+      const result = await GroupService.createGroup(
+        groupName,
+        `Group created by ${currentUser?.name || currentUser?.username}`,
+        selectedMembers.map(member => member.username)
+      );
       
-      // Create a new group object for the list (before clearing the form)
+      console.log('Group created successfully:', result);
+      
+      // Create a new group object for the frontend
       const newGroup = {
-        id: Date.now(), // Use timestamp as temporary ID
-        name: groupName,
-        description: `Group created by ${currentUser?.name || currentUser?.username}`,
+        id: result.group.id,
+        name: result.group.name,
+        description: result.group.description,
         memberCount: selectedMembers.length + 1, // +1 for creator
         lastMessage: null,
         lastMessageTime: new Date(),
         unreadCount: 0,
-        isActive: true,
         creator: { 
           username: currentUser?.username, 
           name: currentUser?.name || currentUser?.username 
@@ -94,8 +96,7 @@ export default function GroupCreate({ onGroupCreated }) {
         members: selectedMembers
       };
 
-      // For now, just show success message
-      setSuccess('Group created successfully!');
+      setSuccess('Group created successfully! Invitation emails sent to all members.');
       setGroupName('');
       setSelectedMembers([]);
       setSearchResults([]);
@@ -106,7 +107,7 @@ export default function GroupCreate({ onGroupCreated }) {
         onGroupCreated(newGroup);
       }
       
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000); // Show success message longer
     } catch (error) {
       console.error('Failed to create group', error);
       setError('Failed to create group. Please try again.');
@@ -296,29 +297,16 @@ export default function GroupCreate({ onGroupCreated }) {
                 }}
               >
                 <ListItemAvatar sx={{ minWidth: 48 }}>
-                  <Badge
-                    overlap="circular"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    badgeContent={
-                      <FiberManualRecordIcon 
-                        sx={{ 
-                          fontSize: 12, 
-                          color: theme.palette.success.main 
-                        }} 
-                      />
-                    }
+                  <Avatar 
+                    src={user.profileImage} 
+                    sx={{ 
+                      width: 40, 
+                      height: 40,
+                      boxShadow: theme.shadows[2]
+                    }}
                   >
-                    <Avatar 
-                      src={user.profileImage} 
-                      sx={{ 
-                        width: 40, 
-                        height: 40,
-                        boxShadow: theme.shadows[2]
-                      }}
-                    >
-                      {(user.name || user.username || 'U').substring(0, 2).toUpperCase()}
-                    </Avatar>
-                  </Badge>
+                    {(user.name || user.username || 'U').substring(0, 2).toUpperCase()}
+                  </Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   primary={
@@ -391,39 +379,7 @@ export default function GroupCreate({ onGroupCreated }) {
         {loading ? 'Creating...' : 'Create Group'}
       </Button>
 
-      {/* Debug: Test button for quick testing */}
-      <Button
-        variant="outlined"
-        fullWidth
-        sx={{
-          mt: 2,
-          borderRadius: 2,
-          height: 40,
-          fontSize: '0.8rem'
-        }}
-        onClick={() => {
-          const testGroup = {
-            id: Date.now(),
-            name: 'Test Group ' + Date.now(),
-            description: 'This is a test group',
-            memberCount: 1,
-            lastMessage: 'Test message',
-            lastMessageTime: new Date(),
-            unreadCount: 0,
-            isActive: true,
-            creator: { 
-              username: currentUser?.username || 'test', 
-              name: currentUser?.name || currentUser?.username || 'Test User' 
-            },
-            members: []
-          };
-          if (onGroupCreated) {
-            onGroupCreated(testGroup);
-          }
-        }}
-      >
-        Test Add Group (Debug)
-      </Button>
+
     </Box>
   );
 } 

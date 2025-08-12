@@ -45,6 +45,7 @@ import {
   Message
 } from '@mui/icons-material';
 import ClassSessionService from '../../service/ClassSessionService';
+import FriendService from '../../service/FriendService';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -53,6 +54,7 @@ const mockCoaches = [
   {
     id: 1,
     name: 'Coach Lee',
+    email: 'coachlee@pickleball.com',
     state: 'Taipei',
     venue: 'Gym A',
     rating: 4.8,
@@ -67,6 +69,7 @@ const mockCoaches = [
   {
     id: 2,
     name: 'Coach Wang',
+    email: 'coachwang@pickleball.com',
     state: 'Taipei',
     venue: 'Gym B',
     rating: 4.6,
@@ -80,6 +83,7 @@ const mockCoaches = [
   {
     id: 3,
     name: 'Coach Chang',
+    email: 'coachchang@pickleball.com',
     state: 'New Taipei',
     venue: 'Gym C',
     rating: 4.9,
@@ -93,6 +97,7 @@ const mockCoaches = [
   {
     id: 4,
     name: 'Coach Chen',
+    email: 'coachchen@pickleball.com',
     state: 'Taichung',
     venue: 'Gym D',
     rating: 4.7,
@@ -113,10 +118,7 @@ export default function BrowseClassPage() {
   const [stateFilter, setStateFilter] = useState('All');
   const [venueFilter, setVenueFilter] = useState('All');
   const [coachFilter, setCoachFilter] = useState('All');
-  const [sessionTypeFilter, setSessionTypeFilter] = useState('All');
-  const [priceRangeFilter, setPriceRangeFilter] = useState('All');
   const [dateRangeFilter, setDateRangeFilter] = useState('All');
-  const [timeOfDayFilter, setTimeOfDayFilter] = useState('All');
   const [dayOfWeekFilter, setDayOfWeekFilter] = useState('All');
   const [showFullCourses, setShowFullCourses] = useState(true); // 新增：是否顯示已滿課程
   const [selectedCoach, setSelectedCoach] = useState(null);
@@ -171,6 +173,7 @@ export default function BrowseClassPage() {
           const formattedCoaches = data.map(coach => ({
             id: coach.id,
             name: coach.name,
+            email: coach.email, // 確保包含email字段
             state: coach.state || 'Unknown',
             venue: coach.venue || 'Unknown',
             rating: coach.rating || 4.5,
@@ -216,9 +219,6 @@ export default function BrowseClassPage() {
       stateFilter,
       venueFilter,
       coachFilter,
-      sessionTypeFilter,
-      priceRangeFilter,
-      timeOfDayFilter,
       dayOfWeekFilter,
       showFullCourses
     });
@@ -237,69 +237,17 @@ export default function BrowseClassPage() {
       const stateMatch = stateFilter === 'All' || session.state === stateFilter;
       const venueMatch = venueFilter === 'All' || session.venue === venueFilter;
       const coachMatch = coachFilter === 'All' || session.coachName === coachFilter;
-      const sessionTypeMatch = sessionTypeFilter === 'All' || session.type === sessionTypeFilter;
       
       console.log(`Session ${session.id} filters:`, {
         state: session.state,
         venue: session.venue,
         coachName: session.coachName,
-        type: session.type,
         stateMatch,
         venueMatch,
-        coachMatch,
-        sessionTypeMatch
+        coachMatch
       });
       
-      // 價格篩選
-      let priceMatch = true;
-      if (priceRangeFilter !== 'All') {
-        const price = session.price || 0;
-        switch (priceRangeFilter) {
-          case 'Under 100':
-            priceMatch = price < 100;
-            break;
-          case '100-500':
-            priceMatch = price >= 100 && price <= 500;
-            break;
-          case '500-1000':
-            priceMatch = price >= 500 && price <= 1000;
-            break;
-          case 'Over 1000':
-            priceMatch = price > 1000;
-            break;
-        }
-        console.log(`Session ${session.id} price: ${price}, priceMatch: ${priceMatch}`);
-      }
-      
-      // 時間篩選
-      let timeMatch = true;
-      if (timeOfDayFilter !== 'All') {
-        try {
-          // 嘗試從不同的時間字段獲取時間
-          const timeString = session.time || session.startTime || '';
-          if (timeString) {
-            const timeParts = timeString.split('-')[0]; // 取開始時間
-            const [hours, minutes] = timeParts.split(':').map(Number);
-            const hour = hours;
-            
-            switch (timeOfDayFilter) {
-              case 'Morning':
-                timeMatch = hour >= 6 && hour < 12;
-                break;
-              case 'Afternoon':
-                timeMatch = hour >= 12 && hour < 18;
-                break;
-              case 'Evening':
-                timeMatch = hour >= 18 || hour < 6;
-                break;
-            }
-            console.log(`Session ${session.id} time: ${timeString}, hour: ${hour}, timeMatch: ${timeMatch}`);
-          }
-        } catch (error) {
-          console.error(`Error parsing time for session ${session.id}:`, error);
-          timeMatch = false;
-        }
-      }
+
       
       // 星期篩選
       let dayMatch = true;
@@ -318,12 +266,12 @@ export default function BrowseClassPage() {
         }
       }
       
-      const finalMatch = stateMatch && venueMatch && coachMatch && sessionTypeMatch && priceMatch && timeMatch && dayMatch;
+      const finalMatch = stateMatch && venueMatch && coachMatch && dayMatch;
       console.log(`Session ${session.id} final match: ${finalMatch}`);
       
       return finalMatch;
     });
-  }, [allSessions, stateFilter, venueFilter, coachFilter, sessionTypeFilter, priceRangeFilter, timeOfDayFilter, dayOfWeekFilter]);
+  }, [allSessions, stateFilter, venueFilter, coachFilter, dayOfWeekFilter]);
 
   // Fetch all available sessions from backend when tabValue is 1
   useEffect(() => {
@@ -512,7 +460,7 @@ export default function BrowseClassPage() {
     const allStates = ['All', ...Array.from(new Set(allSessions.map(s => s.state).filter(Boolean)))];
     const allVenues = ['All', ...Array.from(new Set(allSessions.map(s => s.venue).filter(Boolean)))];
     const allCoaches = ['All', ...Array.from(new Set(allSessions.map(s => s.coachName).filter(Boolean)))];
-    const allSessionTypes = ['All', ...Array.from(new Set(allSessions.map(s => s.type).filter(Boolean)))];
+  
     
     return (
     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
@@ -564,53 +512,10 @@ export default function BrowseClassPage() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Session Type</InputLabel>
-              <Select
-                value={sessionTypeFilter}
-                onChange={(e) => setSessionTypeFilter(e.target.value)}
-                label="Session Type"
-              >
-                {allSessionTypes.map(type => (
-                  <MenuItem key={type} value={type}>{type}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+
           
-          {/* 第二行 */}
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Price Range</InputLabel>
-              <Select
-                value={priceRangeFilter}
-                onChange={(e) => setPriceRangeFilter(e.target.value)}
-                label="Price Range"
-              >
-                <MenuItem value="All">All Prices</MenuItem>
-                <MenuItem value="Under 100">Under $100</MenuItem>
-                <MenuItem value="100-500">$100 - $500</MenuItem>
-                <MenuItem value="500-1000">$500 - $1000</MenuItem>
-                <MenuItem value="Over 1000">Over $1000</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Time of Day</InputLabel>
-              <Select
-                value={timeOfDayFilter}
-                onChange={(e) => setTimeOfDayFilter(e.target.value)}
-                label="Time of Day"
-              >
-                <MenuItem value="All">All Times</MenuItem>
-                <MenuItem value="Morning">Morning (6AM-12PM)</MenuItem>
-                <MenuItem value="Afternoon">Afternoon (12PM-6PM)</MenuItem>
-                <MenuItem value="Evening">Evening (6PM-6AM)</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
+
+
           <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth>
               <InputLabel>Day of Week</InputLabel>
@@ -630,19 +535,7 @@ export default function BrowseClassPage() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Show Full Courses</InputLabel>
-              <Select
-                value={showFullCourses ? 'Yes' : 'No'}
-                onChange={(e) => setShowFullCourses(e.target.value === 'Yes')}
-                label="Show Full Courses"
-              >
-                <MenuItem value="Yes">Show All Courses</MenuItem>
-                <MenuItem value="No">Available Only</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
+          
           <Grid item xs={12} sm={6} md={3}>
             <Button 
               variant="outlined" 
@@ -650,9 +543,6 @@ export default function BrowseClassPage() {
                 setStateFilter('All');
                 setVenueFilter('All');
                 setCoachFilter('All');
-                setSessionTypeFilter('All');
-                setPriceRangeFilter('All');
-                setTimeOfDayFilter('All');
                 setDayOfWeekFilter('All');
                 // 保持用戶的 "Show Full Courses" 選擇，不清除
                 // setShowFullCourses 保持當前值
@@ -669,20 +559,54 @@ export default function BrowseClassPage() {
 
   const CoachCard = ({ coach }) => {
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     
-    const handleMessageClick = (e) => {
+    const handleMessageClick = async (e) => {
       e.stopPropagation(); // 防止觸發卡片的點擊事件
-      navigate('/messages', { 
-        state: { 
-          selectedUser: {
-            id: coach.id,
-            name: coach.name,
-            username: coach.username || coach.email,
-            userType: 'COACH',
-            email: coach.email
+      
+      // Ensure we have sufficient coach information
+      if (!coach.name) {
+        alert('Coach information is incomplete. Cannot send message.');
+        return;
+      }
+      
+      try {
+        // 自动添加教练为朋友
+        const coachUsername = coach.email || coach.username || coach.name;
+        await FriendService.sendRequest(coachUsername);
+        
+        // 显示成功消息
+        console.log(`Successfully sent friend request to ${coach.name}`);
+        
+        // 跳转到消息页面
+        navigate('/messages', { 
+          state: { 
+            selectedUser: {
+              id: coach.id || coach.name, // 使用教練名稱作為備用ID
+              name: coach.name,
+              username: coachUsername,
+              userType: 'COACH',
+              email: coach.email || `${coach.name.toLowerCase().replace(/\s+/g, '')}@coach.com`
+            }
           }
-        }
-      });
+        });
+      } catch (error) {
+        console.error('Failed to send friend request:', error);
+        
+        // 即使添加朋友失败，也尝试跳转到消息页面
+        // 因为教练可能允许非朋友用户发送消息
+        navigate('/messages', { 
+          state: { 
+            selectedUser: {
+              id: coach.id || coach.name,
+              name: coach.name,
+              username: coach.email || coach.username || coach.name,
+              userType: 'COACH',
+              email: coach.email || `${coach.name.toLowerCase().replace(/\s+/g, '')}@coach.com`
+            }
+          }
+        });
+      }
     };
 
     return (
@@ -749,52 +673,121 @@ export default function BrowseClassPage() {
     );
   };
 
-  const SessionCard = ({ session, showCoach = false }) => (
-    <Card sx={{ mb: 2 }}>
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            {showCoach && (
-              <Typography variant="subtitle1" color="primary" gutterBottom>
-                {session.coachName}
-              </Typography>
-            )}
-            <Typography variant="h6" gutterBottom>{session.type}</Typography>
-            <Box display="flex" alignItems="center" mb={1}>
-              <CalendarToday sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {session.date}
-              </Typography>
-            </Box>
-            <Box display="flex" alignItems="center" mb={1}>
-              <AccessTime sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {session.time}
-              </Typography>
-            </Box>
-            {showCoach && (
+  const SessionCard = ({ session, showCoach = false }) => {
+    const navigate = useNavigate();
+    const { currentUser } = useAuth();
+    
+    const handleMessageClick = async (e) => {
+      e.stopPropagation();
+      
+      // Ensure we have sufficient coach information
+      if (!session.coachName) {
+        alert('Coach information is incomplete. Cannot send message.');
+        return;
+      }
+      
+      try {
+        // 自动添加教练为朋友
+        const coachUsername = session.coachEmail || session.coachUsername || session.coachName;
+        await FriendService.sendRequest(coachUsername);
+        
+        // 显示成功消息
+        console.log(`Successfully sent friend request to ${session.coachName}`);
+        
+        // 跳转到消息页面
+        navigate('/messages', { 
+          state: { 
+            selectedUser: {
+              id: session.coachId || session.coachName, // 使用教練名稱作為備用ID
+              name: session.coachName,
+              username: coachUsername,
+              userType: 'COACH',
+              email: session.coachEmail || `${session.coachName.toLowerCase().replace(/\s+/g, '')}@coach.com`
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Failed to send friend request:', error);
+        
+        // 即使添加朋友失败，也尝试跳转到消息页面
+        // 因为教练可能允许非朋友用户发送消息
+        navigate('/messages', { 
+          state: { 
+            selectedUser: {
+              id: session.coachId || session.coachName,
+              name: session.coachName,
+              username: session.coachEmail || session.coachUsername || session.coachName,
+              userType: 'COACH',
+              email: session.coachEmail || `${session.coachName.toLowerCase().replace(/\s+/g, '')}@coach.com`
+            }
+          }
+        });
+      }
+    };
+
+    return (
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+            <Box>
+              {showCoach && (
+                <Typography variant="subtitle1" color="primary" gutterBottom>
+                  {session.coachName}
+                </Typography>
+              )}
+              <Typography variant="h6" gutterBottom>{session.type}</Typography>
               <Box display="flex" alignItems="center" mb={1}>
-                <LocationOn sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+                <CalendarToday sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
                 <Typography variant="body2" color="text.secondary">
-                  {session.state} • {session.venue}
+                  {session.date}
                 </Typography>
               </Box>
-            )}
-            <Typography variant="h6" color="primary">
-              ${session.price}
-            </Typography>
+              <Box display="flex" alignItems="center" mb={1}>
+                <AccessTime sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {session.time}
+                </Typography>
+              </Box>
+              {showCoach && (
+                <Box display="flex" alignItems="center" mb={1}>
+                  <LocationOn sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {session.state} • {session.venue}
+                  </Typography>
+                </Box>
+              )}
+              <Typography variant="h6" color="primary">
+                ${session.price}
+              </Typography>
+            </Box>
+            <Box display="flex" flexDirection="column" gap={1}>
+              <Button 
+                variant="contained" 
+                onClick={() => handleBooking(session)}
+                sx={{ ml: 2 }}
+              >
+                Book Now
+              </Button>
+              {showCoach && (
+                <IconButton
+                  onClick={handleMessageClick}
+                  sx={{ 
+                    color: 'primary.main',
+                    '&:hover': { 
+                      backgroundColor: 'primary.light',
+                      color: 'white'
+                    }
+                  }}
+                >
+                  <Message />
+                </IconButton>
+              )}
+            </Box>
           </Box>
-          <Button 
-            variant="contained" 
-            onClick={() => handleBooking(session)}
-            sx={{ ml: 2 }}
-          >
-            Book Now
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4, minHeight: '100vh' }}>
@@ -999,18 +992,6 @@ export default function BrowseClassPage() {
             <Typography color="error">{sessionError}</Typography>
           ) : (
             <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Debug: Total sessions: {allSessions.length}, Filtered sessions: {filteredSessions.length}, Show Full: {showFullCourses ? 'Yes' : 'No'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Status breakdown: {(() => {
-                  const statusCount = {};
-                  allSessions.forEach(s => {
-                    statusCount[s.status] = (statusCount[s.status] || 0) + 1;
-                  });
-                  return Object.entries(statusCount).map(([status, count]) => `${status}: ${count}`).join(', ');
-                })()}
-              </Typography>
               <Grid container spacing={2} sx={{ minHeight: '400px' }}>
                 {/* Group by recurringGroupId or individual sessions */}
                 {(() => {
@@ -1143,41 +1124,75 @@ export default function BrowseClassPage() {
                               )}
                             </Box>
                             
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              onClick={() => isRecurring ? handleBookGroup(group) : handleBooking(first)}
-                              fullWidth
-                              disabled={(() => {
-                                const currentUserId = parseInt(currentUser?.id);
-                                // 檢查是否已預訂或課程已滿
-                                return group.some(sess => {
-                                  const isBooked = sess.registrations && sess.registrations.some(r => {
-                                    const registrationUserId = parseInt(r.userId);
-                                    return registrationUserId === currentUserId;
+                            <Box display="flex" gap={1} mt={1}>
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => isRecurring ? handleBookGroup(group) : handleBooking(first)}
+                                sx={{ flex: 1 }}
+                                disabled={(() => {
+                                  const currentUserId = parseInt(currentUser?.id);
+                                  // 檢查是否已預訂或課程已滿
+                                  return group.some(sess => {
+                                    const isBooked = sess.registrations && sess.registrations.some(r => {
+                                      const registrationUserId = parseInt(r.userId);
+                                      return registrationUserId === currentUserId;
+                                    });
+                                    const isFull = sess.status === 'FULL' || (sess.currentParticipants >= sess.maxParticipants);
+                                    return isBooked || isFull;
                                   });
-                                  const isFull = sess.status === 'FULL' || (sess.currentParticipants >= sess.maxParticipants);
-                                  return isBooked || isFull;
-                                });
-                              })()}
-                            >
-                              {(() => {
-                                const currentUserId = parseInt(currentUser?.id);
-                                const isBooked = group.some(sess => {
-                                  return sess.registrations && sess.registrations.some(r => {
-                                    const registrationUserId = parseInt(r.userId);
-                                    return registrationUserId === currentUserId;
+                                })()}
+                              >
+                                {(() => {
+                                  const currentUserId = parseInt(currentUser?.id);
+                                  const isBooked = group.some(sess => {
+                                    return sess.registrations && sess.registrations.some(r => {
+                                      const registrationUserId = parseInt(r.userId);
+                                      return registrationUserId === currentUserId;
+                                    });
                                   });
-                                });
-                                const isFull = group.some(sess => {
-                                  return sess.status === 'FULL' || (sess.currentParticipants >= sess.maxParticipants);
-                                });
-                                
-                                if (isBooked) return 'Already Booked';
-                                if (isFull) return 'Full';
-                                return isRecurring ? `Book All ${group.length} Sessions` : 'Book Now';
-                              })()}
-                            </Button>
+                                  const isFull = group.some(sess => {
+                                    return sess.status === 'FULL' || (sess.currentParticipants >= sess.maxParticipants);
+                                  });
+                                  
+                                  if (isBooked) return 'Already Booked';
+                                  if (isFull) return 'Full';
+                                  return isRecurring ? `Book All ${group.length} Sessions` : 'Book Now';
+                                })()}
+                              </Button>
+                              <IconButton
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  
+                                  // Ensure we have sufficient coach information
+                                  if (!first.coachName) {
+                                    alert('Coach information is incomplete. Cannot send message.');
+                                    return;
+                                  }
+                                  
+                                  navigate('/messages', { 
+                                    state: { 
+                                      selectedUser: {
+                                        id: first.coachId || first.coachName, // 使用教練名稱作為備用ID
+                                        name: first.coachName,
+                                        username: first.coachUsername || first.coachEmail || first.coachName, // 使用教練名稱作為備用用戶名
+                                        userType: 'COACH',
+                                        email: first.coachEmail || `${first.coachName.toLowerCase().replace(/\s+/g, '')}@coach.com`
+                                      }
+                                    }
+                                  });
+                                }}
+                                sx={{ 
+                                  color: 'primary.main',
+                                  '&:hover': { 
+                                    backgroundColor: 'primary.light',
+                                    color: 'white'
+                                  }
+                                }}
+                              >
+                                <Message />
+                              </IconButton>
+                            </Box>
                             
                             {expanded && isRecurring && group.length > 1 && (
                               <Box mt={2}>

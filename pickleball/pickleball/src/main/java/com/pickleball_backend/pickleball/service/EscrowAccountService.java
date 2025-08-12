@@ -56,12 +56,22 @@ public class EscrowAccountService {
         payment.setPaymentMethod("WALLET");
         payment.setStatus("ESCROWED"); // 託管狀態
         payment.setPaymentType("CLASS_SESSION_ESCROW");
-        payment.setTransactionId("SESSION_" + session.getId() + "_" + user.getId()); // 關聯課程和用戶
-        payment.setGroupBookingId("ESCROW_" + session.getId() + "_" + user.getId()); // 添加 groupBookingId
+        
+        // 處理 session 為 null 的情況（設備費用）
+        if (session != null) {
+            payment.setTransactionId("SESSION_" + session.getId() + "_" + user.getId()); // 關聯課程和用戶
+            payment.setGroupBookingId("ESCROW_" + session.getId() + "_" + user.getId()); // 添加 groupBookingId
+            log.info("Deposited RM{} to escrow for session {} by user {}", 
+                    amount, session.getId(), user.getId());
+        } else {
+            // 設備費用的特殊處理
+            payment.setTransactionId("EQUIPMENT_" + user.getId() + "_" + System.currentTimeMillis());
+            payment.setGroupBookingId("ESCROW_EQUIPMENT_" + user.getId() + "_" + System.currentTimeMillis());
+            log.info("Deposited RM{} to escrow for equipment by user {}", 
+                    amount, user.getId());
+        }
+        
         paymentRepository.save(payment);
-
-        log.info("Deposited RM{} to escrow for session {} by user {}", 
-                amount, session.getId(), user.getId());
     }
 
     /**

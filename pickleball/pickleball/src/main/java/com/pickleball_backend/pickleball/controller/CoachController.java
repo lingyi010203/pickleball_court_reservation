@@ -6,7 +6,6 @@ import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.*;
 import com.pickleball_backend.pickleball.repository.*;
 import com.pickleball_backend.pickleball.service.CoachCourtService;
-import com.pickleball_backend.pickleball.service.EscrowAccountService;
 import com.pickleball_backend.pickleball.service.ClassSessionServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -50,7 +49,6 @@ public class CoachController {
     private final WalletTransactionRepository walletTransactionRepository;
     private final MemberRepository memberRepository;
     private final MembershipTierRepository membershipTierRepository;
-    private final EscrowAccountService escrowAccountService;
     private final ClassSessionServiceImpl classSessionService;
 
     // 獲取教練可用的球場
@@ -1421,63 +1419,5 @@ public class CoachController {
         }
     }
 
-    @PostMapping("/trigger-settlement")
-    @PreAuthorize("hasAuthority('ROLE_COACH')")
-    public ResponseEntity<?> triggerSettlement() {
-        try {
-            String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            User coach = userRepository.findByUserAccount_Username(username)
-                    .orElseThrow(() -> new ResourceNotFoundException("Coach not found"));
-            
-            // 手动触发收入分配
-            List<ClassSession> completedSessions = sessionRepository.findByStatus("COMPLETED");
-            int settledCount = 0;
-            List<String> messages = new ArrayList<>();
-            
-            for (ClassSession session : completedSessions) {
-                if (session.getCoach().getId().equals(coach.getId())) {
-                    try {
-                        // 检查是否已经有收入分配记录
-                        List<Payment> existingSettlements = paymentRepository.findByPaymentTypeAndStatus("COACH_INCOME", "COMPLETED")
-                            .stream()
-                            .filter(payment -> payment.getTransactionId() != null && 
-                                             payment.getTransactionId().equals("SETTLEMENT_" + session.getId()))
-                            .collect(Collectors.toList());
-                        
-                        // 检查是否有托管支付
-                        List<Payment> escrowedPayments = paymentRepository.findByPaymentTypeAndStatus("CLASS_SESSION_ESCROW", "ESCROWED")
-                            .stream()
-                            .filter(payment -> payment.getTransactionId() != null && 
-                                             payment.getTransactionId().startsWith("SESSION_" + session.getId() + "_"))
-                            .collect(Collectors.toList());
-                        
-                        messages.add(String.format("Session %d: %d existing settlements, %d escrowed payments", 
-                                                  session.getId(), existingSettlements.size(), escrowedPayments.size()));
-                        
-                        // 如果有托管支付但没有结算记录，则进行结算
-                        if (!escrowedPayments.isEmpty() && existingSettlements.isEmpty()) {
-                            escrowAccountService.settleClassSession(session);
-                            settledCount++;
-                            messages.add(String.format("Successfully settled session %d", session.getId()));
-                        } else if (escrowedPayments.isEmpty()) {
-                            messages.add(String.format("No escrowed payments found for session %d", session.getId()));
-                        } else if (!existingSettlements.isEmpty()) {
-                            messages.add(String.format("Session %d already has settlement records", session.getId()));
-                        }
-                    } catch (Exception e) {
-                        messages.add(String.format("Failed to settle session %d: %s", session.getId(), e.getMessage()));
-                    }
-                }
-            }
-            
-            return ResponseEntity.ok(Map.of(
-                "message", "Settlement triggered successfully",
-                "settledSessions", settledCount,
-                "totalCompletedSessions", completedSessions.size(),
-                "details", messages
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
+
 }
