@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -108,5 +109,16 @@ public class FriendController {
         User otherUser = userRepository.findByUsername(otherUsername)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return ResponseEntity.ok(friendshipService.areFriends(currentUser.getId(), otherUser.getId()));
+    }
+
+    @GetMapping("/requests/count")
+    public ResponseEntity<Map<String, Integer>> getPendingRequestsCount(
+            Authentication authentication) {
+        String username = authentication.getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        List<FriendRequestDto> pendingRequests = friendshipService.getPendingRequests(user.getId());
+        return ResponseEntity.ok(Map.of("count", pendingRequests.size()));
     }
 }
