@@ -162,7 +162,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             account.setStatus("ACTIVE");
             account.setUser(savedUser);
             account.setEmailNotifications(true);
-            account.setPushNotifications(true);
+    
             account.setTheme("light");
             userAccountRepository.save(account);
 
@@ -224,6 +224,33 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
             if (StringUtils.hasText(userDto.getGender())) {
                 user.setGender(userDto.getGender());
+            }
+            
+            // 更新用户类型
+            if (StringUtils.hasText(userDto.getUserType())) {
+                String oldUserType = user.getUserType();
+                String newUserType = userDto.getUserType();
+                
+                // 验证用户类型
+                if (!"User".equals(newUserType) && !"Coach".equals(newUserType) && 
+                    !"EventOrganizer".equals(newUserType) && !"Admin".equals(newUserType)) {
+                    throw new ValidationException("Invalid user type: " + newUserType);
+                }
+                
+                // 如果用户类型发生变化
+                if (!newUserType.equals(oldUserType)) {
+                    log.info("Updating user {} type from '{}' to '{}'", user.getId(), oldUserType, newUserType);
+                    user.setUserType(newUserType);
+                    user.setRequestedUserType(null); // 清除任何待处理的类型变更请求
+                    
+                    // 如果从非会员变为会员，创建会员记录
+                    if (!"MEMBER".equalsIgnoreCase(oldUserType) && "MEMBER".equalsIgnoreCase(newUserType)) {
+                        createMemberRecord(user);
+                    }
+                    
+                    // 发送用户类型变更通知
+                    sendRoleUpdateEmail(user, oldUserType, newUserType);
+                }
             }
 
             // 更新账户状态
@@ -396,7 +423,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                             feedbackContent != null ? feedbackContent : "",
                             feedbackCreatedAt != null ? feedbackCreatedAt.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")) : ""
                     );
-                    emailService.sendEmail(toEmail, subject, content);
+                    emailService.sendEmailIfEnabled(toEmail, user, subject, content);
                     warning.setDeliveryStatus("SENT");
                 } else {
                     warning.setDeliveryStatus("FAILED");
@@ -430,7 +457,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                                         user.getName() != null ? user.getName() : user.getUserAccount().getUsername(),
                                         warningThreshold
                                 );
-                                emailService.sendEmail(user.getEmail(), subject, body);
+                                emailService.sendEmailIfEnabled(user, subject, body);
                             }
                         } catch (Exception ignored) {}
                     });
@@ -644,7 +671,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         user.getUserAccount().getUsername(),
                         password
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send welcome email to user {}: {}", user.getId(), e.getMessage());
@@ -661,7 +688,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         "Regards,\nPickleball Team",
                         user.getName()
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send activation email to user {}: {}", user.getId(), e.getMessage());
@@ -679,7 +706,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         "Regards,\nPickleball Team",
                         user.getName()
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send deletion email to user {}: {}", user.getId(), e.getMessage());
@@ -704,7 +731,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         status,
                         reason != null ? reason : ""
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send status update email to user {}: {}", user.getId(), e.getMessage());
@@ -724,7 +751,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         oldRole,
                         newRole
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send role update email to user {}: {}", user.getId(), e.getMessage());
@@ -1029,7 +1056,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                         user.getName(),
                         newPassword
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send password reset email to user {}: {}", user.getId(), e.getMessage());

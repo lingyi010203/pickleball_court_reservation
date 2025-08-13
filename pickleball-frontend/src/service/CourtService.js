@@ -144,8 +144,13 @@ export const getCourtImages = async (courtId) => {
 };
 
 export const getCourtImagesPublic = async (courtId) => {
-  const response = await api.get(`/admin/courts/public/${courtId}/images`);
-  return response.data;
+  try {
+    const response = await api.get(`/courts/${courtId}/images`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching court images:', error);
+    return [];
+  }
 };
 
 

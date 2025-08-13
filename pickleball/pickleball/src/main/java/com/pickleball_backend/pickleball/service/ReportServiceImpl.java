@@ -1084,8 +1084,8 @@ public class ReportServiceImpl implements ReportService {
                 bookingRepository.findBookingsByDateRange(startDateTime, endDateTime)
         );
         
-        // 获取所有场地
-        List<Court> allCourts = courtRepository.findAll();
+        // 获取所有活跃场地（排除 DELETED, MAINTENANCE, INACTIVE 状态的场地）
+        List<Court> allCourts = courtRepository.findActiveCourts();
         
         // 计算场地利用率
         Map<String, Object> venueUtilizationDetails = new HashMap<>();
@@ -1174,8 +1174,8 @@ public class ReportServiceImpl implements ReportService {
                 bookingRepository.findBookingsByDateRange(startDateTime, endDateTime)
         );
         
-        // 获取所有场地
-        List<Court> allCourts = courtRepository.findAll();
+        // 获取所有活跃场地（排除 DELETED, MAINTENANCE, INACTIVE 状态的场地）
+        List<Court> allCourts = courtRepository.findActiveCourts();
         
         // 计算场地排名数据
         Map<String, Double> venueRanking = new HashMap<>();
@@ -1344,8 +1344,8 @@ public class ReportServiceImpl implements ReportService {
                 bookingRepository.findBookingsByDateRange(startDateTime, endDateTime)
         );
         
-        // 获取所有场地
-        List<Court> allCourts = courtRepository.findAll();
+        // 获取所有活跃场地（排除 DELETED, MAINTENANCE, INACTIVE 状态的场地）
+        List<Court> allCourts = courtRepository.findActiveCourts();
         
         // 按场地类型统计
         Map<String, Long> venueTypeBookings = new HashMap<>();

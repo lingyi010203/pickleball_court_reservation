@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box,
   Grid, Button, TextField, CircularProgress, Chip, Divider, Avatar, Snackbar, Alert,
-  Menu, MenuItem, ListItemIcon, ListItemText
+  Menu, MenuItem, ListItemIcon, ListItemText, FormControl, InputLabel, Select
 } from '@mui/material';
 import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
@@ -14,6 +14,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { getStatusChip } from './statusConfig';
 import { usePageTheme } from '../../hooks/usePageTheme';
 import { useLanguage } from '../../context/LanguageContext';
+import api from '../../api/axiosConfig';
 
 const formatDate = (date) => {
   if (!date) return '-';
@@ -58,6 +59,15 @@ const ModernBookingDetailsDialog = ({
   usePageTheme('admin'); // 设置页面类型为admin
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [shareMenuAnchor, setShareMenuAnchor] = useState(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareRecipient, setShareRecipient] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const safeBooking = booking || {};
   const safeCancellation = cancellationRequest || safeBooking.cancellationRequest || {};
 
@@ -119,6 +129,104 @@ const ModernBookingDetailsDialog = ({
     window.open(whatsappUrl, '_blank');
     showSnackbar('Opening WhatsApp... 📱', 'success');
     handleShareMenuClose();
+  };
+
+  // 获取朋友列表
+  const fetchFriends = async () => {
+    try {
+      const response = await api.get('/friends/accepted');
+      setFriends(response.data);
+    } catch (error) {
+      console.error('Failed to fetch friends:', error);
+    }
+  };
+
+  // 搜索用户
+  const searchUsers = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await api.get(`/users/search?query=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchResults(response.data);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Failed to search users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 选择用户
+  const selectUser = (username) => {
+    setShareRecipient(username);
+    setSearchQuery(username);
+    setShowSearchResults(false);
+  };
+
+  // 生成分享消息内容
+  const generateShareMessage = () => {
+    let priceInfo = '';
+    
+    if (safeBooking.voucherUsed) {
+      priceInfo = `💰 Original: RM${safeBooking.originalAmount?.toFixed(2) || '0.00'}
+🎫 Voucher: ${safeBooking.voucherCode || 'Voucher'}
+💸 Discount: -RM${safeBooking.discountAmount?.toFixed(2) || '0.00'}
+✅ Final: RM${safeBooking.totalAmount?.toFixed(2) || '0.00'}`;
+    } else {
+      priceInfo = `💰 Total: RM${safeBooking.totalAmount?.toFixed(2) || '0.00'}`;
+    }
+    
+    return `🏓 My Pickleball Booking
+
+📅 Date: ${timeInfo.date}
+⏰ Time: ${timeInfo.timeRange}
+🏟️ Court: ${safeBooking.courtName || 'Court'}
+📍 Location: ${safeBooking.courtLocation || 'Location'}
+👥 Players: ${safeBooking.numberOfPlayers || 2}
+⏱️ Duration: ${timeInfo.duration}
+${safeBooking.purpose ? `🎯 Purpose: ${safeBooking.purpose}\n` : ''}${safeBooking.numPaddles > 0 ? `🏓 Paddles: ${safeBooking.numPaddles} (RM5 each)\n` : ''}${safeBooking.buyBallSet ? '🏐 Ball Set: Yes (RM12)\n' : ''}
+${priceInfo}
+
+Join me for a great game! 🏓`;
+  };
+
+  // 处理分享
+  const handleShare = () => {
+    setShareMessage(generateShareMessage());
+    setShareDialogOpen(true);
+  };
+
+  // 发送分享消息
+  const handleSendShare = async () => {
+    if (!shareRecipient.trim()) {
+      showSnackbar('Please enter a recipient username', 'error');
+      return;
+    }
+
+    setIsSharing(true);
+    try {
+      const params = new URLSearchParams({
+        recipient: shareRecipient.trim(),
+        content: shareMessage
+      });
+
+      await api.post(`/messages/send?${params.toString()}`);
+      showSnackbar('Message sent successfully!', 'success');
+      setShareDialogOpen(false);
+      setShareRecipient('');
+      setShareMenuAnchor(null);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      showSnackbar('Failed to send message: ' + (error.response?.data || error.message), 'error');
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   // 处理多 slot 预订的时间显示
@@ -361,7 +469,7 @@ const ModernBookingDetailsDialog = ({
         )}
 
         {/* Cost Breakdown - 仅用户端显示 */}
-        {!isAdmin && (safeBooking.numPaddles > 0 || safeBooking.buyBallSet) && (
+        {!isAdmin && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 600 }}>
               {t('admin.costBreakdown')}
@@ -395,10 +503,42 @@ const ModernBookingDetailsDialog = ({
                   </Typography>
                 </Box>
               )}
+              
+              {/* Voucher/Discount Information */}
+              {safeBooking.voucherUsed && (
+                <>
+                  <Divider sx={{ my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Original Amount
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} color="#757575">
+                      RM {safeBooking.originalAmount?.toFixed(2) || safeBooking.totalAmount?.toFixed(2) || '0.00'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Voucher Applied
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} color="#ff9800">
+                      {safeBooking.voucherCode || 'Voucher'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Discount Amount
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} color="#4caf50">
+                      -RM {safeBooking.discountAmount?.toFixed(2) || '0.00'}
+                    </Typography>
+                  </Box>
+                </>
+              )}
+              
               <Divider sx={{ my: 1 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body1" fontWeight={600}>
-                  {t('admin.total')}
+                  {safeBooking.voucherUsed ? 'Final Amount' : t('admin.total')}
                 </Typography>
                 <Typography variant="body1" fontWeight={600} color="primary">
                   RM {safeBooking.totalAmount?.toFixed(2) || '0.00'}
@@ -609,8 +749,154 @@ const ModernBookingDetailsDialog = ({
           </ListItemIcon>
           <ListItemText primary={t('admin.copyToClipboard')} />
         </MenuItem>
+        <MenuItem onClick={handleShare}>
+          <ListItemIcon>
+            <PersonIcon />
+          </ListItemIcon>
+          <ListItemText primary="Share to Friend" />
+        </MenuItem>
       </Menu>
       
+      {/* Share Dialog */}
+      <Dialog 
+        open={shareDialogOpen} 
+        onClose={() => setShareDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Share Confirmation
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Select Friend or Search User:
+            </Typography>
+            
+            {/* 朋友列表下拉框 */}
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>Select from Friends</InputLabel>
+              <Select
+                value=""
+                onChange={(e) => selectUser(e.target.value)}
+                label="Select from Friends"
+                onClick={fetchFriends}
+              >
+                {friends.map((friend) => (
+                  <MenuItem key={friend.id} value={friend.username}>
+                    {friend.username} {friend.name && `(${friend.name})`}
+                  </MenuItem>
+                ))}
+                {friends.length === 0 && (
+                  <MenuItem disabled>No friends found</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+
+            {/* 搜索用户 */}
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField
+                fullWidth
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by username"
+                variant="outlined"
+                size="small"
+                onKeyPress={(e) => e.key === 'Enter' && searchUsers()}
+              />
+              <Button
+                variant="contained"
+                onClick={searchUsers}
+                disabled={isSearching || !searchQuery.trim()}
+                sx={{ minWidth: '80px' }}
+              >
+                {isSearching ? '...' : 'Search'}
+              </Button>
+            </Box>
+
+            {/* 搜索結果 */}
+            {showSearchResults && (
+              <Box sx={{ mb: 2, maxHeight: 150, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                {searchResults.map((user) => (
+                  <Box
+                    key={user.id}
+                    onClick={() => selectUser(user.username)}
+                    sx={{
+                      p: 1,
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: '#f5f5f5' },
+                      borderBottom: '1px solid #f0f0f0'
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight="medium">
+                      {user.username}
+                    </Typography>
+                    {user.name && (
+                      <Typography variant="body2" color="text.secondary">
+                        {user.name}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+                {searchResults.length === 0 && (
+                  <Box sx={{ p: 1, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No users found
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* 選中的用戶 */}
+            {shareRecipient && (
+              <Box sx={{ mb: 2, p: 1, backgroundColor: '#e3f2fd', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Selected: <strong>{shareRecipient}</strong>
+                </Typography>
+              </Box>
+            )}
+          </Box>
+          
+          <Box>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Message Preview:
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={8}
+              value={shareMessage}
+              onChange={(e) => setShareMessage(e.target.value)}
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#f5f5f5'
+                }
+              }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShareDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSendShare}
+            variant="contained"
+            disabled={isSharing || !shareRecipient.trim()}
+            sx={{
+              backgroundColor: '#2196f3',
+              '&:hover': {
+                backgroundColor: '#1976d2'
+              }
+            }}
+          >
+            {isSharing ? 'Sending...' : 'Send Message'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}

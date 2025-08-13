@@ -2,9 +2,17 @@ import Navbar from '../common/Navbar';
 import FooterComponent from '../common/Footer';
 import FloatingMessageButton from '../common/FloatingMessageButton';
 import { Box, Container } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const MainLayout = () => {
+  const location = useLocation();
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
+
   return (
     <>
       <Navbar />

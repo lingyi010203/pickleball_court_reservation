@@ -72,8 +72,8 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
       return;
     }
 
-    // 验证密码
-    if (!formData.generatePassword && (!formData.password || formData.password.length < 6)) {
+    // 验证密码 - 只在创建新用户时验证
+    if (!user && !formData.generatePassword && (!formData.password || formData.password.length < 6)) {
       setError(t('admin.passwordMustBeAtLeast6Characters'));
       return;
     }
@@ -629,7 +629,7 @@ const AdminUserForm = ({ user, onClose, onUserCreated, onUserUpdated }) => {
                 }
               }}
             >
-              {loading ? <CircularProgress size={24} /> : user ? t('admin.updateAdmin') : t('admin.createAdmin')}
+              {loading ? <CircularProgress size={24} /> : user ? t('admin.updateUser') : t('admin.createUser')}
             </Button>
           )}
         </Box>

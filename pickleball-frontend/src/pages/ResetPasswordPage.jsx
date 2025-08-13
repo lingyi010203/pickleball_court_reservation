@@ -7,26 +7,67 @@ import {
   TextField, 
   Button, 
   Container, 
-  AppBar, 
-  Toolbar,
-  useTheme
+  useTheme,
+  Alert,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
+import { 
+  CheckCircle, 
+  Cancel,
+  Visibility,
+  VisibilityOff
+} from '@mui/icons-material';
 import axios from 'axios';
+import Navbar from '../components/common/Navbar';
+import Footer from '../components/common/Footer';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const customTheme = useCustomTheme();
   const { token } = useParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-   const [tokenValid, setTokenValid] = useState(false);
+  const [tokenValid, setTokenValid] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // 密码验证函数
+  const validatePassword = (password) => {
+    const validations = {
+      length: password.length >= 6,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[@$!%*?&]/.test(password)
+    };
+    return validations;
+  };
+
+  const passwordValidations = validatePassword(password);
+  const isPasswordValid = Object.values(passwordValidations).every(Boolean);
+  const isConfirmValid = password === confirmPassword && password.length > 0;
+  const isFormValid = isPasswordValid && isConfirmValid;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (password !== confirmPassword) {
+    // 清除之前的消息
+    setMessage('');
+    
+    // 验证密码
+    if (!isPasswordValid) {
+      setMessage("Please ensure your password meets all requirements");
+      return;
+    }
+    
+    if (!isConfirmValid) {
       setMessage("Passwords don't match");
       return;
     }
@@ -60,16 +101,7 @@ const ResetPasswordPage = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main }}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            PICKLEBALL
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/')}>Home</Button>
-          <Button color="inherit" onClick={() => navigate('/login')}>Login</Button>
-          <Button color="inherit" onClick={() => navigate('/register')}>Register</Button>
-        </Toolbar>
-      </AppBar>
+      <Navbar />
 
       <Box sx={{ 
         flexGrow: 1, 
@@ -77,6 +109,7 @@ const ResetPasswordPage = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
+        pt: { xs: 20, sm: 24 },
         backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
@@ -104,18 +137,83 @@ const ResetPasswordPage = () => {
             <TextField
               fullWidth
               label="New Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              sx={{ mb: 3 }}
+              error={password.length > 0 && !isPasswordValid}
+              helperText={password.length > 0 && !isPasswordValid ? "Password does not meet requirements" : ""}
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    onClick={() => setShowPassword(!showPassword)}
+                    sx={{ minWidth: 'auto', p: 1 }}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </Button>
+                )
+              }}
+              sx={{ mb: 2 }}
             />
+
+            {/* 密码要求提示 */}
+            {password.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}>
+                  Password Requirements:
+                </Typography>
+                <List dense sx={{ py: 0 }}>
+                  <ListItem sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {passwordValidations.length ? <CheckCircle color="success" fontSize="small" /> : <Cancel color="error" fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText primary="At least 6 characters" />
+                  </ListItem>
+                  <ListItem sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {passwordValidations.uppercase ? <CheckCircle color="success" fontSize="small" /> : <Cancel color="error" fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one uppercase letter" />
+                  </ListItem>
+                  <ListItem sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {passwordValidations.lowercase ? <CheckCircle color="success" fontSize="small" /> : <Cancel color="error" fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one lowercase letter" />
+                  </ListItem>
+                  <ListItem sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {passwordValidations.number ? <CheckCircle color="success" fontSize="small" /> : <Cancel color="error" fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one number" />
+                  </ListItem>
+                  <ListItem sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {passwordValidations.special ? <CheckCircle color="success" fontSize="small" /> : <Cancel color="error" fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText primary="At least one special character (@$!%*?&)" />
+                  </ListItem>
+                </List>
+              </Box>
+            )}
             
             <TextField
               fullWidth
               label="Confirm New Password"
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              error={confirmPassword.length > 0 && !isConfirmValid}
+              helperText={confirmPassword.length > 0 && !isConfirmValid ? "Passwords do not match" : ""}
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    sx={{ minWidth: 'auto', p: 1 }}
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </Button>
+                )
+              }}
               sx={{ mb: 3 }}
             />
             
@@ -130,13 +228,15 @@ const ResetPasswordPage = () => {
                 fontWeight: 'bold',
               }}
               onClick={handleSubmit}
-              disabled={isLoading}
+              disabled={isLoading || !isFormValid}
             >
               {isLoading ? 'Resetting Password...' : 'Reset Password'}
             </Button>
           </Box>
         </Container>
       </Box>
+      
+      <Footer />
     </Box>
   );
 };

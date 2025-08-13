@@ -19,7 +19,6 @@ import {
   CircularProgress
 } from '@mui/material';
 import { useTheme } from '../context/ThemeContext';
-import HelpdeskService from '../service/HelpdeskService';
 import {
   Email,
   Phone,
@@ -171,19 +170,22 @@ const ContactPage = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const payload = `Contact Form Submission\nName: ${formData.name}\nEmail: ${formData.email}\nSubject: ${formData.subject}\n\nMessage:\n${formData.message}`;
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      const res = await HelpdeskService.askQuestion(payload);
-      if (res?.id) {
-        try {
-          await HelpdeskService.escalateToHumanSupport(res.id);
-        } catch (err) {
-          // If escalation fails, still consider the submission successful but show info
-          console.warn('Escalation failed:', err);
-        }
+      const response = await fetch('/api/contact/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || 'Failed to send message');
       }
+
       setSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
       setTimeout(() => setSubmitted(false), 5000);
@@ -272,9 +274,9 @@ const ContactPage = () => {
               )}
 
               <Box component="form" onSubmit={handleSubmit} noValidate>
-                <Grid container spacing={3}>
-                  {/* Name + Email 同一行 */}
-                  <Grid item xs={12} sm={6}>
+                <Grid container spacing={3} alignItems="flex-start">
+                  {/* 第一行：Name + Email */}
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Name"
@@ -288,7 +290,7 @@ const ContactPage = () => {
                       sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Email Address"
@@ -304,7 +306,7 @@ const ContactPage = () => {
                     />
                   </Grid>
 
-                  {/* Subject */}
+                  {/* 第二行：Subject */}
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
@@ -320,7 +322,7 @@ const ContactPage = () => {
                     />
                   </Grid>
 
-                  {/* Message */}
+                  {/* 第三行：Message */}
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
@@ -338,36 +340,43 @@ const ContactPage = () => {
                     />
                   </Grid>
 
-                  {/* Submit */}
+                  {/* 第四行：按钮（右对齐/居中） */}
                   <Grid item xs={12}>
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      size="large"
-                      startIcon={<Send />}
+                    <Box
                       sx={{
-                        py: 1.5,
-                        px: 4,
-                        borderRadius: 2,
-                        background: 'linear-gradient(45deg, #7C4DFF 0%, #651FFF 100%)',
-                        fontWeight: 'bold',
-                        textTransform: 'none',
-                        fontSize: '1.1rem',
-                        '&:hover': {
-                          background: 'linear-gradient(45deg, #6A5ACD 0%, #5E35B1 100%)'
-                        }
+                        display: 'flex',
+                        justifyContent: { xs: 'center', sm: 'flex-end' }
                       }}
-                      disabled={isSubmitting}
                     >
-                      {isSubmitting ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CircularProgress color="inherit" size={20} />
-                          Sending...
-                        </Box>
-                      ) : (
-                        'Send Message'
-                      )}
-                    </Button>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        size="large"
+                        startIcon={<Send />}
+                        sx={{
+                          py: 1.5,
+                          px: 4,
+                          borderRadius: 2,
+                          background: 'linear-gradient(45deg, #7C4DFF 0%, #651FFF 100%)',
+                          fontWeight: 'bold',
+                          textTransform: 'none',
+                          fontSize: '1.1rem',
+                          '&:hover': {
+                            background: 'linear-gradient(45deg, #6A5ACD 0%, #5E35B1 100%)'
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress color="inherit" size={20} />
+                            Sending...
+                          </Box>
+                        ) : (
+                          'Send Message'
+                        )}
+                      </Button>
+                    </Box>
                   </Grid>
                 </Grid>
               </Box>

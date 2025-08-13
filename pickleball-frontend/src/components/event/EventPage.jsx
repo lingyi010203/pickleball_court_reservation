@@ -131,6 +131,22 @@ const EventPage = () => {
     }
   }, [location.pathname, page]); // location from react-router
 
+  // Handle eventId from URL query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const eventId = urlParams.get('eventId');
+    
+    if (eventId && events.length > 0) {
+      const targetEvent = events.find(event => event.id == eventId);
+      if (targetEvent) {
+        handleEventClick(targetEvent);
+        // Clear the query parameter to avoid reopening on refresh
+        const newUrl = location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [events, location.search]);
+
   // Update handleEventClick to fetch event details from backend
   const handleEventClick = async (event) => {
     setDetailLoading(true);

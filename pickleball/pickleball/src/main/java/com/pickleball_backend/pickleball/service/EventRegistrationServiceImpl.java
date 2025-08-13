@@ -127,7 +127,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
                 event.getStartTime() != null ? event.getStartTime().toString() : "N/A",
                 event.getVenue() != null ? event.getVenue().getName() : "N/A"
             );
-            emailService.sendEmail(userEmail, subject, content);
+            emailService.sendEmailIfEnabled(userEmail, user, subject, content);
         }
 
         // 7. Build and return response
@@ -176,7 +176,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
                 event.getTitle(),
                 registration.getFeeAmount()
             );
-            emailService.sendEmail(userEmail, subject, content);
+            emailService.sendEmailIfEnabled(userEmail, user, subject, content);
         }
     }
 
@@ -223,7 +223,7 @@ public class EventRegistrationServiceImpl implements EventRegistrationService {
                     organizerUser.getName(),
                     event.getTitle()
                 );
-                emailService.sendEmail(organizerUser.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(organizerUser, subject, content);
             }
         }
     }

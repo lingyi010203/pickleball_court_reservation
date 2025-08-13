@@ -577,10 +577,8 @@ public class CourtServiceImpl implements CourtService {
 
     @Override
     public List<Court> getAllCourtsForMember() {
-        // 返回所有非DELETED状态的球场，用于用户查看
-        return courtRepository.findAll().stream()
-                .filter(court -> !"DELETED".equalsIgnoreCase(court.getStatus()))
-                .collect(Collectors.toList());
+        // 返回所有非DELETED、非MAINTENANCE和非INACTIVE状态的球场，用于用户查看
+        return courtRepository.findActiveCourts();
     }
 
     @Override
@@ -643,7 +641,9 @@ public class CourtServiceImpl implements CourtService {
     public Court getCourtByIdForMember(Integer id) {
         return courtRepository.findById(id)
                 .filter(court ->
-                        !"DELETED".equalsIgnoreCase(court.getStatus())
+                        !"DELETED".equalsIgnoreCase(court.getStatus()) &&
+                        !"MAINTENANCE".equalsIgnoreCase(court.getStatus()) &&
+                        !"INACTIVE".equalsIgnoreCase(court.getStatus())
                 )
                 .orElse(null);
     }

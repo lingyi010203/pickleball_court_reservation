@@ -12,6 +12,7 @@ import com.pickleball_backend.pickleball.entity.Court;
 import com.pickleball_backend.pickleball.entity.Venue;
 import com.pickleball_backend.pickleball.entity.Booking;
 import com.pickleball_backend.pickleball.exception.ConflictException;
+import com.pickleball_backend.pickleball.exception.UnauthorizedException;
 import com.pickleball_backend.pickleball.repository.EventOrganizerRepository;
 import com.pickleball_backend.pickleball.repository.EventRepository;
 import com.pickleball_backend.pickleball.repository.EventRegistrationRepository;
@@ -80,7 +81,12 @@ public class EventServiceImpl implements EventService {
         UserAccount organizer = userAccountRepository.findByUsername(organizerUsername)
                 .orElseThrow(() -> new RuntimeException("Organizer not found"));
 
-        // Check organizer status
+        // Check organizer status - prevent suspended/inactive users from creating events
+        if ("SUSPENDED".equals(organizer.getStatus()) || "INACTIVE".equals(organizer.getStatus())) {
+            throw new UnauthorizedException("Your account is " + organizer.getStatus().toLowerCase() + 
+                ". You cannot create events. Please contact support for assistance.");
+        }
+        
         if (!("ACTIVE".equals(organizer.getStatus()) ||
                 "PENDING".equals(organizer.getStatus()))) {
             throw new RuntimeException("Account not active or pending approval");
@@ -162,23 +168,32 @@ public class EventServiceImpl implements EventService {
             List<User> allUsers = userRepository.findAll();
             int emailsSent = 0;
             int emailsSkipped = 0;
+            int notificationsDisabled = 0;
+            
             for (User user : allUsers) {
-                String userEmail = user.getEmail();
-                if (userEmail == null || userEmail.trim().isEmpty()) {
-                    emailsSkipped++;
-                    continue;
-                }
-                try {
-                    emailService.sendEventNotification(userEmail, savedEvent);
-                    emailsSent++;
-                } catch (Exception e) {
-                    emailsSkipped++;
-                    log.warn("Failed to send event notification to {}: {}", userEmail, e.getMessage());
+                // Check if user has email notifications enabled
+                if (user.getUserAccount() != null && user.getUserAccount().isEmailNotifications()) {
+                    String userEmail = user.getEmail();
+                    if (userEmail == null || userEmail.trim().isEmpty()) {
+                        emailsSkipped++;
+                        continue;
+                    }
+                    try {
+                        emailService.sendEventNotification(userEmail, savedEvent);
+                        emailsSent++;
+                    } catch (Exception e) {
+                        emailsSkipped++;
+                        log.warn("Failed to send event notification to {}: {}", userEmail, e.getMessage());
+                    }
+                } else {
+                    notificationsDisabled++;
+                    log.debug("Skipping notification for user {} (notifications disabled)", 
+                             user.getEmail() != null ? user.getEmail() : "unknown");
                 }
             }
             
-            log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                    emailsSent, emailsSkipped, allUsers.size());
+            log.info("Event notification summary - Sent: {}, Skipped: {}, Notifications disabled: {}, Total processed: {}", 
+                    emailsSent, emailsSkipped, notificationsDisabled, allUsers.size());
         } else {
             log.info("Email notifications disabled for event: {}", savedEvent.getTitle());
         }
@@ -247,23 +262,32 @@ public class EventServiceImpl implements EventService {
             List<User> allUsers = userRepository.findAll();
             int emailsSent = 0;
             int emailsSkipped = 0;
+            int notificationsDisabled = 0;
+            
             for (User user : allUsers) {
-                String userEmail = user.getEmail();
-                if (userEmail == null || userEmail.trim().isEmpty()) {
-                    emailsSkipped++;
-                    continue;
-                }
-                try {
-                    emailService.sendEventUpdateNotification(userEmail, updatedEvent);
-                    emailsSent++;
-                } catch (Exception e) {
-                    emailsSkipped++;
-                    log.warn("Failed to send event update notification to {}: {}", userEmail, e.getMessage());
+                // Check if user has email notifications enabled
+                if (user.getUserAccount() != null && user.getUserAccount().isEmailNotifications()) {
+                    String userEmail = user.getEmail();
+                    if (userEmail == null || userEmail.trim().isEmpty()) {
+                        emailsSkipped++;
+                        continue;
+                    }
+                    try {
+                        emailService.sendEventUpdateNotification(userEmail, updatedEvent);
+                        emailsSent++;
+                    } catch (Exception e) {
+                        emailsSkipped++;
+                        log.warn("Failed to send event update notification to {}: {}", userEmail, e.getMessage());
+                    }
+                } else {
+                    notificationsDisabled++;
+                    log.debug("Skipping update notification for user {} (notifications disabled)", 
+                             user.getEmail() != null ? user.getEmail() : "unknown");
                 }
             }
             
-            log.info("Event update notification summary - Sent: {}, Skipped: {}, Total processed: {}", 
-                    emailsSent, emailsSkipped, allUsers.size());
+            log.info("Event update notification summary - Sent: {}, Skipped: {}, Notifications disabled: {}, Total processed: {}", 
+                    emailsSent, emailsSkipped, notificationsDisabled, allUsers.size());
         } else {
             log.info("Event updated without sending notifications: {}", updatedEvent.getTitle());
         }
@@ -308,20 +332,31 @@ public class EventServiceImpl implements EventService {
         List<User> allUsers = userRepository.findAll();
         int emailsSent = 0;
         int emailsSkipped = 0;
+        int notificationsDisabled = 0;
+        
         for (User user : allUsers) {
-            String userEmail = user.getEmail();
-            if (userEmail == null || userEmail.trim().isEmpty()) {
-                emailsSkipped++;
-                continue;
-            }
-            try {
-                emailService.sendEventNotification(userEmail, event);
-                emailsSent++;
-            } catch (Exception e) {
-                emailsSkipped++;
+            // Check if user has email notifications enabled
+            if (user.getUserAccount() != null && user.getUserAccount().isEmailNotifications()) {
+                String userEmail = user.getEmail();
+                if (userEmail == null || userEmail.trim().isEmpty()) {
+                    emailsSkipped++;
+                    continue;
+                }
+                try {
+                    emailService.sendEventNotification(userEmail, event);
+                    emailsSent++;
+                } catch (Exception e) {
+                    emailsSkipped++;
+                    log.warn("Failed to send event notification to {}: {}", userEmail, e.getMessage());
+                }
+            } else {
+                notificationsDisabled++;
+                log.debug("Skipping notification for user {} (notifications disabled)", 
+                         user.getEmail() != null ? user.getEmail() : "unknown");
             }
         }
-        log.info("Event notification summary - Sent: {}, Skipped: {}, Total processed: {}", emailsSent, emailsSkipped, allUsers.size());
+        log.info("Event notification summary - Sent: {}, Skipped: {}, Notifications disabled: {}, Total processed: {}", 
+                emailsSent, emailsSkipped, notificationsDisabled, allUsers.size());
         return event;
     }
     

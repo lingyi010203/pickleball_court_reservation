@@ -170,4 +170,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     
     // Add missing method for finding bookings by member user ID
     List<Booking> findByMember_User_Id(Integer userId);
+    
+    // Add missing method for finding bookings by member ID and purpose
+    List<Booking> findByMember_IdAndPurpose(Integer memberId, String purpose);
 }

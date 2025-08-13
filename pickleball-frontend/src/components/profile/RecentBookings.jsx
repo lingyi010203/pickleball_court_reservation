@@ -53,7 +53,7 @@ const RecentBookings = () => {
         startTime: booking.startTime,
         endTime: booking.endTime,
         numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
-        totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
+        totalAmount: booking.amount ? Number(booking.amount) : (booking.price || 50.00) + ((booking.numPaddles || 0) * 5) + (booking.buyBallSet ? 12 : 0),
         status: booking.bookingStatus || booking.status || "CONFIRMED",
         purpose: booking.purpose || "Recreational",
         numPaddles: booking.numPaddles || 0,

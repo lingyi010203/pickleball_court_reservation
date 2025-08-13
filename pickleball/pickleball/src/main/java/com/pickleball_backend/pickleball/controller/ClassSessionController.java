@@ -6,6 +6,7 @@ import com.pickleball_backend.pickleball.dto.ClassRegistrationDto;
 import com.pickleball_backend.pickleball.dto.LeaveRequestDto;
 import com.pickleball_backend.pickleball.exception.ConflictException;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
+import com.pickleball_backend.pickleball.exception.UnauthorizedException;
 import com.pickleball_backend.pickleball.service.EscrowAccountService;
 import com.pickleball_backend.pickleball.entity.Feedback;
 import java.time.LocalDateTime;
@@ -14,6 +15,7 @@ import com.pickleball_backend.pickleball.service.ClassSessionService;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.service.LeaveRequestService;
 import com.pickleball_backend.pickleball.repository.*;
+import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,9 +44,10 @@ public class ClassSessionController {
     private final LeaveRequestService leaveRequestService;
     private final EscrowAccountService escrowAccountService;
     private final FeedbackRepository feedbackRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @Autowired
-    public ClassSessionController(ClassSessionService classSessionService, UserRepository userRepository, ClassRegistrationRepository classRegistrationRepository, PaymentRepository paymentRepository, EmailService emailService, ClassSessionRepository classSessionRepository, MemberRepository memberRepository, LeaveRequestService leaveRequestService, EscrowAccountService escrowAccountService, FeedbackRepository feedbackRepository) {
+    public ClassSessionController(ClassSessionService classSessionService, UserRepository userRepository, ClassRegistrationRepository classRegistrationRepository, PaymentRepository paymentRepository, EmailService emailService, ClassSessionRepository classSessionRepository, MemberRepository memberRepository, LeaveRequestService leaveRequestService, EscrowAccountService escrowAccountService, FeedbackRepository feedbackRepository, UserAccountRepository userAccountRepository) {
         this.classSessionService = classSessionService;
         this.userRepository = userRepository;
         this.classRegistrationRepository = classRegistrationRepository;
@@ -55,6 +58,7 @@ public class ClassSessionController {
         this.leaveRequestService = leaveRequestService;
         this.escrowAccountService = escrowAccountService;
         this.feedbackRepository = feedbackRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     // 教练创建课程
@@ -99,7 +103,14 @@ public class ClassSessionController {
                                 session.getTitle(),
                                 registerUrl
                             );
-                            emailService.sendEmail(email, "Make-up Class Notification - Please Register", msg);
+                            // 获取用户对象以检查通知偏好
+                            User user = userRepository.findByEmail(email).orElse(null);
+                            if (user != null) {
+                                emailService.sendEmailIfEnabled(user, "Make-up Class Notification - Please Register", msg);
+                            } else {
+                                // 如果找不到用户，直接发送邮件（向后兼容）
+                                emailService.sendEmail(email, "Make-up Class Notification - Please Register", msg);
+                            }
                         }
                     }
                 }
@@ -141,6 +152,15 @@ public class ClassSessionController {
             }
             
             String username = principal.getName();
+            UserAccount userAccount = userAccountRepository.findByUsername(username)
+                .orElseThrow(() -> new com.pickleball_backend.pickleball.exception.ResourceNotFoundException("User account not found"));
+
+            // Validate user status - prevent suspended/inactive users from booking
+            if ("SUSPENDED".equals(userAccount.getStatus()) || "INACTIVE".equals(userAccount.getStatus())) {
+                throw new UnauthorizedException("Your account is " + userAccount.getStatus().toLowerCase() + 
+                    ". You cannot make bookings. Please contact support for assistance.");
+            }
+
             User user = userRepository.findByUserAccount_Username(username)
                 .orElseThrow(() -> new com.pickleball_backend.pickleball.exception.ResourceNotFoundException("User not found"));
             Integer userId = user.getId();
@@ -1251,7 +1271,14 @@ public class ClassSessionController {
                 content += "\n\nCancellation Reason: " + reason;
             }
             
-            emailService.sendEmail(email, subject, content);
+            // 获取用户对象以检查通知偏好
+            User userForEmail = userRepository.findByEmail(email).orElse(null);
+            if (userForEmail != null) {
+                emailService.sendEmailIfEnabled(userForEmail, subject, content);
+            } else {
+                // 如果找不到用户，直接发送邮件（向后兼容）
+                emailService.sendEmail(email, subject, content);
+            }
             
             // 刪除預訂記錄
             classRegistrationRepository.delete(registration);

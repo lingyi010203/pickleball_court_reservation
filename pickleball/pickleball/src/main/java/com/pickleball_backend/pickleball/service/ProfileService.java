@@ -47,7 +47,6 @@ public class ProfileService {
                 .status(account.getStatus())
                 .theme(account.getTheme())
                 .emailNotifications(account.isEmailNotifications())
-                .pushNotifications(account.isPushNotifications())
                 .profileImage(account.getProfileImage())
                 .build();
     }
@@ -111,7 +110,6 @@ public class ProfileService {
             account.setTheme(profileDto.getTheme());
         }
         account.setEmailNotifications(profileDto.isEmailNotifications());
-        account.setPushNotifications(profileDto.isPushNotifications());
 
         // Save changes
         userRepository.save(user);
@@ -134,7 +132,6 @@ public class ProfileService {
                 .status(account.getStatus())
                 .theme(account.getTheme())
                 .emailNotifications(account.isEmailNotifications())
-                .pushNotifications(account.isPushNotifications())
                 .profileImage(account.getProfileImage())
                 .build();
     }
@@ -183,10 +180,8 @@ public class ProfileService {
 
         // Update notification preferences
         account.setEmailNotifications(preferencesDto.isEmailNotifications());
-        account.setPushNotifications(preferencesDto.isPushNotifications());
 
         log.debug("Email notifications: {}", preferencesDto.isEmailNotifications());
-        log.debug("Push notifications: {}", preferencesDto.isPushNotifications());
 
         // Save updated preferences
         userAccountRepository.save(account);
@@ -195,7 +190,6 @@ public class ProfileService {
         return ProfileDto.builder()
                 .theme(account.getTheme())
                 .emailNotifications(account.isEmailNotifications())
-                .pushNotifications(account.isPushNotifications())
                 .build();
     }
 

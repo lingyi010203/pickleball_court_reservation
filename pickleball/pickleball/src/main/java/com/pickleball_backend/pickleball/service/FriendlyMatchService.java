@@ -14,20 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 import com.pickleball_backend.pickleball.repository.CourtRepository;
 import com.pickleball_backend.pickleball.repository.VenueRepository;
 import com.pickleball_backend.pickleball.repository.BookingRepository;
 import com.pickleball_backend.pickleball.repository.PaymentRepository;
 import com.pickleball_backend.pickleball.repository.WalletRepository;
-import com.pickleball_backend.pickleball.repository.WalletTransactionRepository;
-import com.pickleball_backend.pickleball.entity.WalletTransaction;
-import com.pickleball_backend.pickleball.service.VoucherRedemptionService;
-import com.pickleball_backend.pickleball.dto.VoucherRedemptionDto;
 import org.springframework.scheduling.annotation.Scheduled;
-import java.util.Map;
-import java.util.HashMap;
-import java.time.LocalDate;
-import java.util.UUID;
 
 @Service
 public class FriendlyMatchService {
@@ -46,18 +40,6 @@ public class FriendlyMatchService {
     private CancellationRequestRepository cancellationRequestRepository;
     @Autowired
     private FeedbackRepository feedbackRepository;
-    @Autowired
-    private VoucherRedemptionService voucherRedemptionService;
-    @Autowired
-    private WalletTransactionRepository walletTransactionRepository;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private UserAccountRepository userAccountRepository;
-    @Autowired
-    private BookingSlotRepository bookingSlotRepository;
-    @Autowired
-    private MemberService memberService;
 
     public List<FriendlyMatch> getOpenMatches() {
         // 获取所有状态为OPEN的比赛，包括邀请类型和独立类型
@@ -183,6 +165,14 @@ public class FriendlyMatchService {
         }
 
         FriendlyMatch savedMatch = matchRepository.save(match);
+        
+        // 為 organizer 創建一個 join request，確保他們被計算為參與者
+        JoinRequest organizerJoinRequest = new JoinRequest();
+        organizerJoinRequest.setFriendlyMatch(savedMatch);
+        organizerJoinRequest.setMember(organizer);
+        organizerJoinRequest.setStatus(JoinRequest.Status.APPROVED);
+        organizerJoinRequest.setRequestTime(LocalDateTime.now());
+        joinRequestRepository.save(organizerJoinRequest);
         
         // Convert to DTO to avoid serialization issues
         return convertToResponseDto(savedMatch, "Friendly match created successfully! The court is now temporarily locked.");
@@ -324,11 +314,6 @@ public class FriendlyMatchService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
-        // Check if user is the organizer (organizer is already counted as a player)
-        if (match.getOrganizer() != null && match.getOrganizer().getId().equals(memberId)) {
-            throw new ValidationException("You are the organizer of this match and are already counted as a player");
-        }
-
         // Check for existing request
         boolean alreadyJoined = match.getJoinRequests() != null && match.getJoinRequests().stream()
             .anyMatch(r -> r.getMember() != null && r.getMember().getId().equals(memberId));
@@ -353,8 +338,8 @@ public class FriendlyMatchService {
             matchRepository.save(match);
             
             // 满员时通知organizer
-            emailService.sendEmail(
-                    match.getOrganizer().getUser().getEmail(),
+            emailService.sendEmailIfEnabled(
+                    match.getOrganizer().getUser(),
                     "Match is Full - Payment Required",
                     "Your match on " + match.getStartTime() + " is now full with " + 
                     match.getCurrentPlayers() + "/" + match.getMaxPlayers() + " players.\n\n" +
@@ -363,8 +348,8 @@ public class FriendlyMatchService {
             );
         } else {
             // 未满员时通知organizer有新玩家加入
-            emailService.sendEmail(
-                    match.getOrganizer().getUser().getEmail(),
+            emailService.sendEmailIfEnabled(
+                    match.getOrganizer().getUser(),
                     "New Player Joined Your Match",
                     member.getUser().getName() + " has joined your match on " +
                             match.getStartTime() + "\n\nPlease check the app for details."
@@ -372,8 +357,8 @@ public class FriendlyMatchService {
         }
 
         // Notify participant
-        emailService.sendEmail(
-                member.getUser().getEmail(),
+        emailService.sendEmailIfEnabled(
+                member.getUser(),
                 "Successfully Joined Match",
                 "You have successfully joined the match on " + match.getStartTime() +
                         "\n\nLocation: " + match.getLocation()
@@ -391,27 +376,12 @@ public class FriendlyMatchService {
             throw new UnauthorizedException("Only requester can cancel request");
         }
 
-        // 獲取相關的 friendly match
-        FriendlyMatch match = request.getFriendlyMatch();
-        
         // 直接刪除 join request，不需要判斷狀態
         joinRequestRepository.delete(request);
-        
-        // 減少 currentPlayers 數量
-        if (match.getCurrentPlayers() > 0) {
-            match.setCurrentPlayers(match.getCurrentPlayers() - 1);
-            
-            // 如果之前是滿員狀態，現在改為開放狀態
-            if (match.getStatus().equals("FULL") && match.getCurrentPlayers() < match.getMaxPlayers()) {
-                match.setStatus("OPEN");
-            }
-            
-            matchRepository.save(match);
-        }
 
         // Notify organizer
-        emailService.sendEmail(
-                match.getOrganizer().getUser().getEmail(),
+        emailService.sendEmailIfEnabled(
+                request.getFriendlyMatch().getOrganizer().getUser(),
                 "Join Request Cancelled",
                 request.getMember().getUser().getName() + " has cancelled their request to join your match"
         );
@@ -529,8 +499,8 @@ public class FriendlyMatchService {
                     }
                     
                     // 通知organizer
-                    emailService.sendEmail(
-                        match.getOrganizer().getUser().getEmail(),
+                    emailService.sendEmailIfEnabled(
+                        match.getOrganizer().getUser(),
                         "Match Cancelled - Payment Timeout",
                         "Your match on " + match.getStartTime() + " has been automatically cancelled " +
                         "due to non-payment within 24 hours. The court has been released for other bookings."
@@ -590,8 +560,8 @@ public class FriendlyMatchService {
             }
             
             // 通知organizer
-            emailService.sendEmail(
-                match.getOrganizer().getUser().getEmail(),
+            emailService.sendEmailIfEnabled(
+                match.getOrganizer().getUser(),
                 "Match Cancelled - Timeout",
                 "Your match on " + match.getStartTime() + " has been automatically cancelled " +
                 "due to timeout (24 hours). The court has been released for other bookings."
@@ -618,138 +588,6 @@ public class FriendlyMatchService {
             cancellationRequestRepository.delete(req);
         }
         // 注意：不删除 booking，因为 booking 的取消由 BookingService 处理
-    }
-
-    // 新增：取消 match 付款並處理退款
-    @Transactional
-    public String cancelMatchPayment(FriendlyMatch match, Member organizer) {
-        try {
-            // 1. 檢查是否有相關的 booking
-            Booking booking = match.getBooking();
-            if (booking == null) {
-                throw new RuntimeException("No booking found for this match");
-            }
-
-            // 2. 解鎖場地時段
-            if (match.getStartTime() != null && match.getCourtId() != null) {
-                LocalDateTime startTime = match.getStartTime();
-                LocalDateTime endTime = match.getEndTime();
-                
-                List<Slot> slotsToUnlock = slotRepository.findByCourtIdAndDateAndStatus(
-                    match.getCourtId(),
-                    startTime.toLocalDate(),
-                    "PENDING"
-                );
-                
-                List<Slot> slotsInTimeRange = slotsToUnlock.stream()
-                    .filter(slot -> !slot.getStartTime().isBefore(startTime.toLocalTime()) && 
-                                   !slot.getEndTime().isAfter(endTime.toLocalTime()))
-                    .toList();
-                
-                for (Slot slot : slotsInTimeRange) {
-                    slot.setStatus("AVAILABLE");
-                    slot.setAvailable(true);
-                    slotRepository.save(slot);
-                }
-            }
-
-            // 3. 處理退款（50%）
-            double refund = booking.getTotalAmount() * 0.5;
-            Wallet wallet = walletRepository.findByMemberId(organizer.getId())
-                .orElseThrow(() -> new RuntimeException("Wallet not found"));
-            
-            double balanceBefore = wallet.getBalance();
-            wallet.setBalance(wallet.getBalance() + refund);
-            wallet.setTotalSpent(wallet.getTotalSpent() - refund);
-            walletRepository.save(wallet);
-            
-            // 創建退款交易記錄
-            createWalletTransaction(wallet, "REFUND", refund, balanceBefore, wallet.getBalance(), 
-                                  "FRIENDLY_MATCH", match.getId(), "Friendly match cancellation refund (50%)");
-
-            // 4. 扣除積分（50%）
-            MemberService.PointDeductionResult deductionResult = memberService.deductPointsForRefund(organizer, booking.getTotalAmount(), 0.5);
-            
-            // Assuming log is available, otherwise replace with System.out.println
-            // log.info("Deducted {} tier points and {} reward points from member {} for friendly match cancellation {}",
-            //         deductionResult.getTierPointsDeducted(), deductionResult.getRewardPointsDeducted(), organizer.getId(), match.getId());
-            System.out.println("Deducted " + deductionResult.getTierPointsDeducted() + " tier points and " + deductionResult.getRewardPointsDeducted() + " reward points from member " + organizer.getId() + " for friendly match cancellation " + match.getId());
-
-            // 5. 更新 booking 狀態
-            booking.setStatus("CANCELLED");
-            bookingRepository.save(booking);
-
-            // 6. 更新 booking slot 狀態
-            if (booking.getBookingSlots() != null && !booking.getBookingSlots().isEmpty()) {
-                for (BookingSlot bookingSlot : booking.getBookingSlots()) {
-                    bookingSlot.setStatus("CANCELLED");
-                    bookingSlotRepository.save(bookingSlot);
-                }
-            }
-
-            // 7. 更新 payment 狀態
-            Payment payment = booking.getPayment();
-            if (payment != null) {
-                // 創建退款記錄（50%）
-                Payment refundPayment = new Payment();
-                refundPayment.setAmount(refund); // 50% 退款金額
-                refundPayment.setPaymentType("REFUND");
-                refundPayment.setPaymentMethod("WALLET_REFUND");
-                refundPayment.setStatus("COMPLETED");
-                refundPayment.setTransactionId("REF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-                refundPayment.setReferenceId(payment.getTransactionId());
-                refundPayment.setProcessedAt(LocalDateTime.now());
-                paymentRepository.save(refundPayment);
-                
-                // 更新原始 payment 狀態
-                payment.setStatus("REFUNDED");
-                payment.setRefundDate(LocalDateTime.now());
-                paymentRepository.save(payment);
-            }
-
-            // 8. 更新 match 狀態
-            match.setStatus("CANCELLED");
-            match.setPaymentStatus("CANCELLED");
-            match.setBooking(null);
-            matchRepository.save(match);
-
-            // 9. 刪除所有相關的 join requests
-            if (match.getJoinRequests() != null) {
-                joinRequestRepository.deleteAll(match.getJoinRequests());
-            }
-
-            // 10. 更新用戶統計數據
-            User user = organizer.getUser();
-            double cancelledHours = booking.getBookingSlots().stream()
-                    .mapToDouble(bs -> bs.getSlot().getDurationHours())
-                    .sum();
-            user.setBookingHours(Math.max(0, user.getBookingHours() - cancelledHours));
-            user.setAmountSpent(Math.max(0, user.getAmountSpent() - booking.getTotalAmount()));
-            userRepository.save(user);
-
-            // 11. 發送通知給所有參與者
-            if (match.getJoinRequests() != null) {
-                for (JoinRequest joinRequest : match.getJoinRequests()) {
-                    if (joinRequest.getStatus().equals("APPROVED")) {
-                        emailService.sendEmail(
-                            joinRequest.getMember().getUser().getEmail(),
-                            "Friendly Match Cancelled",
-                            "The friendly match on " + match.getStartTime() + " has been cancelled by the organizer. " +
-                            "The court has been released and refunds have been processed."
-                        );
-                    }
-                }
-            }
-
-            return "Payment cancelled successfully. Refund of RM " + refund + " has been processed to your wallet.";
-            
-        } catch (Exception e) {
-            // Assuming log is available, otherwise replace with System.out.println
-            // log.error("Error cancelling friendly match payment: {}", e.getMessage(), e);
-            System.out.println("Error cancelling friendly match payment: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Failed to cancel payment: " + e.getMessage());
-        }
     }
 
     // 查詢所有 invitation 型的 OPEN match
@@ -818,11 +656,31 @@ public class FriendlyMatchService {
                 }
             }
             
-            // 修復：確保 currentPlayers 至少為 1（organizer 已經被計算為第一個玩家）
-            if (match.getCurrentPlayers() < 1) {
-                System.out.println("Fixing match " + match.getId() + ": Setting currentPlayers to 1");
-                match.setCurrentPlayers(1);
-                matchRepository.save(match);
+            // 修復：為所有 match 檢查是否有 organizer 的 join request
+            if (match.getOrganizer() != null) {
+                // 檢查是否已經有 organizer 的 join request
+                boolean hasOrganizerJoinRequest = match.getJoinRequests() != null && 
+                    match.getJoinRequests().stream()
+                        .anyMatch(req -> req.getMember().getId().equals(match.getOrganizer().getId()) && 
+                                       req.getStatus() == JoinRequest.Status.APPROVED);
+                
+                if (!hasOrganizerJoinRequest) {
+                    System.out.println("Fixing match " + match.getId() + ": Adding organizer join request");
+                    
+                    // 為 organizer 創建 join request
+                    JoinRequest organizerJoinRequest = new JoinRequest();
+                    organizerJoinRequest.setFriendlyMatch(match);
+                    organizerJoinRequest.setMember(match.getOrganizer());
+                    organizerJoinRequest.setStatus(JoinRequest.Status.APPROVED);
+                    organizerJoinRequest.setRequestTime(LocalDateTime.now());
+                    joinRequestRepository.save(organizerJoinRequest);
+                    
+                    // 確保 currentPlayers 至少為 1
+                    if (match.getCurrentPlayers() < 1) {
+                        match.setCurrentPlayers(1);
+                        matchRepository.save(match);
+                    }
+                }
             }
             
             // 修復：為現有的 matches 設置價格
@@ -1001,8 +859,8 @@ public class FriendlyMatchService {
                         String courtName = parts[0].trim();
                         String venueName = parts[1].trim();
                         
-                        // 尝试通过court name查找
-                        List<Court> courts = courtRepository.findAll();
+                        // 尝试通过court name查找（只查找活跃场地）
+                        List<Court> courts = courtRepository.findActiveCourts();
                         Court foundCourt = courts.stream()
                             .filter(c -> c.getName().equals(courtName))
                             .findFirst()
@@ -1110,86 +968,29 @@ public class FriendlyMatchService {
         double ballSetFee = buyBallSet ? 12.0 : 0.0;
         double totalAmount = baseAmount + paddleFee + ballSetFee;
         
-        // 處理 voucher 折扣
-        double originalAmount = totalAmount;
-        double discountAmount = 0.0;
-        VoucherRedemptionDto appliedVoucher = null;
-        
-        if (paymentDto != null && paymentDto.getUseVoucher() != null && paymentDto.getUseVoucher() && 
-            paymentDto.getVoucherRedemptionId() != null) {
-            try {
-                appliedVoucher = voucherRedemptionService.useVoucher(paymentDto.getVoucherRedemptionId());
-                if (appliedVoucher != null) {
-                    if ("percentage".equals(appliedVoucher.getDiscountType())) {
-                        // 百分比折扣
-                        discountAmount = totalAmount * (appliedVoucher.getDiscountValue() / 100.0);
-                    } else {
-                        // 固定金額折扣
-                        discountAmount = appliedVoucher.getDiscountValue();
-                    }
-                    
-                    // 確保折扣不超過總金額
-                    discountAmount = Math.min(discountAmount, totalAmount);
-                    totalAmount = totalAmount - discountAmount;
-                    
-                    System.out.println("Applied voucher discount: RM" + discountAmount + 
-                        " (" + appliedVoucher.getDiscountValue() + "% of original RM" + originalAmount + ")");
-                }
-            } catch (Exception e) {
-                System.out.println("Failed to apply voucher: " + e.getMessage());
-                // 如果優惠券應用失敗，繼續使用原始金額
-            }
+        // 3. 檢查 wallet balance
+        if (wallet.getBalance() < totalAmount) {
+            throw new InsufficientBalanceException("Insufficient wallet balance. Available: " + wallet.getBalance() + ", Required: " + totalAmount);
         }
         
-        // 3. 確定支付方式
-        String paymentMethod = paymentDto != null && paymentDto.getPaymentMethod() != null ? 
-            paymentDto.getPaymentMethod() : "WALLET";
-        
-        // 4. 如果是錢包支付，檢查餘額並扣除
-        if ("WALLET".equals(paymentMethod)) {
-            if (wallet.getBalance() < totalAmount) {
-                throw new InsufficientBalanceException("Insufficient wallet balance. Available: " + wallet.getBalance() + ", Required: " + totalAmount);
-            }
-            
-            // 記錄支付前的餘額
-            double balanceBefore = wallet.getBalance();
-            
-            // 扣除 wallet balance
-            wallet.setBalance(wallet.getBalance() - totalAmount);
-            wallet.setTotalSpent(wallet.getTotalSpent() + totalAmount); // 更新總支出
-            walletRepository.save(wallet);
-            
-            // 創建錢包交易記錄
-            createWalletTransaction(wallet, "PAYMENT", totalAmount, balanceBefore, wallet.getBalance(),
-                "FRIENDLY_MATCH", match.getId(), 
-                "Friendly Match Payment - " + match.getLocation() + 
-                (numPaddles > 0 ? " (Paddles: " + numPaddles + ")" : "") +
-                (buyBallSet ? " (Ball Set)" : "") +
-                (discountAmount > 0 ? " (Voucher: -RM" + discountAmount + ")" : ""));
-        }
+        // 4. 扣除 wallet balance
+        wallet.setBalance(wallet.getBalance() - totalAmount);
+        wallet.setTotalSpent(wallet.getTotalSpent() + totalAmount); // 更新總支出
+        walletRepository.save(wallet);
         
         // 5. 創建 payment 記錄
         Payment payment = new Payment();
         payment.setAmount(totalAmount);
         payment.setPaymentDate(LocalDateTime.now());
         payment.setPaymentType("FRIENDLY_MATCH");
-        payment.setPaymentMethod(paymentMethod);
+        payment.setPaymentMethod("WALLET");
         payment.setStatus("COMPLETED");
-        
-        // 記錄折扣信息
-        if (discountAmount > 0) {
-            payment.setDiscountAmount(discountAmount);
-            payment.setOriginalAmount(originalAmount);
-        }
-        
         payment = paymentRepository.save(payment);
         
         // 6. 創建 booking 記錄
         Booking booking = new Booking();
         booking.setBookingDate(LocalDateTime.now());
         booking.setTotalAmount(totalAmount);
-        booking.setOriginalAmount(originalAmount); // 記錄原始金額
-        booking.setDiscountAmount(discountAmount); // 記錄折扣金額
         booking.setStatus("CONFIRMED");
         booking.setMember(member);
         booking.setPayment(payment);
@@ -1214,11 +1015,8 @@ public class FriendlyMatchService {
         response.setEndTime(match.getEndTime().toLocalTime());
         response.setNumberOfPlayers(match.getMaxPlayers());
         response.setTotalAmount(totalAmount);
-        response.setOriginalAmount(originalAmount); // 新增：設置原始金額
-        response.setDiscountAmount(discountAmount); // 新增：設置折扣金額
-        response.setVoucherUsed(discountAmount > 0); // 新增：設置是否使用了優惠券
         response.setPaymentStatus("COMPLETED");
-        response.setPaymentMethod(paymentMethod);
+        response.setPaymentMethod("WALLET");
         response.setDurationHours(match.getDurationHours());
         response.setWalletBalance(wallet.getBalance());
         // BookingResponseDto 沒有 numPaddles, buyBallSet, bookingType 字段
@@ -1236,119 +1034,155 @@ public class FriendlyMatchService {
         }
         return wallet;
     }
-    
-    private void createWalletTransaction(Wallet wallet, String transactionType, double amount, 
-                                       double balanceBefore, double balanceAfter, 
-                                       String referenceType, Integer referenceId, String description) {
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setWalletId(wallet.getId());
-        transaction.setTransactionType(transactionType);
-        transaction.setAmount(amount);
-        transaction.setBalanceBefore(balanceBefore);
-        transaction.setBalanceAfter(balanceAfter);
-        transaction.setFrozenBefore(wallet.getFrozenBalance());
-        transaction.setFrozenAfter(wallet.getFrozenBalance());
-        transaction.setReferenceType(referenceType);
-        transaction.setReferenceId(referenceId);
-        transaction.setDescription(description);
-        transaction.setStatus("COMPLETED");
-        transaction.setProcessedAt(LocalDateTime.now());
+
+    /**
+     * 取消 match 付款並退款
+     */
+    @Transactional
+    public String cancelMatchPayment(FriendlyMatch match, Member member) {
+        // 檢查是否為 organizer
+        if (!match.getOrganizer().getId().equals(member.getId())) {
+            throw new UnauthorizedException("Only organizer can cancel payment for the match");
+        }
         
-        walletTransactionRepository.save(transaction);
+        // 檢查是否已付款
+        if (!"PAID".equals(match.getPaymentStatus())) {
+            throw new ValidationException("Match is not paid yet");
+        }
+        
+        // 查找相關的 booking 和 payment
+        List<Booking> relatedBookings = bookingRepository.findByMember_IdAndPurpose(member.getId(), "Friendly Match");
+        Booking matchBooking = null;
+        Payment matchPayment = null;
+        
+        for (Booking booking : relatedBookings) {
+            if (booking.getPayment() != null && 
+                "FRIENDLY_MATCH".equals(booking.getPayment().getPaymentType()) &&
+                booking.getBookingDate() != null &&
+                Math.abs(java.time.Duration.between(booking.getBookingDate(), match.getStartTime()).toHours()) < 24) {
+                matchBooking = booking;
+                matchPayment = booking.getPayment();
+                break;
+            }
+        }
+        
+        if (matchBooking == null || matchPayment == null) {
+            throw new ResourceNotFoundException("No payment record found for this match");
+        }
+        
+        // 退款到 wallet
+        Wallet wallet = getOrCreateWallet(member);
+        double refundAmount = matchPayment.getAmount();
+        wallet.setBalance(wallet.getBalance() + refundAmount);
+        walletRepository.save(wallet);
+        
+        // 更新 payment 狀態
+        matchPayment.setStatus("REFUNDED");
+        matchPayment.setRefundDate(LocalDateTime.now());
+        paymentRepository.save(matchPayment);
+        
+        // 更新 booking 狀態
+        matchBooking.setStatus("CANCELLED");
+        bookingRepository.save(matchBooking);
+        
+        // 更新 match 狀態
+        match.setPaymentStatus("CANCELLED");
+        match.setStatus("CANCELLED");
+        matchRepository.save(match);
+        
+        // 解鎖對應的時間段
+        if (match.getStartTime() != null && match.getCourtId() != null) {
+            LocalDateTime startTime = match.getStartTime();
+            LocalDateTime endTime = match.getEndTime();
+            
+            List<Slot> slotsToUnlock = slotRepository.findByCourtIdAndDateAndStatus(
+                match.getCourtId(),
+                startTime.toLocalDate(),
+                "PENDING"
+            );
+            
+            List<Slot> slotsInTimeRange = slotsToUnlock.stream()
+                .filter(slot -> !slot.getStartTime().isBefore(startTime.toLocalTime()) && 
+                               !slot.getEndTime().isAfter(endTime.toLocalTime()))
+                .toList();
+            
+            for (Slot slot : slotsInTimeRange) {
+                slot.setStatus("AVAILABLE");
+                slot.setAvailable(true);
+                slotRepository.save(slot);
+            }
+        }
+        
+        // 通知參與者
+        if (match.getJoinRequests() != null) {
+            for (JoinRequest joinRequest : match.getJoinRequests()) {
+                if (joinRequest.getMember() != null && joinRequest.getMember().getUser() != null) {
+                    emailService.sendEmail(
+                        joinRequest.getMember().getUser().getEmail(),
+                        "Match Cancelled - Payment Refunded",
+                        "The match on " + match.getStartTime() + " has been cancelled and payment has been refunded.\n\n" +
+                        "Refund amount: RM " + refundAmount + "\n" +
+                        "The court has been released for other bookings."
+                    );
+                }
+            }
+        }
+        
+        return "Payment cancelled successfully. Refund amount: RM " + refundAmount;
     }
 
     /**
      * 獲取可用用戶的玩家數量統計
-     * @return 包含各種用戶統計信息的Map
      */
     public Map<String, Object> getAvailableUserPlayerStatistics() {
+        Map<String, Object> statistics = new HashMap<>();
+        
         try {
-            Map<String, Object> statistics = new HashMap<>();
+            // 獲取所有用戶
+            List<Member> allMembers = memberRepository.findAll();
             
-            // 1. 總用戶數
-            long totalUsers = userRepository.count();
+            // 統計各種用戶類型
+            long totalUsers = allMembers.size();
+            long activeUsers = allMembers.stream()
+                .filter(member -> member.getUser() != null && 
+                                member.getUser().getUserAccount() != null && 
+                                "ACTIVE".equals(member.getUser().getUserAccount().getStatus()))
+                .count();
+            
+            // 統計參與過 friendly match 的用戶
+            long usersWithMatches = allMembers.stream()
+                .filter(member -> member.getJoinRequests() != null && !member.getJoinRequests().isEmpty())
+                .count();
+            
+                         // 統計創建過 match 的用戶
+             long organizers = allMembers.stream()
+                 .filter(member -> member.getOrganizedMatches() != null && !member.getOrganizedMatches().isEmpty())
+                 .count();
+            
+            // 獲取最近的 match 統計
+            List<FriendlyMatch> recentMatches = matchRepository.findAll().stream()
+                .filter(match -> match.getStartTime() != null && 
+                               match.getStartTime().isAfter(LocalDateTime.now().minusDays(30)))
+                .toList();
+            
+            long recentMatchesCount = recentMatches.size();
+            long completedMatches = recentMatches.stream()
+                .filter(match -> "END".equals(determineMatchStatus(match)) || "CANCELLED".equals(match.getStatus()))
+                .count();
+            
             statistics.put("totalUsers", totalUsers);
-            
-            // 2. 活躍用戶數（狀態為ACTIVE的用戶）
-            long activeUsers = userAccountRepository.countByStatus("ACTIVE");
             statistics.put("activeUsers", activeUsers);
-            
-            // 3. 按用戶類型統計
-            long memberUsers = userRepository.countByUserType("MEMBER");
-            long coachUsers = userRepository.countByUserType("COACH");
-            long adminUsers = userRepository.countByUserType("ADMIN");
-            long eventOrganizerUsers = userRepository.countByUserType("EVENTORGANIZER");
-            
-            statistics.put("memberUsers", memberUsers);
-            statistics.put("coachUsers", coachUsers);
-            statistics.put("adminUsers", adminUsers);
-            statistics.put("eventOrganizerUsers", eventOrganizerUsers);
-            
-            // 4. 可用於友好比賽的用戶數（MEMBER + COACH + EVENTORGANIZER）
-            long availableForFriendlyMatch = memberUsers + coachUsers + eventOrganizerUsers;
-            statistics.put("availableForFriendlyMatch", availableForFriendlyMatch);
-            
-            // 5. 本月新增用戶數
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime startOfThisMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
-            LocalDateTime endOfThisMonth = now.withDayOfMonth(now.toLocalDate().lengthOfMonth()).withHour(23).withMinute(59).withSecond(59);
-            
-            Long newUsersThisMonth = userRepository.countByCreatedAtBetween(startOfThisMonth, endOfThisMonth);
-            statistics.put("newUsersThisMonth", newUsersThisMonth != null ? newUsersThisMonth : 0L);
-            
-            // 6. 活躍友好比賽數量
-            long openMatches = matchRepository.findByStatus("OPEN").size();
-            long fullMatches = matchRepository.findByStatus("FULL").size();
-            long activeFriendlyMatches = openMatches + fullMatches;
-            statistics.put("activeFriendlyMatches", activeFriendlyMatches);
-            
-            // 7. 總友好比賽數量
-            long totalFriendlyMatches = matchRepository.count();
-            statistics.put("totalFriendlyMatches", totalFriendlyMatches);
-            
-            // 8. 今日活躍用戶數（今天有登錄或活動的用戶）
-            LocalDate today = LocalDate.now();
-            LocalDateTime startOfToday = today.atStartOfDay();
-            LocalDateTime endOfToday = today.atTime(23, 59, 59);
-            
-            // 這裡可以根據實際需求添加今日活躍用戶的統計邏輯
-            // 例如：今天有預訂、今天有加入友好比賽等
-            long todayActiveUsers = 0; // 暫時設為0，可以根據實際需求實現
-            statistics.put("todayActiveUsers", todayActiveUsers);
-            
-            System.out.println("=== Available User Player Statistics ===");
-            System.out.println("Total Users: " + totalUsers);
-            System.out.println("Active Users: " + activeUsers);
-            System.out.println("Member Users: " + memberUsers);
-            System.out.println("Coach Users: " + coachUsers);
-            System.out.println("Event Organizer Users: " + eventOrganizerUsers);
-            System.out.println("Available for Friendly Match: " + availableForFriendlyMatch);
-            System.out.println("New Users This Month: " + newUsersThisMonth);
-            System.out.println("Active Friendly Matches: " + activeFriendlyMatches);
-            System.out.println("Total Friendly Matches: " + totalFriendlyMatches);
-            System.out.println("=== End Statistics ===");
-            
-            return statistics;
+            statistics.put("usersWithMatches", usersWithMatches);
+            statistics.put("organizers", organizers);
+            statistics.put("recentMatchesCount", recentMatchesCount);
+            statistics.put("completedMatches", completedMatches);
+            statistics.put("success", true);
             
         } catch (Exception e) {
-            System.err.println("Error getting available user player statistics: " + e.getMessage());
-            e.printStackTrace();
-            
-            // 返回默認值以防錯誤
-            Map<String, Object> defaultStats = new HashMap<>();
-            defaultStats.put("totalUsers", 0L);
-            defaultStats.put("activeUsers", 0L);
-            defaultStats.put("memberUsers", 0L);
-            defaultStats.put("coachUsers", 0L);
-            defaultStats.put("adminUsers", 0L);
-            defaultStats.put("eventOrganizerUsers", 0L);
-            defaultStats.put("availableForFriendlyMatch", 0L);
-            defaultStats.put("newUsersThisMonth", 0L);
-            defaultStats.put("activeFriendlyMatches", 0L);
-            defaultStats.put("totalFriendlyMatches", 0L);
-            defaultStats.put("todayActiveUsers", 0L);
-            
-            return defaultStats;
+            statistics.put("success", false);
+            statistics.put("error", e.getMessage());
         }
+        
+        return statistics;
     }
 }

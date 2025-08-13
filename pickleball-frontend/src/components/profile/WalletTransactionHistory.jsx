@@ -23,6 +23,7 @@ import {
   alpha,
   Button
 } from '@mui/material';
+import { useTheme as useCustomTheme } from '../../context/ThemeContext';
 import {
   AccountBalance as WalletIcon,
   TrendingUp as DepositIcon,
@@ -36,6 +37,7 @@ import { getWalletTransactions, getWalletDetails } from '../../service/WalletSer
 
 const WalletTransactionHistory = () => {
   const theme = useTheme();
+  const customTheme = useCustomTheme();
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [walletDetails, setWalletDetails] = useState(null);

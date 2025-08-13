@@ -456,12 +456,9 @@ const FeedbackPage = () => {
     setError('');
     setSuccessMessage('');
     
-    // 滚动到表单区域
+    // 滚动到页面顶部
     setTimeout(() => {
-      const formElement = document.querySelector('form');
-      if (formElement) {
-        formElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
   };
 

@@ -29,7 +29,6 @@ public class UserAccount {
     private String profileImage;
     private String theme = "light";
     private boolean emailNotifications = true;
-    private boolean pushNotifications = true;
     private boolean requireReauthForSensitiveActions = false;
 
     // FIXED RELATIONSHIP: Changed to OneToOne

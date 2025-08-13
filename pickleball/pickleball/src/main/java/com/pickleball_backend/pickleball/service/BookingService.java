@@ -5,6 +5,7 @@ import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
 import com.pickleball_backend.pickleball.exception.ValidationException;
 import com.pickleball_backend.pickleball.exception.ConflictException;
+import com.pickleball_backend.pickleball.exception.UnauthorizedException;
 import com.pickleball_backend.pickleball.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -60,7 +61,13 @@ public class BookingService {
         UserAccount account = userAccountRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
 
-        // 2. Get member
+        // 2. Validate user status - prevent suspended/inactive users from booking
+        if ("SUSPENDED".equals(account.getStatus()) || "INACTIVE".equals(account.getStatus())) {
+            throw new UnauthorizedException("Your account is " + account.getStatus().toLowerCase() + 
+                ". You cannot make bookings. Please contact support for assistance.");
+        }
+
+        // 3. Get member
         Member member = memberRepository.findByUserId(account.getUser().getId());
         if (member == null) {
             throw new ResourceNotFoundException("Member not found");
@@ -500,13 +507,24 @@ public class BookingService {
                 true
             );
 
-            return new CancellationResponse(
-                request.getId(),
-                booking.getId(),
-                request.getStatus(),
-                request.getRequestDate(),
-                "Cancellation auto-approved and 50% refunded to wallet"
-            );
+            // 创建详细的取消响应
+            CancellationResponse response = new CancellationResponse();
+            response.setRequestId(request.getId());
+            response.setBookingId(booking.getId());
+            response.setStatus(request.getStatus());
+            response.setRequestDate(request.getRequestDate());
+            response.setMessage("Cancellation auto-approved and 50% refunded to wallet");
+            response.setOriginalAmount(booking.getTotalAmount());
+            response.setRefundAmount(refund);
+            response.setRefundMethod("Wallet");
+            response.setRefundStatus("COMPLETED");
+            response.setCourtName(court != null ? court.getName() : "Court not found");
+            response.setSlotDate(slot.getDate().toString());
+            response.setSlotTime(formatTime(slot.getStartTime()) + " - " + formatTime(slot.getEndTime()));
+            response.setIsAutoApproved(true);
+            response.setAdminRemark("Auto-approved by system (more than 24h before slot)");
+            
+            return response;
         }
 
         // 6. 原有流程（<=24小时，人工审核）
@@ -539,13 +557,24 @@ public class BookingService {
                 court
         );
 
-        return new CancellationResponse(
-                request.getId(),
-                booking.getId(),
-                request.getStatus(),
-                request.getRequestDate(),
-                "Cancellation request submitted"
-        );
+        // 创建详细的取消响应
+        CancellationResponse response = new CancellationResponse();
+        response.setRequestId(request.getId());
+        response.setBookingId(booking.getId());
+        response.setStatus(request.getStatus());
+        response.setRequestDate(request.getRequestDate());
+        response.setMessage("Cancellation request submitted");
+        response.setOriginalAmount(booking.getTotalAmount());
+        response.setRefundAmount(null); // 待审核，暂不确定退款金额
+        response.setRefundMethod("Pending");
+        response.setRefundStatus("PENDING");
+        response.setCourtName(court != null ? court.getName() : "Court not found");
+        response.setSlotDate(slot.getDate().toString());
+        response.setSlotTime(formatTime(slot.getStartTime()) + " - " + formatTime(slot.getEndTime()));
+        response.setIsAutoApproved(false);
+        response.setAdminRemark(null);
+        
+        return response;
     }
 
     public List<SlotResponseDto> getAvailableSlots(LocalDate date) {
@@ -745,13 +774,24 @@ public class BookingService {
                 approve
         );
 
-        return new CancellationResponse(
-                request.getId(),
-                booking.getId(),
-                request.getStatus(),
-                request.getRequestDate(),
-                approve ? "Cancellation approved" : "Cancellation rejected"
-        );
+        // Create detailed cancellation response
+        CancellationResponse response = new CancellationResponse();
+        response.setRequestId(request.getId());
+        response.setBookingId(booking.getId());
+        response.setStatus(request.getStatus());
+        response.setRequestDate(request.getRequestDate());
+        response.setMessage(approve ? "Cancellation approved" : "Cancellation rejected");
+        response.setOriginalAmount(booking.getTotalAmount());
+        response.setRefundAmount(approve ? booking.getTotalAmount() * 0.5 : null);
+        response.setRefundMethod(approve ? "Wallet" : null);
+        response.setRefundStatus(approve ? "COMPLETED" : null);
+        response.setCourtName(court != null ? court.getName() : "Court not found");
+        response.setSlotDate(slot != null ? slot.getDate().toString() : null);
+        response.setSlotTime(slot != null ? formatTime(slot.getStartTime()) + " - " + formatTime(slot.getEndTime()) : null);
+        response.setIsAutoApproved(false); // This is admin processing, not auto-approved
+        response.setAdminRemark(adminRemark);
+        
+        return response;
     }
 
     public List<BookingHistoryDto> getBookingHistory(Integer memberId, String status) {
@@ -1050,6 +1090,11 @@ public class BookingService {
         transaction.setProcessedAt(LocalDateTime.now());
         
         walletTransactionRepository.save(transaction);
+    }
+
+    private String formatTime(LocalTime time) {
+        if (time == null) return null;
+        return time.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"));
     }
 
     /**

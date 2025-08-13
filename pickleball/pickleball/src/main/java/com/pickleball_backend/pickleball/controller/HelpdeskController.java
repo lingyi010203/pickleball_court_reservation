@@ -2,6 +2,7 @@
 package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.dto.EscalateFormRequest;
+import com.pickleball_backend.pickleball.dto.HelpdeskQuestionRequest;
 import com.pickleball_backend.pickleball.entity.HelpdeskQuery;
 import com.pickleball_backend.pickleball.service.HelpdeskService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,15 +25,20 @@ public class HelpdeskController {
     @PostMapping("/ask")
     public ResponseEntity<HelpdeskQuery> askQuestion(
             Authentication authentication,
-            @RequestBody String question) {
+            @RequestBody HelpdeskQuestionRequest request) {
 
-        if (question == null || question.trim().isEmpty()) {
+        if (request == null || request.getQuestion() == null || request.getQuestion().trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
 
-        String username = authentication.getName();
-        HelpdeskQuery response = helpdeskService.processQuery(username, question);
-        return ResponseEntity.ok(response);
+        try {
+            String username = authentication.getName();
+            HelpdeskQuery response = helpdeskService.processQuery(username, request.getQuestion());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @PostMapping("/escalate/{queryId}")

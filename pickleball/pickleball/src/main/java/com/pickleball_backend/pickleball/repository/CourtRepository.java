@@ -17,7 +17,7 @@ public interface CourtRepository extends JpaRepository<Court, Integer> {
     boolean existsByNameAndVenueId(String name, Integer venueId);
     List<Court> findByIsArchivedFalseOrIsArchivedIsNull();
     List<Court> findAll();
-    @Query("SELECT c FROM Court c LEFT JOIN FETCH c.venue WHERE c.status != 'DELETED'")
+    @Query("SELECT c FROM Court c LEFT JOIN FETCH c.venue WHERE c.status != 'DELETED' AND c.status != 'MAINTENANCE' AND c.status != 'INACTIVE'")
     List<Court> findActiveCourts();
     // Add this new method
     Optional<Court> findById(Integer id);
@@ -35,6 +35,6 @@ public interface CourtRepository extends JpaRepository<Court, Integer> {
     List<Court> findByVenueId(Integer venueId);
     
     // 新增：查找所有可用的球場
-    @Query("SELECT c FROM Court c LEFT JOIN FETCH c.venue WHERE c.status != 'DELETED'")
+    @Query("SELECT c FROM Court c LEFT JOIN FETCH c.venue WHERE c.status != 'DELETED' AND c.status != 'MAINTENANCE' AND c.status != 'INACTIVE'")
     List<Court> findAvailableCourts();
 }

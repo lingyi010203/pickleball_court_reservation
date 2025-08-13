@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Container,
   Card,
@@ -15,55 +15,180 @@ import {
   CircularProgress,
   Grid,
   useTheme,
-  alpha
+  alpha,
+  IconButton,
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Chip
 } from '@mui/material';
+import { useTheme as useCustomTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowBack as BackIcon } from '@mui/icons-material';
+import { 
+  ArrowBack as BackIcon,
+  Clear as ClearIcon,
+  CreditCard as CardIcon,
+  AccountBalance as BankIcon,
+  AccountBalanceWallet as WalletIcon,
+  Warning as WarningIcon
+} from '@mui/icons-material';
 import { getWalletBalance, topUpWallet } from '../../service/WalletService';
 
 const WalletTopUpPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const customTheme = useCustomTheme();
   const [amount, setAmount] = useState('');
-  const [paymentSource, setPaymentSource] = useState('BANK_CARD');
+  const [paymentSource, setPaymentSource] = useState(() => {
+    // 从 localStorage 获取上次选择的支付方式，默认为 BANK_CARD
+    return localStorage.getItem('wallet_payment_source') || 'BANK_CARD';
+  });
   const [walletBalance, setWalletBalance] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState(null);
+  const [loadingStates, setLoadingStates] = useState({
+    balance: true,    // 余额加载状态
+    topUp: false      // 充值处理状态
+  });
+  const [errors, setErrors] = useState({
+    balance: null,    // 余额加载错误
+    topUp: null       // 充值处理错误
+  });
   const [success, setSuccess] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmAmount, setConfirmAmount] = useState(0);
 
-  useEffect(() => {
-    const fetchWalletBalance = async () => {
-      try {
-        const balance = await getWalletBalance();
-        setWalletBalance(balance);
-      } catch (error) {
-        console.error('Failed to fetch wallet balance:', error);
-        setError('Failed to load wallet balance');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // 金额限制
+  const MIN_AMOUNT = 1;
+  const MAX_AMOUNT = 2000;
+  const LARGE_AMOUNT_THRESHOLD = 1000;
 
-    fetchWalletBalance();
+  // 加载状态管理函数
+  const setLoadingState = useCallback((key, value) => {
+    setLoadingStates(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleTopUp = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      setError('Please enter a valid amount');
-      return;
-    }
+  const setErrorState = useCallback((key, value) => {
+    setErrors(prev => ({ ...prev, [key]: value }));
+  }, []);
 
+  // 获取余额
+  const fetchWalletBalance = useCallback(async () => {
     try {
-      setIsProcessing(true);
-      setError(null);
+      setLoadingState('balance', true);
+      setErrorState('balance', null);
+      const balance = await getWalletBalance();
+      setWalletBalance(balance);
+    } catch (error) {
+      console.error('Failed to fetch wallet balance:', error);
+      setErrorState('balance', 'Failed to load wallet balance');
+    } finally {
+      setLoadingState('balance', false);
+    }
+  }, [setLoadingState, setErrorState]);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, [fetchWalletBalance]);
+
+  // 格式化金额显示 - 使用 useCallback 缓存
+  const formatAmount = useCallback((value) => {
+    if (!value) return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '';
+    return num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, []);
+
+  // 验证金额 - 使用 useCallback 缓存
+  const validateAmount = useCallback((value) => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num < MIN_AMOUNT) {
+      return `Minimum amount is RM${MIN_AMOUNT.toFixed(2)}`;
+    }
+    if (num > MAX_AMOUNT) {
+      return `Maximum amount is RM${MAX_AMOUNT.toLocaleString()}`;
+    }
+    return null;
+  }, []);
+
+  // 处理金额输入 - 使用 useCallback 缓存
+  const handleAmountChange = useCallback((e) => {
+    const value = e.target.value;
+    // 只允许数字和小数点
+    if (/^\d*\.?\d{0,2}$/.test(value) || value === '') {
+      setAmount(value);
+      setErrorState('topUp', null); // 清除充值错误
+    }
+  }, [setErrorState]);
+
+  // 预定义金额 - 使用 useMemo 缓存
+  const predefinedAmounts = useMemo(() => [20, 50, 100, 200, 500], []);
+
+  // 计算属性 - 使用 useMemo 缓存
+  // 解析后的金额数值 - 使用 useMemo 缓存
+  const parsedAmount = useMemo(() => {
+    if (!amount) return 0;
+    const num = parseFloat(amount);
+    return isNaN(num) ? 0 : num;
+  }, [amount]);
+
+  const isAmountValid = useMemo(() => {
+    return parsedAmount >= MIN_AMOUNT && parsedAmount <= MAX_AMOUNT;
+  }, [parsedAmount]);
+
+  const isLargeAmount = useMemo(() => {
+    return parsedAmount >= LARGE_AMOUNT_THRESHOLD;
+  }, [parsedAmount]);
+
+  const isAmountPositive = useMemo(() => {
+    return parsedAmount > 0;
+  }, [parsedAmount]);
+
+  const formattedAmount = useMemo(() => {
+    return formatAmount(amount);
+  }, [amount, formatAmount]);
+
+  const validationError = useMemo(() => {
+    return validateAmount(amount);
+  }, [amount, validateAmount]);
+
+  // 确认金额的格式化 - 使用 useMemo 缓存
+  const formattedConfirmAmount = useMemo(() => {
+    return formatAmount(confirmAmount);
+  }, [confirmAmount, formatAmount]);
+
+  // 获取支付方式图标 - 使用 useMemo 缓存所有图标映射
+  const paymentIcons = useMemo(() => ({
+    BANK_CARD: <CardIcon />,
+    BANK_TRANSFER: <BankIcon />,
+    E_WALLET: <WalletIcon />
+  }), []);
+
+  const getPaymentIcon = useCallback((type) => {
+    return paymentIcons[type] || <CardIcon />;
+  }, [paymentIcons]);
+
+  // 获取支付方式显示名称 - 使用 useMemo 缓存所有名称映射
+  const paymentDisplayNames = useMemo(() => ({
+    BANK_CARD: 'Credit/Debit Card',
+    BANK_TRANSFER: 'Bank Transfer',
+    E_WALLET: 'E-Wallet'
+  }), []);
+
+  const getPaymentDisplayName = useCallback((type) => {
+    return paymentDisplayNames[type] || type;
+  }, [paymentDisplayNames]);
+
+  const processTopUp = useCallback(async (numAmount) => {
+    try {
+      setLoadingState('topUp', true);
+      setErrorState('topUp', null);
       
-      await topUpWallet(parseFloat(amount), paymentSource);
+      await topUpWallet(numAmount, paymentSource);
       
       setSuccess(true);
       // Refresh wallet balance
-      const newBalance = await getWalletBalance();
-      setWalletBalance(newBalance);
+      await fetchWalletBalance();
       
       // Redirect back to payment page after 2 seconds
       setTimeout(() => {
@@ -71,18 +196,63 @@ const WalletTopUpPage = () => {
       }, 2000);
       
     } catch (error) {
-      setError(error.message || 'Top-up failed. Please try again.');
+      setErrorState('topUp', error.message || 'Top-up failed. Please try again.');
     } finally {
-      setIsProcessing(false);
+      setLoadingState('topUp', false);
+      setShowConfirmDialog(false);
     }
-  };
+  }, [paymentSource, navigate, setLoadingState, setErrorState, fetchWalletBalance]);
 
-  const predefinedAmounts = [10, 20, 50, 100, 200, 500];
+  const handleTopUp = useCallback(async () => {
+    if (validationError) {
+      setErrorState('topUp', validationError);
+      return;
+    }
+    
+    // 大额充值需要确认
+    if (isLargeAmount) {
+      setConfirmAmount(parsedAmount);
+      setShowConfirmDialog(true);
+      return;
+    }
 
-  if (isLoading) {
+    await processTopUp(parsedAmount);
+  }, [validationError, isLargeAmount, parsedAmount, processTopUp, setErrorState]);
+
+  // 处理键盘事件 - 使用 useCallback 缓存
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !loadingStates.topUp && isAmountValid) {
+      handleTopUp();
+    }
+  }, [loadingStates.topUp, isAmountValid, handleTopUp]);
+
+  // 处理支付方式选择 - 使用 useCallback 缓存
+  const handlePaymentSourceChange = useCallback((event) => {
+    const newPaymentSource = event.target.value;
+    setPaymentSource(newPaymentSource);
+    // 保存到 localStorage 中
+    localStorage.setItem('wallet_payment_source', newPaymentSource);
+  }, []);
+
+  // 清除支付方式历史记录 - 使用 useCallback 缓存
+  const clearPaymentHistory = useCallback(() => {
+    localStorage.removeItem('wallet_payment_source');
+    setPaymentSource('BANK_CARD'); // 重置为默认值
+  }, []);
+
+  // 清除金额 - 使用 useCallback 缓存
+  const clearAmount = useCallback(() => {
+    setAmount('');
+    setErrorState('topUp', null); // 清除充值错误
+  }, [setErrorState]);
+
+  if (loadingStates.balance) {
     return (
       <Container sx={{ py: 4, textAlign: 'center' }}>
         <CircularProgress size={60} />
+        <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+          Loading wallet balance...
+        </Typography>
       </Container>
     );
   }
@@ -113,21 +283,18 @@ const WalletTopUpPage = () => {
 
       <Card sx={{
         borderRadius: 3,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        boxShadow: `0 8px 28px ${alpha(theme.palette.common.black, 0.1)}`,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         background: `linear-gradient(135deg, ${theme.palette.background.paper}, ${alpha(theme.palette.background.paper, 0.8)})`
       }}>
         <CardContent sx={{ p: 5 }}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography 
-              variant="h3" 
+              variant="h4" 
               sx={{ 
-                fontWeight: 800,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2
+                fontWeight: 700,
+                color: theme.palette.text.primary,
+                mb: 1
               }}
             >
             Top Up Wallet
@@ -140,32 +307,55 @@ const WalletTopUpPage = () => {
 
           {/* Current Balance */}
           <Box sx={{ 
-            mb: 5, 
-            p: 4, 
-            background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)}, ${alpha(theme.palette.success.light, 0.05)})`,
-            borderRadius: 3,
-            border: `2px solid ${alpha(theme.palette.success.main, 0.2)}`,
+            mb: 3, 
+            p: 2, 
+            backgroundColor: theme.palette.primary.main,
+            borderRadius: 2,
+            border: `0.5px solid ${alpha(theme.palette.success.main, 0.1)}`,
             textAlign: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '60px',
-              height: '60px',
-              background: `radial-gradient(circle, ${alpha(theme.palette.success.main, 0.1)} 0%, transparent 70%)`,
-              borderRadius: '50%',
-              transform: 'translate(20px, -20px)'
-            }
+            boxShadow: theme.shadows[1],
+            position: 'relative'
           }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.success.main, mb: 1 }}>
-              Current Balance
+            {loadingStates.balance && (
+              <Box sx={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)',
+                zIndex: 1
+              }}>
+                <CircularProgress size={20} sx={{ color: theme.palette.common.white }} />
+              </Box>
+            )}
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: theme.palette.common.white, 
+              mb: 0.5,
+              opacity: loadingStates.balance ? 0.5 : 1
+            }}>
+              Current Balance： RM{walletBalance.toFixed(2)}
             </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: theme.palette.success.dark }}>
-              RM{walletBalance.toFixed(2)}
-            </Typography>
+            
+            {/* 余额加载错误时显示重试按钮 */}
+            {errors.balance && !loadingStates.balance && (
+              <Box sx={{ mt: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={fetchWalletBalance}
+                  sx={{ 
+                    color: theme.palette.common.white, 
+                    borderColor: theme.palette.common.white,
+                    '&:hover': {
+                      borderColor: theme.palette.common.white,
+                      backgroundColor: alpha(theme.palette.common.white, 0.1)
+                    }
+                  }}
+                >
+                  Retry
+                </Button>
+              </Box>
+            )}
           </Box>
 
           {success && (
@@ -174,19 +364,25 @@ const WalletTopUpPage = () => {
             </Alert>
           )}
 
-          {error && (
+          {errors.balance && (
             <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
+              {errors.balance}
+            </Alert>
+          )}
+
+          {errors.topUp && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {errors.topUp}
             </Alert>
           )}
 
           {/* Amount Selection */}
-          <Box sx={{ mb: 5 }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, color: theme.palette.text.primary }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: theme.palette.text.primary }}>
               Select Amount
             </Typography>
             
-            <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Grid container spacing={1.5} sx={{ mb: 3 }}>
               {predefinedAmounts.map((predefinedAmount) => (
                 <Grid item xs={4} sm={2} key={predefinedAmount}>
                   <Button
@@ -194,22 +390,22 @@ const WalletTopUpPage = () => {
                     variant={amount === predefinedAmount.toString() ? "contained" : "outlined"}
                     onClick={() => setAmount(predefinedAmount.toString())}
                     sx={{
-                      py: 2,
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      transition: 'all 0.3s ease',
+                      py: 1.5,
+                      borderRadius: 1.5,
+                      fontWeight: 500,
+                      fontSize: '0.85rem',
+                      transition: 'all 0.2s ease',
                       ...(amount === predefinedAmount.toString() && {
-                        background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+                        backgroundColor: theme.palette.primary.main,
                         color: theme.palette.common.white,
-                        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-                        transform: 'translateY(-2px)'
+                        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
                       }),
                       '&:hover': {
-                        transform: amount === predefinedAmount.toString() ? 'translateY(-2px)' : 'translateY(-1px)',
-                        boxShadow: amount === predefinedAmount.toString() ? 
-                          `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}` : 
-                          `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
+                        backgroundColor: amount === predefinedAmount.toString() ? 
+                          theme.palette.primary.dark : 
+                          alpha(theme.palette.primary.main, 0.08),
+                        transform: 'translateY(-1px)',
+                        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.15)}`
                       }
                     }}
                   >
@@ -222,10 +418,13 @@ const WalletTopUpPage = () => {
             <TextField
               fullWidth
               label="Custom Amount (RM)"
-              type="number"
+              type="text"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
+              onChange={handleAmountChange}
+              onKeyPress={handleKeyPress}
+              placeholder={`Enter amount (RM${MIN_AMOUNT.toFixed(2)} - RM${MAX_AMOUNT.toLocaleString()})`}
+              error={!!validationError}
+              helperText={validationError || `Amount range: RM${MIN_AMOUNT.toFixed(2)} - RM${MAX_AMOUNT.toLocaleString()}`}
               sx={{ 
                 mb: 2,
                 '& .MuiOutlinedInput-root': {
@@ -241,22 +440,62 @@ const WalletTopUpPage = () => {
                 }
               }}
               InputProps={{
-                startAdornment: <Typography sx={{ mr: 1, fontWeight: 600, color: theme.palette.primary.main }}>RM</Typography>
+                startAdornment: <Typography sx={{ mr: 1, fontWeight: 600, color: theme.palette.primary.main }}>RM</Typography>,
+                endAdornment: amount && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={clearAmount}
+                      edge="end"
+                      size="small"
+                      sx={{ color: theme.palette.text.secondary }}
+                    >
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                )
               }}
             />
+
+            {/* 显示格式化金额 */}
+            {isAmountPositive && (
+              <Box sx={{ 
+                mt: 0.5, 
+                p: 2, 
+                backgroundColor: alpha(theme.palette.info.main, 0.1),
+                borderRadius: 2,
+                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+              }}>
+                <Typography variant="body2" color="info.main" sx={{ fontWeight: 600 }}>
+                  You will add: RM{formattedAmount}
+                </Typography>
+                {isLargeAmount && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                    <WarningIcon sx={{ fontSize: 16, color: theme.palette.warning.main, mr: 0.5 }} />
+                    <Typography variant="caption" color="warning.main">
+                      Large amount - confirmation required
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
 
           {/* Payment Source */}
           <Box sx={{ mb: 5 }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, color: theme.palette.text.primary }}>
-              Payment Method
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
+                Payment Method
+              </Typography>
+              <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontStyle: 'italic' }}>
+                Your choice will be remembered
+              </Typography>
+            </Box>
             
             <FormControl fullWidth>
               <InputLabel sx={{ fontWeight: 500 }}>Payment Source</InputLabel>
               <Select
                 value={paymentSource}
-                onChange={(e) => setPaymentSource(e.target.value)}
+                onChange={handlePaymentSourceChange}
                 label="Payment Source"
                 sx={{
                   borderRadius: 2,
@@ -273,32 +512,80 @@ const WalletTopUpPage = () => {
                   }
                 }}
               >
-                <MenuItem value="BANK_CARD">Credit/Debit Card</MenuItem>
-                <MenuItem value="BANK_TRANSFER">Bank Transfer</MenuItem>
-                <MenuItem value="E_WALLET">E-Wallet</MenuItem>
+                <MenuItem value="BANK_CARD">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CardIcon sx={{ fontSize: 20 }} />
+                    Credit/Debit Card
+                  </Box>
+                </MenuItem>
+                <MenuItem value="BANK_TRANSFER">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BankIcon sx={{ fontSize: 20 }} />
+                    Bank Transfer
+                  </Box>
+                </MenuItem>
+                <MenuItem value="E_WALLET">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WalletIcon sx={{ fontSize: 20 }} />
+                    E-Wallet
+                  </Box>
+                </MenuItem>
               </Select>
             </FormControl>
+
+            {/* 显示选中的支付方式 */}
+            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
+              <Chip
+                icon={getPaymentIcon(paymentSource)}
+                label={getPaymentDisplayName(paymentSource)}
+                variant="outlined"
+                sx={{
+                  borderColor: alpha(theme.palette.primary.main, 0.3),
+                  color: theme.palette.primary.main,
+                  fontWeight: 500
+                }}
+              />
+              
+              {/* 重置支付方式历史记录按钮 */}
+              {localStorage.getItem('wallet_payment_source') && (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={clearPaymentHistory}
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: theme.palette.text.secondary,
+                    textTransform: 'none',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.text.secondary, 0.08)
+                    }
+                  }}
+                >
+                  Reset History
+                </Button>
+              )}
+            </Box>
           </Box>
 
           {/* Top Up Button */}
           <Button
             fullWidth
             variant="contained"
-            size="large"
+            size="medium"
             onClick={handleTopUp}
-            disabled={isProcessing || !amount || parseFloat(amount) <= 0}
+            disabled={loadingStates.topUp || !isAmountValid}
             sx={{
-              py: 3,
-              px: 4,
+              py: 2,
+              px: 3,
               borderRadius: 2,
-              fontWeight: 700,
-              fontSize: '1.1rem',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+              fontWeight: 600,
+              fontSize: '1rem',
+              backgroundColor: theme.palette.primary.main,
+              boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
               '&:hover': {
-                background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-                transform: 'translateY(-2px)'
+                backgroundColor: theme.palette.primary.dark,
+                boxShadow: `0 3px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                transform: 'translateY(-1px)'
               },
               '&:disabled': {
                 background: theme.palette.grey[300],
@@ -306,17 +593,68 @@ const WalletTopUpPage = () => {
                 boxShadow: 'none',
                 transform: 'none'
               },
-              transition: 'all 0.3s ease'
+              transition: 'all 0.2s ease'
             }}
           >
-            {isProcessing ? (
-              <CircularProgress size={28} color="inherit" />
-            ) : (
-              `Top Up RM${amount || '0.00'}`
-            )}
+                          {loadingStates.topUp ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                `Top Up RM${formattedAmount || '0.00'}`
+              )}
           </Button>
         </CardContent>
       </Card>
+
+      {/* 确认对话框 */}
+      <Dialog
+        open={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1,
+          color: theme.palette.warning.main 
+        }}>
+          <WarningIcon />
+          Confirm Large Amount Top-up
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            You are about to top up your wallet with:
+          </Typography>
+          <Typography variant="h4" sx={{ 
+            fontWeight: 700, 
+            color: theme.palette.primary.main,
+            textAlign: 'center',
+            mb: 2
+          }}>
+            RM{formattedConfirmAmount}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Please confirm this amount is correct before proceeding.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button 
+            onClick={() => setShowConfirmDialog(false)}
+            variant="outlined"
+            sx={{ px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => processTopUp(confirmAmount)}
+            variant="contained"
+            sx={{ px: 3 }}
+            disabled={loadingStates.topUp}
+          >
+            {loadingStates.topUp ? <CircularProgress size={20} /> : 'Confirm Top-up'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

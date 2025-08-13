@@ -10,5 +10,6 @@ public class AdminUpdateUserDto {
     private LocalDate dob;
     private String gender;
     private String status;
+    private String userType;
     // getters & setters
 }

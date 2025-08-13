@@ -639,8 +639,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         List<CourtUtilizationDto.CourtUtilizationData> courtUtilizations = new ArrayList<>();
         Map<String, Double> timeSlotUtilizations = new HashMap<>();
         
-        // 获取所有场地
-        List<Court> courts = courtRepository.findAll();
+        // 获取所有活跃场地（排除 DELETED, MAINTENANCE, INACTIVE 状态的场地）
+        List<Court> courts = courtRepository.findActiveCourts();
         
         for (Court court : courts) {
             CourtUtilizationDto.CourtUtilizationData courtData = new CourtUtilizationDto.CourtUtilizationData();
@@ -680,6 +680,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                                               "13:00-14:00", "14:00-15:00", "15:00-16:00", "16:00-17:00", 
                                               "17:00-18:00", "18:00-19:00", "19:00-20:00", "20:00-21:00");
         
+        Map<String, CourtUtilizationDto.TimeSlotDetailData> timeSlotDetails = new HashMap<>();
+        
         for (String timeSlot : timeSlots) {
             String[] times = timeSlot.split("-");
             LocalTime startTimeSlot = LocalTime.parse(times[0]);
@@ -705,10 +707,44 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             double timeSlotUtilization = totalSlotsInTimeSlot > 0 ? 
                 (double) bookedSlotsInTimeSlot / totalSlotsInTimeSlot * 100 : 0.0;
             timeSlotUtilizations.put(timeSlot, Math.round(timeSlotUtilization * 100.0) / 100.0);
+            
+            // 获取该时段的预订数据
+            List<Booking> bookingsInTimeSlot = bookingRepository.findBookingsByDateRangeAndTimeSlot(
+                startTime, endTime, startTimeSlot, endTimeSlot
+            );
+            
+            // 计算总收入
+            double totalRevenue = bookingsInTimeSlot.stream()
+                .mapToDouble(Booking::getTotalAmount)
+                .sum();
+            
+            // 确定促销潜力
+            String promotionPotential;
+            if (timeSlotUtilization < 30) {
+                promotionPotential = "HIGH";
+            } else if (timeSlotUtilization < 50) {
+                promotionPotential = "MODERATE";
+            } else {
+                promotionPotential = "LOW";
+            }
+            
+            // 创建详细数据
+            CourtUtilizationDto.TimeSlotDetailData detailData = new CourtUtilizationDto.TimeSlotDetailData();
+            detailData.setTimeSlot(timeSlot);
+            detailData.setUtilizationRate(Math.round(timeSlotUtilization * 100.0) / 100.0);
+            detailData.setTotalSlots(totalSlotsInTimeSlot);
+            detailData.setBookedSlots(bookedSlotsInTimeSlot);
+            detailData.setAvailableSlots(totalSlotsInTimeSlot - bookedSlotsInTimeSlot);
+            detailData.setTotalBookings((long) bookingsInTimeSlot.size());
+            detailData.setTotalRevenue(totalRevenue);
+            detailData.setPromotionPotential(promotionPotential);
+            
+            timeSlotDetails.put(timeSlot, detailData);
         }
         
         dto.setCourtUtilizations(courtUtilizations);
         dto.setTimeSlotUtilizations(timeSlotUtilizations);
+        dto.setTimeSlotDetails(timeSlotDetails);
         
         return dto;
     }

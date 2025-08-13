@@ -3,9 +3,15 @@ import api from './api';
 class HelpdeskService {
   static async askQuestion(question) {
     try {
-      const response = await api.post('/helpdesk/ask', question, {
+      const requestBody = {
+        question: question,
+        topic: 'General Inquiry',
+        message: question
+      };
+      
+      const response = await api.post('/helpdesk/ask', requestBody, {
         headers: {
-          'Content-Type': 'text/plain'
+          'Content-Type': 'application/json'
         }
       });
       return response.data;

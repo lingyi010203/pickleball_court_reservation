@@ -13,11 +13,14 @@ import {
 } from '@mui/material';
 import { Email, ArrowBack } from '@mui/icons-material';
 import Navbar from '../components/common/Navbar';
+import Footer from '../components/common/Footer';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import axios from 'axios';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const customTheme = useCustomTheme();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -88,6 +91,7 @@ const ForgotPasswordPage = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
+        pt: { xs: 20, sm: 24 },
         backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
@@ -180,6 +184,8 @@ const ForgotPasswordPage = () => {
           </Box>
         </Container>
       </Box>
+      
+      <Footer />
     </Box>
   );
 };

@@ -13,6 +13,10 @@ const VenueService = {
     const response = await api.get('/venues');
     return response.data;
   },
+  getVenueById: async (venueId) => {
+    const response = await api.get(`/venues/${venueId}`);
+    return response.data;
+  },
   checkVenueAvailability: async ({ venueId, date, startTime, endTime, peopleCount }) => {
     const response = await api.get(`/venues/check-availability`, {
       params: { venueId, date, startTime, endTime, peopleCount }

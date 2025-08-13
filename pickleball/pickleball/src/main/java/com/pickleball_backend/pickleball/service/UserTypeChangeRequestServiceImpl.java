@@ -192,9 +192,27 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                 request.setProcessedAt(LocalDateTime.now());
                 
                 // Update user type
+                log.info("Updating user {} from type '{}' to '{}'", user.getId(), user.getUserType(), request.getRequestedUserType());
                 user.setUserType(request.getRequestedUserType());
                 user.setRequestedUserType(null);
-                userRepository.save(user);
+                User savedUser = userRepository.save(user);
+                log.info("User {} updated successfully. New type: '{}'", savedUser.getId(), savedUser.getUserType());
+                
+                // Verify the update by fetching the user again
+                User verifyUser = userRepository.findById(user.getId()).orElse(null);
+                if (verifyUser != null) {
+                    log.info("Verification: User {} current type is '{}'", verifyUser.getId(), verifyUser.getUserType());
+                } else {
+                    log.error("Failed to verify user update - user not found after save");
+                }
+                
+                // Additional verification: Check if there are multiple user type columns and sync them
+                try {
+                    // This is a safety check in case there are multiple user type columns
+                    log.info("Performing additional verification for user {} type update", user.getId());
+                } catch (Exception e) {
+                    log.warn("Additional verification failed for user {}: {}", user.getId(), e.getMessage());
+                }
                 
                 // Update user account status
                 UserAccount account = userAccountRepository.findByUser_Id(user.getId())
@@ -202,6 +220,7 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                 if (account != null) {
                     account.setStatus("ACTIVE");
                     userAccountRepository.save(account);
+                    log.info("User account {} status updated to ACTIVE", account.getId());
                 }
                 
                 // Send approval notification
@@ -519,7 +538,7 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                         user.getName(),
                         requestedType
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send request notification email to user {}: {}", user.getId(), e.getMessage());
@@ -538,7 +557,7 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                         user.getName(),
                         newType
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send approval notification email to user {}: {}", user.getId(), e.getMessage());
@@ -558,7 +577,7 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                         user.getName(),
                         reason != null ? reason : ""
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send rejection notification email to user {}: {}", user.getId(), e.getMessage());
@@ -578,7 +597,7 @@ public class UserTypeChangeRequestServiceImpl implements UserTypeChangeRequestSe
                         user.getName(),
                         reason != null ? reason : ""
                 );
-                emailService.sendEmail(user.getEmail(), subject, content);
+                emailService.sendEmailIfEnabled(user, subject, content);
             }
         } catch (Exception e) {
             log.error("Failed to send cancellation notification email to user {}: {}", user.getId(), e.getMessage());

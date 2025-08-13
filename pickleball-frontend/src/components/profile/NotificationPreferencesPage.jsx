@@ -18,8 +18,7 @@ import UserService from '../../service/UserService';
 const NotificationPreferences = ({ profile, onSave, onCancel }) => {
   const theme = useTheme();
   const [preferences, setPreferences] = useState({
-    emailNotifications: profile.emailNotifications,
-    pushNotifications: profile.pushNotifications
+    emailNotifications: profile.emailNotifications
   });
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -31,8 +30,7 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
   useEffect(() => {
     // Initialize preferences with profile data
     setPreferences({
-      emailNotifications: profile.emailNotifications,
-      pushNotifications: profile.pushNotifications
+      emailNotifications: profile.emailNotifications
     });
   }, [profile]);
 
@@ -113,30 +111,6 @@ const NotificationPreferences = ({ profile, onSave, onCancel }) => {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Receive important updates, booking confirmations, and promotional offers via email
-                </Typography>
-              </Box>
-            }
-            sx={{ alignItems: 'flex-start' }}
-          />
-        </Box>
-        
-        <Box sx={{ p: 2, backgroundColor: theme.palette.action.hover, borderRadius: '8px' }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={preferences.pushNotifications}
-                onChange={handleChange}
-                name="pushNotifications"
-                color="primary"
-              />
-            }
-            label={
-              <Box>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  Push Notifications
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Get real-time updates about your bookings and game invitations
                 </Typography>
               </Box>
             }

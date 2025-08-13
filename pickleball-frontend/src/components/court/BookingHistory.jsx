@@ -20,7 +20,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   SportsTennis as CourtIcon,
@@ -36,7 +38,7 @@ import {
   Event as EventIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import api from '../../api/axiosConfig';
 import ModernBookingDetailsDialog from '../admin/ModernBookingDetailsDialog';
 
@@ -240,6 +242,7 @@ const ModernButton = styled(Button)(({ variant, color }) => {
 
 const BookingHistory = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [tabValue, setTabValue] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [bookings, setBookings] = useState([]);
@@ -252,6 +255,13 @@ const BookingHistory = () => {
   const [cancelBookingId, setCancelBookingId] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+  const [cancellationDetails, setCancellationDetails] = useState(null);
+  const [cancellationDetailsOpen, setCancellationDetailsOpen] = useState(false);
 
   const fetchBookingHistory = async () => {
     try {
@@ -276,7 +286,7 @@ const BookingHistory = () => {
           startTime: booking.startTime, // 使用API中的startTime字段
           endTime: booking.endTime, // 使用API中的endTime字段
         numberOfPlayers: booking.playerCount || booking.numberOfPlayers || 4,
-        totalAmount: booking.amount ? Number(booking.amount) : booking.price || 50.00,
+        totalAmount: booking.amount ? Number(booking.amount) : (booking.price || 50.00) + ((booking.numPaddles || 0) * 5) + (booking.buyBallSet ? 12 : 0),
         status: booking.bookingStatus || booking.status || "CONFIRMED",
         purpose: booking.purpose || "Recreational",
         numPaddles: booking.numPaddles || 0,
@@ -337,20 +347,38 @@ const BookingHistory = () => {
 
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) {
-      alert('Please provide a reason for cancellation.');
+      setSnackbar({
+        open: true,
+        message: 'Please provide a reason for cancellation.',
+        severity: 'warning'
+      });
       return;
     }
     setCancellingId(cancelBookingId);
     setCancelStatus(prev => ({ ...prev, [cancelBookingId]: 'processing' }));
     api.post(`/member/bookings/${cancelBookingId}/cancel`, { reason: cancelReason })
       .then(response => {
+        const cancellationData = response.data;
+        
+        // 更新预订状态
         setBookings(prev => prev.map(booking =>
           booking.bookingId === cancelBookingId
-            ? { ...booking, status: 'CANCELLATION_REQUESTED' }
+            ? { ...booking, status: cancellationData.status === 'APPROVED' ? 'CANCELLED' : 'CANCELLATION_REQUESTED' }
             : booking
         ));
         setCancelStatus(prev => ({ ...prev, [cancelBookingId]: 'requested' }));
-        alert('Cancellation request submitted successfully!');
+        
+        // 如果是自动批准的取消，显示详细信息
+        if (cancellationData.isAutoApproved) {
+          setCancellationDetails(cancellationData);
+          setCancellationDetailsOpen(true);
+        } else {
+          setSnackbar({
+            open: true,
+            message: 'Cancellation request submitted successfully!',
+            severity: 'success'
+          });
+        }
       })
       .catch(error => {
         console.error('Cancellation failed:', error);
@@ -366,7 +394,11 @@ const BookingHistory = () => {
         } else {
           errorMsg = error.message;
         }
-        alert(`Cancellation failed: ${errorMsg}`);
+        setSnackbar({
+          open: true,
+          message: `Cancellation failed: ${errorMsg}`,
+          severity: 'error'
+        });
       })
       .finally(() => {
         setCancellingId(null);
@@ -379,6 +411,15 @@ const BookingHistory = () => {
     setCancelDialogOpen(false);
     setCancelBookingId(null);
     setCancelReason('');
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  const handleCancellationDetailsClose = () => {
+    setCancellationDetailsOpen(false);
+    setCancellationDetails(null);
   };
 
   const handleLeaveReview = (booking) => {
@@ -941,6 +982,199 @@ const BookingHistory = () => {
         editableRemark={false}
         isAdmin={false}
       />
+
+      {/* Cancellation Details Dialog */}
+      <Dialog 
+        open={cancellationDetailsOpen} 
+        onClose={handleCancellationDetailsClose} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+            backgroundColor: theme.palette.background.paper,
+            boxShadow: theme.shadows[10]
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          textAlign: 'center', 
+          pb: 1,
+          color: COLORS.success,
+          fontWeight: 700
+        }}>
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h4" sx={{ 
+              fontWeight: 700, 
+              color: COLORS.success,
+              mb: 1
+            }}>
+              ✅ Cancellation Successful
+            </Typography>
+            <Typography variant="body2" sx={{ 
+              color: theme.palette.text.secondary,
+              fontWeight: 500
+            }}>
+              Your booking has been cancelled and refund processed
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 2 }}>
+          {cancellationDetails && (
+            <Box>
+              {/* Booking Information */}
+              <Paper sx={{ p: 3, mb: 3, backgroundColor: COLORS.surface, borderRadius: 2 }}>
+                <Typography variant="h6" sx={{ mb: 2, color: COLORS.neutral, fontWeight: 600 }}>
+                  📅 Booking Details
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Court:</strong> {cancellationDetails.courtName}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Date:</strong> {cancellationDetails.slotDate}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Time:</strong> {cancellationDetails.slotTime}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Booking ID:</strong> #{cancellationDetails.bookingId}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Status:</strong> 
+                      <Chip 
+                        label="CANCELLED" 
+                        size="small" 
+                        sx={{ 
+                          ml: 1,
+                          backgroundColor: COLORS.errorLight,
+                          color: COLORS.error,
+                          fontWeight: 600
+                        }} 
+                      />
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Processed:</strong> {new Date(cancellationDetails.requestDate).toLocaleString()}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Refund Information */}
+              <Paper sx={{ p: 3, mb: 3, backgroundColor: COLORS.successLight, borderRadius: 2, border: `1px solid ${COLORS.success}20` }}>
+                <Typography variant="h6" sx={{ mb: 2, color: COLORS.success, fontWeight: 600 }}>
+                  💰 Refund Details
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Original Amount:</strong> MYR {cancellationDetails.originalAmount?.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Refund Amount:</strong> 
+                      <span style={{ color: COLORS.success, fontWeight: 600, fontSize: '1.1em' }}>
+                        {' '}MYR {cancellationDetails.refundAmount?.toFixed(2)}
+                      </span>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Refund Method:</strong> {cancellationDetails.refundMethod}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                      <strong>Refund Status:</strong> 
+                      <Chip 
+                        label={cancellationDetails.refundStatus} 
+                        size="small" 
+                        sx={{ 
+                          ml: 1,
+                          backgroundColor: COLORS.success,
+                          color: '#ffffff',
+                          fontWeight: 600
+                        }} 
+                      />
+                    </Typography>
+                  </Grid>
+                </Grid>
+                <Typography variant="body2" sx={{ 
+                  color: COLORS.success, 
+                  mt: 2, 
+                  p: 2, 
+                  backgroundColor: '#ffffff', 
+                  borderRadius: 1,
+                  border: `1px solid ${COLORS.success}30`
+                }}>
+                  <strong>Note:</strong> Your refund has been automatically processed and credited to your wallet. 
+                  You can use this amount for future bookings.
+                </Typography>
+              </Paper>
+
+              {/* Additional Information */}
+              <Paper sx={{ p: 3, backgroundColor: COLORS.primaryLight, borderRadius: 2, border: `1px solid ${COLORS.primary}20` }}>
+                <Typography variant="h6" sx={{ mb: 2, color: COLORS.primary, fontWeight: 600 }}>
+                  ℹ️ Additional Information
+                </Typography>
+                <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                  <strong>Processing Type:</strong> {cancellationDetails.isAutoApproved ? 'Auto-approved' : 'Manual review'}
+                </Typography>
+                {cancellationDetails.adminRemark && (
+                  <Typography variant="body2" sx={{ color: COLORS.neutral, mb: 1 }}>
+                    <strong>Admin Note:</strong> {cancellationDetails.adminRemark}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ 
+                  color: COLORS.primary, 
+                  mt: 2, 
+                  p: 2, 
+                  backgroundColor: '#ffffff', 
+                  borderRadius: 1,
+                  border: `1px solid ${COLORS.primary}30`
+                }}>
+                  <strong>Next Steps:</strong> You can now book another court or check your wallet balance. 
+                  The refunded amount is immediately available for use.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button 
+            onClick={handleCancellationDetailsClose} 
+            variant="contained"
+            sx={{
+              backgroundColor: COLORS.success,
+              color: '#ffffff',
+              '&:hover': {
+                backgroundColor: COLORS.successHover
+              }
+            }}
+          >
+            Got it!
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* Footer */}
       <Box sx={{ mt: 8, textAlign: 'center', color: COLORS.neutral, opacity: 0.6 }}>

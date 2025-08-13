@@ -349,6 +349,35 @@ public class EmailService {
         }
     }
 
+    /**
+     * Send email only if user has email notifications enabled
+     */
+    public void sendEmailIfEnabled(User user, String subject, String body) {
+        if (user != null && user.getUserAccount() != null && 
+            user.getUserAccount().isEmailNotifications() && 
+            user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+            sendEmail(user.getEmail(), subject, body);
+            log.debug("Email sent to user {} (notifications enabled)", user.getEmail());
+        } else {
+            log.debug("Email skipped for user {} (notifications disabled or no email)", 
+                     user != null ? user.getEmail() : "null");
+        }
+    }
+
+    /**
+     * Send email only if user has email notifications enabled (by email address)
+     */
+    public void sendEmailIfEnabled(String email, User user, String subject, String body) {
+        if (user != null && user.getUserAccount() != null && 
+            user.getUserAccount().isEmailNotifications() && 
+            email != null && !email.trim().isEmpty()) {
+            sendEmail(email, subject, body);
+            log.debug("Email sent to {} (notifications enabled)", email);
+        } else {
+            log.debug("Email skipped for {} (notifications disabled)", email);
+        }
+    }
+
     public void sendEventNotification(String email, Event event) {
         if (email == null || event == null) return;
         log.info("Sending event notification to: {}", email);
@@ -571,30 +600,53 @@ public class EmailService {
         sendEmail(coachEmail, subject, content);
     }
 
+    // Contact form email method
+    public void sendContactFormEmail(String name, String email, String subject, String message) {
+        String adminEmail = "sitxy-wp22@student.tarc.edu.my";
+        String emailSubject = "New Contact Form Submission: " + subject;
+        String emailContent = String.format(
+                "You have received a new contact form submission:\n\n" +
+                "Name: %s\n" +
+                "Email: %s\n" +
+                "Subject: %s\n\n" +
+                "Message:\n%s\n\n" +
+                "Please reply directly to: %s",
+                name, email, subject, message, email
+        );
+
+        try {
+            sendEmail(adminEmail, emailSubject, emailContent);
+            log.info("Contact form email sent to admin from: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send contact form email: {}", e.getMessage());
+            throw new RuntimeException("Failed to send contact form email: " + e.getMessage(), e);
+        }
+    }
+
     public void sendGroupInvitationEmail(String toEmail, String groupName, String creatorName, String creatorUsername) {
+        if (toEmail == null || groupName == null) {
+            log.error("Missing parameters for group invitation email");
+            return;
+        }
+
+        String subject = "Group Invitation: " + groupName;
+        String content = String.format(
+                "Dear Picklefy User,\n\n" +
+                "You have been invited to join the group \"%s\" by %s.\n\n" +
+                "Group Details:\n" +
+                "• Group Name: %s\n" +
+                "• Invited by: %s\n\n" +
+                "Please log into the Picklefy app to accept or decline this invitation.\n\n" +
+                "Best regards,\n" +
+                "The Picklefy Team",
+                groupName, creatorName, groupName, creatorName
+        );
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
-        message.setSubject("🎾 You've been invited to join a Pickleball Group: " + groupName);
-        
-        String content = String.format(
-            "Dear Picklefy User,\n\n" +
-            "🎉 You've been invited to join a new pickleball group!\n\n" +
-            "📋 Group Details:\n" +
-            "• Group Name: %s\n" +
-            "• Created by: %s (@%s)\n\n" +
-            "💬 This group is ready for messaging and coordination.\n\n" +
-            "🔗 To join the group and start chatting:\n" +
-            "1. Open the Picklefy app\n" +
-            "2. Go to Messages section\n" +
-            "3. Look for the group \"%s\" in your Groups tab\n" +
-            "4. Click on it to start chatting!\n\n" +
-            "🏓 Get ready to coordinate games, share tips, and connect with fellow pickleball enthusiasts!\n\n" +
-            "Best regards,\nThe Picklefy Team",
-            groupName, creatorName, creatorUsername, groupName
-        );
-        
+        message.setSubject(subject);
         message.setText(content);
-        
+
         try {
             javaMailSender.send(message);
             log.info("Group invitation email sent to: {}", toEmail);

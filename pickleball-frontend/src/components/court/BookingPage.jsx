@@ -48,20 +48,19 @@ const BookingPage = () => {
   const [error, setError] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('Today');
-  const [currentMonth, setCurrentMonth] = useState(dayjs().format('MMMM YYYY'));
+  const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [numPlayers, setNumPlayers] = useState(2);
   const [numPaddles, setNumPaddles] = useState(0);
   const [buyBallSet, setBuyBallSet] = useState(false);
-  const [purpose, setPurpose] = useState('Recreational');
 
   // 日历数据结构
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const tabs = ['Today', 'Tomorrow', 'This Week', 'Custom Date'];
 
   // 生成日历数据
-  const generateCalendar = () => {
-    const startOfMonth = dayjs().startOf('month');
-    const endOfMonth = dayjs().endOf('month');
+  const generateCalendar = (month = dayjs()) => {
+    const startOfMonth = month.startOf('month');
+    const endOfMonth = month.endOf('month');
     const startDate = startOfMonth.startOf('week');
     const endDate = endOfMonth.endOf('week');
 
@@ -75,7 +74,12 @@ const BookingPage = () => {
         week = [];
       }
 
-      week.push(current.month() === dayjs().month() ? current.date() : null);
+      week.push({
+        date: current.date(),
+        month: current.month(),
+        year: current.year(),
+        isCurrentMonth: current.month() === month.month()
+      });
       current = current.add(1, 'day');
     }
 
@@ -86,12 +90,12 @@ const BookingPage = () => {
     return calendar;
   };
 
-  const calendar = generateCalendar();
+  const calendar = generateCalendar(currentMonth);
 
   // 检查日期是否可用
-  const isDateAvailable = (date) => {
-    if (!date) return false;
-    const dateStr = dayjs().date(date).format('YYYY-MM-DD');
+  const isDateAvailable = (dateObj) => {
+    if (!dateObj || !dateObj.isCurrentMonth) return false;
+    const dateStr = dayjs().year(dateObj.year).month(dateObj.month).date(dateObj.date).format('YYYY-MM-DD');
     return availableDates.includes(dateStr);
   };
 
@@ -169,8 +173,7 @@ const BookingPage = () => {
       startTime: selectedSlots[0].startTime,
       endTime: selectedSlots[selectedSlots.length - 1].endTime,
       durationHours: selectedSlots.length,
-      price: total, // 修正：传递总价（含paddle/ball set）
-      purpose: purpose,
+      price: totalPrice, // 传递场地费用（不含equipment）
       numberOfPlayers: numPlayers, // 传递人数
       numPaddles, // 传递paddle数量
       buyBallSet // 传递ball set选择
@@ -199,11 +202,8 @@ const BookingPage = () => {
     return isPeak ? (court.peakHourlyPrice || 80) : (court.offPeakHourlyPrice || 50);
   })() : 0);
 
-  // 计算总价
-  const total =
-    totalPrice +
-    numPaddles * PADDLE_PRICE +
-    (buyBallSet ? BALL_SET_PRICE : 0);
+  // 计算总价 (仅场地费用)
+  const total = totalPrice;
 
   const renderBookingSummary = () => {
     if (!court) return null;
@@ -249,80 +249,9 @@ const BookingPage = () => {
             </Box>
           )}
 
-          <Divider sx={{ my: 2 }} />
 
-          {/* 玩家和装备 */}
-          {selectedSlots.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <Grid container spacing={2}>
-                {/* Players */}
-                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="subtitle2" color="text.secondary">Players</Typography>
-                  <TextField
-                    type="number"
-                    size="small"
-                    inputProps={{ min: 2, max: 8, style: { textAlign: 'right' } }}
-                    value={numPlayers}
-                    onChange={e => setNumPlayers(Math.max(2, Math.min(8, Number(e.target.value))))}
-                    sx={{ width: 80 }}
-                  />
-                </Grid>
-                {/* Paddles */}
-                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="subtitle2" color="text.secondary">Paddles</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <TextField
-                      type="number"
-                      size="small"
-                      inputProps={{ min: 0, max: 8, style: { textAlign: 'right' } }}
-                      value={numPaddles}
-                      onChange={e => setNumPaddles(Math.max(0, Math.min(8, Number(e.target.value))))}
-                      sx={{ width: 80 }}
-                    />
-                    <Typography variant="caption" sx={{ ml: 1 }}>
-                      RM{PADDLE_PRICE} each
-                    </Typography>
-                  </Box>
-                </Grid>
-                {/* Ball Set */}
-                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="subtitle2" color="text.secondary">Ball Set</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={buyBallSet}
-                      onChange={e => setBuyBallSet(e.target.checked)}
-                      style={{ transform: 'scale(1.3)' }}
-                      aria-label="Buy Ball Set"
-                    />
-                    <Typography variant="caption" sx={{ ml: 1 }}>
-                      {buyBallSet ? `Yes (RM${BALL_SET_PRICE})` : 'No'}
-                    </Typography>
-                  </Box>
-                </Grid>
-                {/* Purpose */}
-                <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="subtitle2" color="text.secondary">Purpose</Typography>
-                  <TextField
-                    select
-                    size="small"
-                    value={purpose}
-                    onChange={e => setPurpose(e.target.value)}
-                    sx={{ width: 140 }}
-                  >
-                    <MenuItem value="Recreational">Recreational</MenuItem>
-                    <MenuItem value="Training">Training</MenuItem>
-                    <MenuItem value="Competition">Competition</MenuItem>
-                    <MenuItem value="Social">Social</MenuItem>
-                    <MenuItem value="Practice">Practice</MenuItem>
-                    <MenuItem value="Tournament">Tournament</MenuItem>
-                  </TextField>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
 
-        {/* 价格详情 */}
+                  {/* 价格详情 */}
         {selectedSlots.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -334,12 +263,6 @@ const BookingPage = () => {
             <Typography variant="body2" sx={{ mb: 0.5 }}>
               Peak: RM{court.peakHourlyPrice || 80}/hour
             </Typography>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>
-              Paddles: RM{PADDLE_PRICE} each
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>
-              Ball Set: RM{BALL_SET_PRICE} (set of 4)
-            </Typography>
           </Box>
         )}
 
@@ -350,7 +273,7 @@ const BookingPage = () => {
             <Grid container>
               <Grid item xs={7}>
                 <Typography variant="body1" fontWeight="bold">
-                  Total Amount:
+                  Court Rental:
                 </Typography>
               </Grid>
               <Grid item xs={5} textAlign="right">
@@ -490,12 +413,15 @@ return (
                     switch (tab) {
                       case 'Today':
                         setSelectedDate(dayjs());
+                        setCurrentMonth(dayjs());
                         break;
                       case 'Tomorrow':
                         setSelectedDate(dayjs().add(1, 'day'));
+                        setCurrentMonth(dayjs().add(1, 'day'));
                         break;
                       case 'This Week':
                         setSelectedDate(dayjs().add(7, 'day'));
+                        setCurrentMonth(dayjs().add(7, 'day'));
                         break;
                       case 'Custom Date':
                         // Keep current date for custom selection
@@ -529,8 +455,8 @@ return (
             }}>
               <IconButton
                 onClick={() => {
-                  const newMonth = dayjs().subtract(1, 'month');
-                  setCurrentMonth(newMonth.format('MMMM YYYY'));
+                  const newMonth = currentMonth.subtract(1, 'month');
+                  setCurrentMonth(newMonth);
                 }}
                 sx={{
                   p: 1.5,
@@ -545,13 +471,32 @@ return (
               </IconButton>
 
               <Typography variant="h6" fontWeight="bold">
-                {currentMonth}
+                {currentMonth.format('MMMM YYYY')}
               </Typography>
+              
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setCurrentMonth(dayjs());
+                  setSelectedDate(dayjs());
+                }}
+                sx={{
+                  ml: 2,
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600
+                }}
+              >
+                Today
+              </Button>
 
               <IconButton
                 onClick={() => {
-                  const newMonth = dayjs().add(1, 'month');
-                  setCurrentMonth(newMonth.format('MMMM YYYY'));
+                  const newMonth = currentMonth.add(1, 'month');
+                  setCurrentMonth(newMonth);
                 }}
                 sx={{
                   p: 1.5,
@@ -591,30 +536,30 @@ return (
               <Grid container spacing={1}>
                 {calendar.map((week, weekIndex) => (
                   <React.Fragment key={weekIndex}>
-                    {week.map((date, dateIndex) => (
+                    {week.map((dateObj, dateIndex) => (
                       <Grid item xs key={`${weekIndex}-${dateIndex}`}>
-                        {date ? (
+                        {dateObj.isCurrentMonth ? (
                           <Button
                             fullWidth
-                            variant={selectedDate?.date() === date ? "contained" : "outlined"}
+                            variant={selectedDate?.date() === dateObj.date && selectedDate?.month() === dateObj.month ? "contained" : "outlined"}
                             onClick={() => {
-                              if (isDateAvailable(date)) {
-                                const newDate = dayjs().date(date);
+                              if (isDateAvailable(dateObj)) {
+                                const newDate = dayjs().year(dateObj.year).month(dateObj.month).date(dateObj.date);
                                 setSelectedDate(newDate);
                               }
                             }}
-                            disabled={!isDateAvailable(date)}
+                            disabled={!isDateAvailable(dateObj)}
                             sx={{
                               height: 56,
                               minWidth: 0,
                               borderRadius: '12px',
                               fontWeight: 600,
-                              ...(selectedDate?.date() === date && {
+                              ...(selectedDate?.date() === dateObj.date && selectedDate?.month() === dateObj.month && {
                                 background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)',
                                 color: 'white',
                                 boxShadow: '0 4px 12px rgba(37, 117, 252, 0.3)'
                               }),
-                              ...(isDateAvailable(date) ? {} : {
+                              ...(isDateAvailable(dateObj) ? {} : {
                                 border: '2px solid #f44336',
                                 color: '#f44336',
                                 opacity: 0.7,
@@ -625,7 +570,7 @@ return (
                               })
                             }}
                           >
-                            {date}
+                            {dateObj.date}
                           </Button>
                         ) : (
                           <Box sx={{ height: 56 }} />

@@ -13,6 +13,7 @@ import {
   Chip,
   useMediaQuery
 } from '@mui/material';
+import { useTheme as useCustomTheme } from '../../context/ThemeContext';
 import {
   AccountBalance as WalletIcon,
   Add as AddIcon,
@@ -28,6 +29,7 @@ import UserService from '../../service/UserService';
 const WalletPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const customTheme = useCustomTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletDetails, setWalletDetails] = useState(null);

@@ -860,7 +860,7 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
               }
             }}
           >
-            {t('admin.addNewAdmin')}
+            {t('admin.addNewUser')}
           </Button>
           <Button
             variant="outlined"
@@ -1302,13 +1302,13 @@ const UserManagementTab = ({ inviteOpen, setInviteOpen }) => {
               color: theme.palette.primary.main,
               mb: 1
             }}>
-              {currentUser ? `${t('admin.edit')} ${t('admin.admin')}: ${currentUser.name}` : t('admin.addNewAdmin')}
+              {currentUser ? `${t('admin.edit')} ${t('admin.user')}: ${currentUser.name}` : t('admin.addNewUser')}
             </Typography>
             <Typography variant="body2" sx={{ 
               color: theme.palette.text.secondary,
               fontWeight: 500
             }}>
-              {currentUser ? t('admin.updateAdminInformationAndSettings') : t('admin.createNewAdminWithDetailedInformation')}
+              {currentUser ? t('admin.updateUserInformationAndSettings') : t('admin.createNewUserWithDetailedInformation')}
             </Typography>
           </Box>
         </DialogTitle>

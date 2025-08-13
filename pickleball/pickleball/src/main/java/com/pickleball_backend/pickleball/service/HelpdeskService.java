@@ -77,7 +77,7 @@ public class HelpdeskService {
                 "Question: " + query.getQuestion() + "\n\n" +
                 "Please handle this support request.";
 
-        emailService.sendEmail(adminEmail, subject, content);
+        emailService.sendEmail(adminEmail, subject, content); // Admin emails don't need preference check
 
         // Send notification to the user
         User user = userRepository.findByUsername(query.getUsername())
@@ -89,7 +89,7 @@ public class HelpdeskService {
                 "Your helpdesk query has been escalated to human support. Our team will contact you soon.\n\n" +
                 "Question: " + query.getQuestion();
 
-        emailService.sendEmail(userEmail, userSubject, userContent);
+        emailService.sendEmailIfEnabled(user, userSubject, userContent);
     }
 
     public void escalateForm(String username, String topic, String message) {
@@ -99,7 +99,7 @@ public class HelpdeskService {
         String adminEmail = "admin@example.com";
         String subject = "New Escalation from " + username + " [" + topic + "]";
         String content = "User: " + username + "\\nTopic: " + topic + "\\nMessage: " + message;
-        emailService.sendEmail(adminEmail, subject, content);
+        emailService.sendEmail(adminEmail, subject, content); // Admin emails don't need preference check
         // Optionally send confirmation to user
     }
 

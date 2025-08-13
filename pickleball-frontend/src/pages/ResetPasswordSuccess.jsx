@@ -1,24 +1,19 @@
 // src/pages/ResetPasswordSuccess.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Container, AppBar, Toolbar, useTheme } from '@mui/material';
+import { Box, Typography, Button, Container, useTheme } from '@mui/material';
+import Navbar from '../components/common/Navbar';
+import Footer from '../components/common/Footer';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 
 const ResetPasswordSuccess = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const customTheme = useCustomTheme();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main }}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            PICKLEBALL
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/')}>Home</Button>
-          <Button color="inherit" onClick={() => navigate('/login')}>Login</Button>
-          <Button color="inherit" onClick={() => navigate('/register')}>Register</Button>
-        </Toolbar>
-      </AppBar>
+      <Navbar />
 
       <Box sx={{ 
         flexGrow: 1, 
@@ -26,6 +21,7 @@ const ResetPasswordSuccess = () => {
         alignItems: 'center', 
         justifyContent: 'center',
         py: 4,
+        pt: { xs: 20, sm: 24 },
         backgroundColor: theme.palette.background.default,
       }}>
         <Container maxWidth="sm">
@@ -62,6 +58,8 @@ const ResetPasswordSuccess = () => {
           </Box>
         </Container>
       </Box>
+      
+      <Footer />
     </Box>
   );
 };

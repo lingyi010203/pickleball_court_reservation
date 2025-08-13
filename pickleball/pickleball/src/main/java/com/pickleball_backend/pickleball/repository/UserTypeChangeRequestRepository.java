@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.pickleball_backend.pickleball.entity.User;
 
 @Repository
 public interface UserTypeChangeRequestRepository extends JpaRepository<UserTypeChangeRequest, Integer> {
@@ -19,6 +20,9 @@ public interface UserTypeChangeRequestRepository extends JpaRepository<UserTypeC
 
     // Find requests by user ID
     List<UserTypeChangeRequest> findByUser_IdOrderByCreatedAtDesc(Integer userId);
+
+    // Find requests by user object
+    List<UserTypeChangeRequest> findByUserOrderByCreatedAtDesc(User user);
 
     // Find requests by user ID and status
     List<UserTypeChangeRequest> findByUser_IdAndStatusOrderByCreatedAtDesc(Integer userId, UserTypeChangeRequest.RequestStatus status);

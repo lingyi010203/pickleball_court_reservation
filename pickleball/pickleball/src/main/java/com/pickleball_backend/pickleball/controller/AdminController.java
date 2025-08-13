@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
@@ -43,6 +44,7 @@ public class AdminController {
     private final MemberRepository memberRepository;
     private final TierAutoUpgradeService tierAutoUpgradeService;
     private final FileStorageService fileStorageService;
+    private final UserTypeChangeRequestRepository userTypeChangeRequestRepository;
 
     // User Type Change Management
     @GetMapping("/pending-type-changes")
@@ -111,6 +113,36 @@ public class AdminController {
         userAccountRepository.save(account);
 
         return ResponseEntity.ok("User type change request rejected");
+    }
+
+    // Debug endpoint to check user type status
+    @GetMapping("/debug-user-type/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> debugUserType(@PathVariable Integer userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("userId", user.getId());
+            result.put("userName", user.getName());
+            result.put("userType", user.getUserType());
+            result.put("requestedUserType", user.getRequestedUserType());
+            result.put("updatedAt", user.getUpdatedAt());
+
+            // Check if there are any pending requests for this user
+            List<UserTypeChangeRequest> requests = userTypeChangeRequestRepository.findByUserOrderByCreatedAtDesc(user);
+            result.put("pendingRequests", requests.stream()
+                    .filter(r -> r.getStatus() == UserTypeChangeRequest.RequestStatus.PENDING)
+                    .count());
+            result.put("approvedRequests", requests.stream()
+                    .filter(r -> r.getStatus() == UserTypeChangeRequest.RequestStatus.APPROVED)
+                    .count());
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // Admin Registration & Authentication
@@ -386,7 +418,7 @@ public class AdminController {
             dto.setStatus(user.getUserAccount().getStatus());
             dto.setTheme(user.getUserAccount().getTheme());
             dto.setEmailNotifications(user.getUserAccount().isEmailNotifications());
-            dto.setPushNotifications(user.getUserAccount().isPushNotifications());
+    
         }
         
         // Add more fields as needed

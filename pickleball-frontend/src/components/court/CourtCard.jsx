@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCourtImagesPublic } from '../../service/CourtService';
 import ThemedCard from '../common/ThemedCard';
 import { useAuth } from '../../context/AuthContext';
+import { getFullImageUrl } from '../../utils/imageUtils';
 
 const CourtCard = ({ court }) => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const CourtCard = ({ court }) => {
       getCourtImagesPublic(court.id)
         .then(images => {
           if (images && images.length > 0) {
-            setImageUrl(images[0].imagePath);
+            setImageUrl(getFullImageUrl(images[0].imagePath));
           } else {
             setImageUrl(null);
           }

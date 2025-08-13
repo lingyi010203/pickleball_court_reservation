@@ -2,6 +2,7 @@ package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.entity.*;
 import com.pickleball_backend.pickleball.exception.ResourceNotFoundException;
+import com.pickleball_backend.pickleball.exception.UnauthorizedException;
 import com.pickleball_backend.pickleball.repository.MemberRepository;
 import com.pickleball_backend.pickleball.repository.UserAccountRepository;
 import com.pickleball_backend.pickleball.service.FriendlyMatchService;
@@ -229,6 +230,12 @@ public class FriendlyMatchController {
         // Get UserAccount first
         UserAccount userAccount = userAccountRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+
+        // Validate user status - prevent suspended/inactive users from booking
+        if ("SUSPENDED".equals(userAccount.getStatus()) || "INACTIVE".equals(userAccount.getStatus())) {
+            throw new UnauthorizedException("Your account is " + userAccount.getStatus().toLowerCase() + 
+                ". You cannot make bookings. Please contact support for assistance.");
+        }
 
         // Then get Member through the User
         return memberRepository.findByUserId(userAccount.getUser().getId());

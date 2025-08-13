@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Grid, Paper, Button, Chip, Divider, Stack } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getCourtImagesPublic } from '../../service/CourtService';
+import { processImageUrls } from '../../utils/imageUtils';
 
 const CourtDetails = ({ court = {} }) => {
   const navigate = useNavigate();
@@ -31,13 +33,36 @@ const CourtDetails = ({ court = {} }) => {
 
   const courtData = { ...defaultCourt, ...court };
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [courtImages, setCourtImages] = useState([]);
+
+  // 获取球场图片
+  useEffect(() => {
+    if (court && court.id) {
+      getCourtImagesPublic(court.id)
+        .then(images => {
+          if (images && images.length > 0) {
+            setCourtImages(processImageUrls(images));
+          } else {
+            // 如果没有图片，使用默认图片
+            setCourtImages(defaultCourt.images.map(img => ({ imagePath: img })));
+          }
+        })
+        .catch(() => {
+          // 如果获取失败，使用默认图片
+          setCourtImages(defaultCourt.images.map(img => ({ imagePath: img })));
+        });
+    } else {
+      // 如果没有court.id，使用默认图片
+      setCourtImages(defaultCourt.images.map(img => ({ imagePath: img })));
+    }
+  }, [court]);
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % courtData.images.length);
+    setCurrentImageIndex((prev) => (prev + 1) % courtImages.length);
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + courtData.images.length) % courtData.images.length);
+    setCurrentImageIndex((prev) => (prev - 1 + courtImages.length) % courtImages.length);
   };
 
   const amenities = [
@@ -57,7 +82,7 @@ const CourtDetails = ({ court = {} }) => {
       <Paper elevation={3} sx={{ borderRadius: 4, overflow: 'hidden', mb: 4 }}>
         <Box sx={{ position: 'relative', height: 360, bgcolor: 'grey.200' }}>
           <img
-            src={courtData.images[currentImageIndex]}
+            src={courtImages[currentImageIndex]?.imagePath || courtData.images[currentImageIndex]}
             alt={`${courtData.name} - Image ${currentImageIndex + 1}`}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
@@ -78,7 +103,7 @@ const CourtDetails = ({ court = {} }) => {
           </Button>
           {/* Image Counter */}
           <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', bgcolor: 'rgba(0,0,0,0.5)', borderRadius: 2, px: 2, py: 0.5 }}>
-            <Typography color="white" fontSize={14}>{currentImageIndex + 1} / {courtData.images.length}</Typography>
+            <Typography color="white" fontSize={14}>{currentImageIndex + 1} / {courtImages.length}</Typography>
           </Box>
           {/* Court Info Overlay */}
           <Box sx={{ position: 'absolute', bottom: 24, left: 32, color: 'white', zIndex: 2 }}>
@@ -104,7 +129,7 @@ const CourtDetails = ({ court = {} }) => {
         {/* Thumbnails */}
         <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
           <Stack direction="row" spacing={1}>
-            {courtData.images.map((image, idx) => (
+            {courtImages.map((image, idx) => (
               <Box
                 key={idx}
                 onClick={() => setCurrentImageIndex(idx)}
@@ -112,7 +137,7 @@ const CourtDetails = ({ court = {} }) => {
                   width: 56, height: 56, borderRadius: 2, overflow: 'hidden', border: idx === currentImageIndex ? '2px solid #1976d2' : '2px solid #eee', cursor: 'pointer', boxShadow: idx === currentImageIndex ? 2 : 0
                 }}
               >
-                <img src={image} alt={`thumb${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={image.imagePath} alt={`thumb${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </Box>
             ))}
           </Stack>

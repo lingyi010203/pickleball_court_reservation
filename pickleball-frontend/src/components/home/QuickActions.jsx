@@ -7,7 +7,7 @@ import {
   CardContent, 
   Typography, 
   Box, 
-  useTheme,
+  useTheme as useMuiTheme,
   Stack,
   Chip
 } from '@mui/material';
@@ -15,17 +15,17 @@ import {
   CalendarMonth as CalendarIcon,
   EmojiEvents as EventsIcon,
   Group as GroupIcon,
-  AccountBalanceWallet as WalletIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
 import ThemedCard from '../common/ThemedCard';
+import { useTheme } from '../../context/ThemeContext';
 
 const QUICK_ACTIONS = [
   { 
     id: 'book-court',
     Icon: CalendarIcon, 
     title: 'Book a Court', 
-    description: 'Reserve your favorite court instantly', 
+    description: 'Reserve your favorite court instantly',
     path: '/courts',
     color: 'primary'
   },
@@ -33,25 +33,9 @@ const QUICK_ACTIONS = [
     id: 'join-events',
     Icon: EventsIcon, 
     title: 'Join Events', 
-    description: 'Participate in tournaments and training', 
+    description: 'Participate in tournaments and training',
     path: '/events',
     color: 'warning'
-  },
-  { 
-    id: 'find-partners',
-    Icon: GroupIcon, 
-    title: 'Find Partners', 
-    description: 'Connect with other players', 
-    path: '/messages',
-    color: 'success'
-  },
-  { 
-    id: 'topup-wallet',
-    Icon: WalletIcon, 
-    title: 'Top Up Wallet', 
-    description: 'Add funds to your account', 
-    path: '/wallet/topup',
-    color: 'secondary'
   },
   {
     id: 'court-availability',
@@ -61,23 +45,56 @@ const QUICK_ACTIONS = [
     path: '/court-availability',
     color: 'info'
   },
+  { 
+    id: 'find-partners',
+    Icon: GroupIcon, 
+    title: 'Find Partners', 
+    description: 'Connect with other players',
+    path: '/messages',
+    color: 'success'
+  },
 ];
 
-const ActionCard = ({ action, navigate }) => {
-  const theme = useTheme();
+const ActionCard = ({ action, navigate, totalCards }) => {
+  const muiTheme = useMuiTheme();
+  const { getPrimaryColor, getPrimaryDarkColor, getPrimaryLightColor } = useTheme();
+  
+  // Calculate responsive grid sizes based on total number of cards
+  const getGridSize = () => {
+    if (totalCards <= 2) {
+      return { xs: 12, sm: 6, md: 6 }; // 2 cards per row on medium+ screens
+    } else if (totalCards === 3) {
+      return { xs: 12, sm: 6, md: 4 }; // 3 cards per row on medium+ screens
+    } else if (totalCards === 4) {
+      return { xs: 12, sm: 6, md: 3 }; // 4 cards per row on medium+ screens
+    } else {
+      return { xs: 12, sm: 6, md: 3 }; // Default: 4 cards per row
+    }
+  };
+  
+  const gridSize = getGridSize();
+  
   return (
-    <Grid item xs={12} sm={6} md={3}>
+    <Grid item xs={gridSize.xs} sm={gridSize.sm} md={gridSize.md}>
       <ThemedCard
         sx={{
-          borderRadius: 3,
-          height: 200,
-          width: '100%',
-          transition: theme.transitions.create(['transform', 'box-shadow'], {
-            duration: theme.transitions.duration.short,
+          borderRadius: 4,
+          height: 250,
+          width: 250,
+          mx: 'auto',
+          background: muiTheme.palette.mode === 'dark' 
+            ? 'linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)'
+            : 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+          border: `1px solid ${muiTheme.palette.divider}`,
+          transition: muiTheme.transitions.create(['transform', 'box-shadow', 'border-color'], {
+            duration: muiTheme.transitions.duration.standard,
           }),
           '&:hover': {
-            boxShadow: 6,
-            transform: 'translateY(-4px)'
+            boxShadow: muiTheme.palette.mode === 'dark' 
+              ? '0 8px 32px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2)'
+              : '0 8px 32px rgba(0,0,0,0.1), 0 4px 16px rgba(0,0,0,0.05)',
+            transform: 'translateY(-6px)',
+            borderColor: getPrimaryColor(),
           }
         }}
       >
@@ -92,32 +109,41 @@ const ActionCard = ({ action, navigate }) => {
             display: 'flex', 
             flexDirection: 'column',
             justifyContent: 'space-between',
-            p: 1,
-            '&:last-child': { pb: 1 }
+            p: 2,
+            '&:last-child': { pb: 2 }
           }}>
             <Box sx={{
-              mb: 1.5,
+              mb: 2,
               display: 'inline-flex',
-              p: 1.25,
-              borderRadius: '16px',
-              bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-              color: theme.palette[action.color]?.main || theme.palette.text.primary,
-              border: `1px solid ${theme.palette.divider}`,
-              alignSelf: 'center'
+              p: 1.5,
+              borderRadius: '20px',
+              background: `linear-gradient(135deg, ${getPrimaryColor()}15 0%, ${getPrimaryColor()}25 100%)`,
+              color: getPrimaryColor(),
+              border: `2px solid ${getPrimaryColor()}30`,
+              alignSelf: 'center',
+              transition: muiTheme.transitions.create(['transform', 'background'], {
+                duration: muiTheme.transitions.duration.short,
+              }),
+              '&:hover': {
+                transform: 'scale(1.1)',
+                background: `linear-gradient(135deg, ${getPrimaryColor()}25 0%, ${getPrimaryColor()}35 100%)`,
+              }
             }}>
-              <action.Icon fontSize="large" />
+              <action.Icon sx={{ fontSize: '2rem' }} />
             </Box>
             <Typography
               variant="h6"
-              fontWeight="bold"
+              fontWeight="700"
               gutterBottom
               sx={{ 
-                minHeight: '2.2rem',
-                fontSize: '1.05rem',
-                lineHeight: 1.2,
+                minHeight: '2.4rem',
+                fontSize: '1.1rem',
+                lineHeight: 1.3,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                color: muiTheme.palette.text.primary,
+                mb: 1
               }}
             >
               {action.title}
@@ -126,13 +152,14 @@ const ActionCard = ({ action, navigate }) => {
               variant="body2"
               color="text.secondary"
               sx={{ 
-                minHeight: '2.2rem',
-                fontSize: '0.875rem',
-                lineHeight: 1.3,
+                minHeight: '2.8rem',
+                fontSize: '0.9rem',
+                lineHeight: 1.4,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                textAlign: 'center'
+                textAlign: 'center',
+                opacity: 0.8
               }}
             >
               {action.description}
@@ -146,19 +173,22 @@ const ActionCard = ({ action, navigate }) => {
 
 const QuickActions = () => {
   const navigate = useNavigate();
+  const { getPrimaryColor, getPrimaryDarkColor } = useTheme();
   
   return (
     <Box component="section" sx={{ mb: 6, maxWidth: 1200, mx: 'auto', width: '100%' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h5" component="h2" fontWeight="bold">
-          Quick Actions
-        </Typography>
-        <Chip label="Shortcut" size="small" color="primary" variant="outlined" />
-      </Stack>
+      <Typography variant="h5" component="h2" fontWeight="bold" sx={{ mb: 2, color: 'black' }}>
+        Quick Actions
+      </Typography>
 
-      <Grid container spacing={2.5}>
+      <Grid container spacing={3} justifyContent="center">
         {QUICK_ACTIONS.map((action) => (
-          <ActionCard key={action.id} action={action} navigate={navigate} />
+          <ActionCard 
+            key={action.id} 
+            action={action} 
+            navigate={navigate} 
+            totalCards={QUICK_ACTIONS.length}
+          />
         ))}
       </Grid>
     </Box>

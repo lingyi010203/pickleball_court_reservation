@@ -32,6 +32,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     private ClassSessionRepository sessionRepository;
     private final CourtRepository courtRepository;
     private final UserRepository userRepository;
+    private final UserAccountRepository userAccountRepository;
     private final ClassRegistrationRepository registrationRepository;
     private final BookingRepository bookingRepository;
     private final EmailService emailService;
@@ -224,7 +225,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                     if (reason != null && !reason.isEmpty()) {
                         msg += "\nReason: " + reason;
                     }
-                    emailService.sendEmail(email, "Class Cancelled", msg);
+                    emailService.sendEmailIfEnabled(email, member.getUser(), "Class Cancelled", msg);
                 }
             }
         }
@@ -259,6 +260,14 @@ public class ClassSessionServiceImpl implements ClassSessionService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Validate user status - prevent suspended/inactive users from booking
+        UserAccount userAccount = userAccountRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+        if ("SUSPENDED".equals(userAccount.getStatus()) || "INACTIVE".equals(userAccount.getStatus())) {
+            throw new UnauthorizedException("Your account is " + userAccount.getStatus().toLowerCase() + 
+                ". You cannot make bookings. Please contact support for assistance.");
+        }
 
         Member member = memberRepository.findByUserId(userId);
         if (member == null) {
@@ -330,6 +339,15 @@ public class ClassSessionServiceImpl implements ClassSessionService {
     public Map<String, Object> registerUserForMultipleSessions(Integer userId, List<Integer> sessionIds, String paymentMethod, Integer numPaddles, Boolean buyBallSet) throws ConflictException, ResourceNotFoundException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Validate user status - prevent suspended/inactive users from booking
+        UserAccount userAccount = userAccountRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+        if ("SUSPENDED".equals(userAccount.getStatus()) || "INACTIVE".equals(userAccount.getStatus())) {
+            throw new UnauthorizedException("Your account is " + userAccount.getStatus().toLowerCase() + 
+                ". You cannot make bookings. Please contact support for assistance.");
+        }
+
         Member member = memberRepository.findByUserId(userId);
         if (member == null) {
             throw new ValidationException("User is not a member");
@@ -773,7 +791,7 @@ public class ClassSessionServiceImpl implements ClassSessionService {
                 totalRevenue * 0.20
             );
             
-            emailService.sendEmail(coach.getEmail(), subject, message);
+            emailService.sendEmailIfEnabled(coach, subject, message);
             logger.info("Revenue distribution notification sent to coach {} for session {}", 
                        coach.getId(), session.getId());
         } catch (Exception e) {

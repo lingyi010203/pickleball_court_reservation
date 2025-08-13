@@ -74,6 +74,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/courts/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courts/booked").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courts/available").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courts/{id}/images").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courts/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/admin/courts/public/**").permitAll()
                         
                         // Public event access for unauthenticated users
                         .requestMatchers(HttpMethod.GET, "/api/events/upcoming").permitAll()
@@ -149,7 +152,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/feedback").hasRole("USER")
                         .requestMatchers(HttpMethod.PUT, "/api/feedback/**").hasRole("USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/feedback/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/helpdesk/ask").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/helpdesk/escalate/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.GET, "/api/helpdesk/queries").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/contact/submit").permitAll()
                         .requestMatchers("/api/auth/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/receipt/generate").authenticated()
 
                         // Admin public endpoints (must come before general admin rule)
                         .requestMatchers("/api/admin/courts/public/**").permitAll()

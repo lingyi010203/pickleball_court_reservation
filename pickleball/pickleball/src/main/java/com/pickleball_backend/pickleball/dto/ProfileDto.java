@@ -29,7 +29,6 @@ public class ProfileDto {
     private double amountSpent;
     private String theme;
     private boolean emailNotifications;
-    private boolean pushNotifications;
     private String verificationDocuments;
     private String verificationStatus;
     

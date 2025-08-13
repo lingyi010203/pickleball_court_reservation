@@ -6,6 +6,7 @@ import com.pickleball_backend.pickleball.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth/password")
@@ -25,7 +26,7 @@ public class PasswordController {
     }
 
     @PostMapping("/reset")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             return ResponseEntity.badRequest().body("Passwords do not match");
         }

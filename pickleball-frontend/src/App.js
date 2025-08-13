@@ -59,6 +59,7 @@ import ProfileOverview from './components/profile/ProfileOverview';
 import EditProfileForm from './components/profile/EditProfileForm';
 import AdminModerationDashboard from './components/admin/AdminModerationDashboard';
 import EventOrganizerDashboard from './components/event/EventOrganizerDashboard';
+import UserStatusGuard from './components/common/UserStatusGuard';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -230,21 +231,27 @@ function App() {
           {/* Booking flow */}
           <Route path="booking/:courtId" element={
             <ProtectedRoute>
-              <BookingPage />
+              <UserStatusGuard>
+                <BookingPage />
+              </UserStatusGuard>
             </ProtectedRoute>
           } />
 
           {/* Payment page */}
           <Route path="payment" element={
             <ProtectedRoute>
-              <PaymentPage />
+              <UserStatusGuard>
+                <PaymentPage />
+              </UserStatusGuard>
             </ProtectedRoute>
           } />
 
           {/* Booking confirmation page */}
           <Route path="booking/confirmation" element={
             <ProtectedRoute>
-              <BookingConfirmationPage />
+              <UserStatusGuard>
+                <BookingConfirmationPage />
+              </UserStatusGuard>
             </ProtectedRoute>
           } />
 
@@ -261,7 +268,9 @@ function App() {
           {/* Event creation */}
           <Route path="events/create" element={
             <ProtectedRoute>
-              <EventCreatePage />
+              <UserStatusGuard>
+                <EventCreatePage />
+              </UserStatusGuard>
             </ProtectedRoute>
           } />
 
@@ -273,12 +282,18 @@ function App() {
           } />
 
           {/* Friendly Match page */}
-          <Route path="friendly-matches" element={<FriendlyMatchPage />} />
+          <Route path="friendly-matches" element={
+            <UserStatusGuard>
+              <FriendlyMatchPage />
+            </UserStatusGuard>
+          } />
 
           {/* Friendly Match create page */}
           <Route path="friendly-matches/create" element={
             <ProtectedRoute>
-              <FriendlyMatchCreatePage />
+              <UserStatusGuard>
+                <FriendlyMatchCreatePage />
+              </UserStatusGuard>
             </ProtectedRoute>
           } />
 
@@ -300,8 +315,16 @@ function App() {
 
           {/* User-side: Browse available coaching sessions */}
           <Route path="coaching/browse" element={<BrowseClassPage />} />
-          <Route path="class/:id" element={<ClassSessionRegisterPage />} />
-          <Route path="class/:id/register" element={<ClassSessionRegisterPage />} />
+          <Route path="class/:id" element={
+            <UserStatusGuard>
+              <ClassSessionRegisterPage />
+            </UserStatusGuard>
+          } />
+          <Route path="class/:id/register" element={
+            <UserStatusGuard>
+              <ClassSessionRegisterPage />
+            </UserStatusGuard>
+          } />
 
           {/* Footer Links - Public Pages */}
           <Route path="about" element={<AboutPage />} />
