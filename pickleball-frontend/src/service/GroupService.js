@@ -1,51 +1,43 @@
-import api from '../api/axiosConfig';
+import api from './api';
 
-class GroupService {
-  constructor() {
-    // No need to set baseURL as it's handled by axios instance
-  }
-
-  /**
-   * Create a new group
-   * @param {string} name - Group name
-   * @param {string} description - Group description
-   * @param {Array<string>} memberUsernames - Array of usernames to add to the group
-   * @returns {Promise<Object>} - Created group data
-   */
-  async createGroup(name, description, memberUsernames) {
+const GroupService = {
+  // Create a new group
+  createGroup: async (groupName, description, memberUsernames) => {
     try {
-      const response = await api.post('/groups', {
-        name,
+      console.log('GroupService: Sending request to create group:', {
+        groupName,
         description,
         memberUsernames
       });
+      
+      const response = await api.post('/groups/create', {
+        groupName,
+        description,
+        memberUsernames
+      });
+      
+      console.log('GroupService: Response received:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error creating group:', error);
+      console.error('GroupService: Error creating group:', error);
+      console.error('GroupService: Error response:', error.response?.data);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Get all groups for the current user
-   * @returns {Promise<Array>} - Array of groups
-   */
-  async getUserGroups() {
+  // Get user's groups
+  getUserGroups: async () => {
     try {
-      const response = await api.get('/groups/user');
+      const response = await api.get('/groups/my-groups');
       return response.data;
     } catch (error) {
       console.error('Error fetching user groups:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Get a specific group by ID
-   * @param {number} groupId - Group ID
-   * @returns {Promise<Object>} - Group data
-   */
-  async getGroupById(groupId) {
+  // Get group by ID
+  getGroupById: async (groupId) => {
     try {
       const response = await api.get(`/groups/${groupId}`);
       return response.data;
@@ -53,66 +45,85 @@ class GroupService {
       console.error('Error fetching group:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Add members to an existing group
-   * @param {number} groupId - Group ID
-   * @param {Array<string>} memberUsernames - Array of usernames to add
-   * @returns {Promise<Object>} - Updated group data
-   */
-  async addMembersToGroup(groupId, memberUsernames) {
+  // Get group members
+  getGroupMembers: async (groupId) => {
+    try {
+      const response = await api.get(`/groups/${groupId}/members`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching group members:', error);
+      throw error;
+    }
+  },
+
+  // Add member to group
+  addMemberToGroup: async (groupId, username) => {
     try {
       const response = await api.post(`/groups/${groupId}/members`, {
-        memberUsernames
+        username
       });
       return response.data;
     } catch (error) {
-      console.error('Error adding members to group:', error);
+      console.error('Error adding member to group:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Remove members from a group
-   * @param {number} groupId - Group ID
-   * @param {Array<string>} memberUsernames - Array of usernames to remove
-   * @returns {Promise<Object>} - Updated group data
-   */
-  async removeMembersFromGroup(groupId, memberUsernames) {
+  // Remove member from group
+  removeMemberFromGroup: async (groupId, username) => {
     try {
-      const response = await api.delete(`/groups/${groupId}/members`, {
-        data: { memberUsernames }
+      const response = await api.delete(`/groups/${groupId}/members/${username}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error removing member from group:', error);
+      throw error;
+    }
+  },
+
+  // Get group messages
+  getGroupMessages: async (groupId, page = 0, size = 50) => {
+    try {
+      const response = await api.get(`/groups/${groupId}/messages`, {
+        params: { page, size }
       });
       return response.data;
     } catch (error) {
-      console.error('Error removing members from group:', error);
+      console.error('Error fetching group messages:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Update group information
-   * @param {number} groupId - Group ID
-   * @param {Object} updateData - Data to update (name, description)
-   * @returns {Promise<Object>} - Updated group data
-   */
-  async updateGroup(groupId, updateData) {
+  // Send message to group
+  sendMessage: async (groupId, content, imageUrl = null) => {
     try {
-      const response = await api.put(`/groups/${groupId}`, updateData);
+      const response = await api.post(`/groups/${groupId}/messages`, {
+        content,
+        imageUrl
+      });
       return response.data;
     } catch (error) {
-      console.error('Error updating group:', error);
+      console.error('Error sending message:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Delete a group
-   * @param {number} groupId - Group ID
-   * @returns {Promise<Object>} - Deletion result
-   */
-  async deleteGroup(groupId) {
+  // Mark messages as read
+  markMessagesAsRead: async (groupId, lastReadMessageId) => {
+    try {
+      const response = await api.post(`/groups/${groupId}/messages/read`, {
+        lastReadMessageId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      throw error;
+    }
+  },
+
+  // Delete group
+  deleteGroup: async (groupId) => {
     try {
       const response = await api.delete(`/groups/${groupId}`);
       return response.data;
@@ -120,22 +131,34 @@ class GroupService {
       console.error('Error deleting group:', error);
       throw error;
     }
-  }
+  },
 
-  /**
-   * Leave a group
-   * @param {number} groupId - Group ID
-   * @returns {Promise<Object>} - Result of leaving the group
-   */
-  async leaveGroup(groupId) {
+  // Search groups
+  searchGroups: async (query) => {
     try {
-      const response = await api.post(`/groups/${groupId}/leave`);
+      const response = await api.get('/groups/search', {
+        params: { query }
+      });
       return response.data;
     } catch (error) {
-      console.error('Error leaving group:', error);
+      console.error('Error searching groups:', error);
+      throw error;
+    }
+  },
+
+  // Send group invitations (legacy endpoint)
+  sendGroupInvitations: async (groupName, memberUsernames) => {
+    try {
+      const response = await api.post('/groups/send-invitations', {
+        groupName,
+        memberUsernames
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending group invitations:', error);
       throw error;
     }
   }
-}
+};
 
-export default new GroupService();
+export default GroupService;

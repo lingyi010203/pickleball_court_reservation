@@ -1,5 +1,6 @@
 package com.pickleball_backend.pickleball.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -42,10 +43,12 @@ public class Group {
     private Boolean isActive = true;
     
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     @ToString.Exclude
     private List<GroupMember> members = new ArrayList<>();
     
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     @ToString.Exclude
     private List<GroupMessage> messages = new ArrayList<>();
     

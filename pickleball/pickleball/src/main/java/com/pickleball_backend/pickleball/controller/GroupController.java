@@ -1,6 +1,7 @@
 package com.pickleball_backend.pickleball.controller;
 
 import com.pickleball_backend.pickleball.entity.*;
+import com.pickleball_backend.pickleball.dto.GroupDto;
 import com.pickleball_backend.pickleball.service.GroupService;
 import com.pickleball_backend.pickleball.service.EmailService;
 import com.pickleball_backend.pickleball.repository.UserRepository;
@@ -24,6 +25,12 @@ public class GroupController {
     private final EmailService emailService;
     private final UserRepository userRepository;
 
+    // Health check endpoint
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "OK", "message", "Group service is running"));
+    }
+
     // Create a new group
     @PostMapping("/create")
     public ResponseEntity<?> createGroup(@RequestBody CreateGroupRequest request, Authentication authentication) {
@@ -39,9 +46,22 @@ public class GroupController {
                 request.getMemberUsernames()
             );
 
+            // Convert to DTO to avoid circular reference
+            GroupDto groupDto = new GroupDto(
+                group.getId(),
+                group.getName(),
+                group.getDescription(),
+                group.getCreator().getUserAccount().getUsername(),
+                group.getCreator().getName() != null ? group.getCreator().getName() : group.getCreator().getUserAccount().getUsername(),
+                group.getCreatedAt(),
+                group.getUpdatedAt(),
+                group.getIsActive(),
+                group.getMembers().size()
+            );
+
             return ResponseEntity.ok(Map.of(
                 "message", "Group created successfully",
-                "group", group
+                "group", groupDto
             ));
         } catch (Exception e) {
             log.error("Error creating group: {}", e.getMessage());

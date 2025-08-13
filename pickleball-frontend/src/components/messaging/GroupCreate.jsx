@@ -45,9 +45,16 @@ export default function GroupCreate({ onGroupCreated }) {
   };
 
   const handleAddMember = (user) => {
-    if (!selectedMembers.some(member => member.username === user.username)) {
+    // Check if user is already in selected members
+    const isAlreadySelected = selectedMembers.some(member => member.username === user.username);
+    
+    if (!isAlreadySelected) {
       setSelectedMembers([...selectedMembers, user]);
       setSearchResults(searchResults.filter(u => u.username !== user.username));
+    } else {
+      // Show a brief error message
+      setError(`${user.name || user.username} is already added to the group`);
+      setTimeout(() => setError(''), 2000);
     }
   };
 
@@ -62,8 +69,26 @@ export default function GroupCreate({ onGroupCreated }) {
       return;
     }
 
+    if (groupName.trim().length > 100) {
+      setError('Group name must be less than 100 characters');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
     if (selectedMembers.length === 0) {
       setError('Please add at least one member to the group');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    // Remove duplicate members by username
+    const uniqueMembers = selectedMembers.filter((member, index, self) => 
+      index === self.findIndex(m => m.username === member.username)
+    );
+
+    if (uniqueMembers.length !== selectedMembers.length) {
+      setSelectedMembers(uniqueMembers);
+      setError('Duplicate members removed. Please try creating the group again.');
       setTimeout(() => setError(''), 3000);
       return;
     }
@@ -71,21 +96,39 @@ export default function GroupCreate({ onGroupCreated }) {
     setLoading(true);
     setError('');
     try {
+      // Debug logging
+      console.log('Creating group with data:', {
+        groupName,
+        description: `Group created by ${currentUser?.name || currentUser?.username}`,
+        memberUsernames: uniqueMembers.map(member => member.username),
+        currentUser: currentUser?.username
+      });
+      
+      // Check if backend is accessible
+      console.log('Checking backend connectivity...');
+      const token = localStorage.getItem('authToken');
+      console.log('Auth token exists:', !!token);
+      
       // Create group using GroupService
       const result = await GroupService.createGroup(
         groupName,
         `Group created by ${currentUser?.name || currentUser?.username}`,
-        selectedMembers.map(member => member.username)
+        uniqueMembers.map(member => member.username)
       );
       
       console.log('Group created successfully:', result);
+      
+      // Check if result.group exists
+      if (!result.group) {
+        throw new Error('Group creation response is missing group data');
+      }
       
       // Create a new group object for the frontend
       const newGroup = {
         id: result.group.id,
         name: result.group.name,
         description: result.group.description,
-        memberCount: selectedMembers.length + 1, // +1 for creator
+        memberCount: uniqueMembers.length + 1, // +1 for creator
         lastMessage: null,
         lastMessageTime: new Date(),
         unreadCount: 0,
@@ -93,7 +136,7 @@ export default function GroupCreate({ onGroupCreated }) {
           username: currentUser?.username, 
           name: currentUser?.name || currentUser?.username 
         },
-        members: selectedMembers
+        members: uniqueMembers
       };
 
       setSuccess('Group created successfully! Invitation emails sent to all members.');
@@ -110,8 +153,37 @@ export default function GroupCreate({ onGroupCreated }) {
       setTimeout(() => setSuccess(''), 5000); // Show success message longer
     } catch (error) {
       console.error('Failed to create group', error);
-      setError('Failed to create group. Please try again.');
-      setTimeout(() => setError(''), 3000);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response,
+        request: error.request,
+        config: error.config
+      });
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to create group. Please try again.';
+      
+      if (error.response) {
+        // Server responded with error status
+        const serverError = error.response.data;
+        console.error('Server error response:', serverError);
+        if (serverError.message) {
+          errorMessage = serverError.message;
+        } else if (serverError.error) {
+          errorMessage = serverError.error;
+        }
+      } else if (error.request) {
+        // Network error
+        console.error('Network error - no response received');
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else {
+        // Other error
+        console.error('Other error:', error.message);
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setLoading(false);
     }

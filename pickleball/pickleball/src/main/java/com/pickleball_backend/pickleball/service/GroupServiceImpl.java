@@ -5,8 +5,8 @@ import com.pickleball_backend.pickleball.repository.GroupRepository;
 import com.pickleball_backend.pickleball.repository.GroupMemberRepository;
 import com.pickleball_backend.pickleball.repository.GroupMessageRepository;
 import com.pickleball_backend.pickleball.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -16,25 +16,52 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class GroupServiceImpl implements GroupService {
     
-    private final GroupRepository groupRepository;
-    private final GroupMemberRepository groupMemberRepository;
-    private final GroupMessageRepository groupMessageRepository;
-    private final UserRepository userRepository;
-    private final EmailService emailService;
+    @Autowired
+    private GroupRepository groupRepository;
+    
+    @Autowired
+    private GroupMemberRepository groupMemberRepository;
+    
+    @Autowired
+    private GroupMessageRepository groupMessageRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private EmailService emailService;
     
     @Override
     public Group createGroup(String name, String description, User creator, List<String> memberUsernames) {
-        // Create the group
-        Group group = new Group();
-        group.setName(name);
-        group.setDescription(description);
-        group.setCreator(creator);
-        group = groupRepository.save(group);
+        // Validate input
+        if (name == null || name.trim().isEmpty()) {
+            throw new RuntimeException("Group name cannot be empty");
+        }
+        
+        if (creator == null) {
+            throw new RuntimeException("Creator cannot be null");
+        }
+        
+        // Remove duplicate usernames
+        List<String> uniqueUsernames = memberUsernames.stream()
+            .distinct()
+            .toList();
+        
+        if (uniqueUsernames.size() != memberUsernames.size()) {
+            log.warn("Duplicate usernames found in member list, removing duplicates");
+        }
+        
+        try {
+            // Create the group
+            Group group = new Group();
+            group.setName(name);
+            group.setDescription(description);
+            group.setCreator(creator);
+            group = groupRepository.save(group);
         
         // Add creator as admin member
         GroupMember creatorMember = new GroupMember();
@@ -44,35 +71,43 @@ public class GroupServiceImpl implements GroupService {
         groupMemberRepository.save(creatorMember);
         
         // Add other members
-        for (String username : memberUsernames) {
+        for (String username : uniqueUsernames) {
             Optional<User> userOpt = userRepository.findByUserAccount_Username(username);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
                 
                 // Check if user is not already the creator
                 if (!user.getId().equals(creator.getId())) {
-                    GroupMember member = new GroupMember();
-                    member.setGroup(group);
-                    member.setUser(user);
-                    member.setIsAdmin(false);
-                    groupMemberRepository.save(member);
+                    // Check if user is already a member (should not happen with unique usernames, but safety check)
+                    Optional<GroupMember> existingMember = groupMemberRepository.findByGroupIdAndUserId(group.getId(), user.getId());
+                    if (existingMember.isEmpty()) {
+                        GroupMember member = new GroupMember();
+                        member.setGroup(group);
+                        member.setUser(user);
+                        member.setIsAdmin(false);
+                        groupMemberRepository.save(member);
                     
-                    // Send invitation email
-                    try {
-                        emailService.sendGroupInvitationEmail(
-                            user.getEmail(),
-                            group.getName(),
-                            creator.getName() != null ? creator.getName() : creator.getUserAccount().getUsername(),
-                            creator.getUserAccount().getUsername()
-                        );
-                    } catch (Exception e) {
-                        log.error("Failed to send invitation email to {}: {}", username, e.getMessage());
+                        // Send invitation email
+                        try {
+                            emailService.sendGroupInvitationEmail(
+                                user.getEmail(),
+                                group.getName(),
+                                creator.getName() != null ? creator.getName() : creator.getUserAccount().getUsername(),
+                                creator.getUserAccount().getUsername()
+                            );
+                        } catch (Exception e) {
+                            log.error("Failed to send invitation email to {}: {}", username, e.getMessage());
+                        }
                     }
                 }
             }
         }
         
         return group;
+        } catch (Exception e) {
+            log.error("Error creating group: {}", e.getMessage());
+            throw new RuntimeException("Failed to create group: " + e.getMessage());
+        }
     }
     
     @Override

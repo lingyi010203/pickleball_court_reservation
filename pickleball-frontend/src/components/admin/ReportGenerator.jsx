@@ -515,8 +515,98 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
   }, [showPreview, reportData, calculatePageBreaks]);
 
   // 简化的导出处理
-  const handleExport = (exporting) => {
-    setIsExporting(exporting);
+  const handleExport = async () => {
+    if (!showPreview || !reportData) {
+      alert('Please preview the report first before exporting');
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+
+    try {
+      // 动态导入库
+      const [html2canvas, jsPDF] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+
+      // 获取预览内容元素
+      const previewElement = document.querySelector('[data-preview-content]');
+      if (!previewElement) {
+        throw new Error('Preview content not found. Please try refreshing the page.');
+      }
+
+      // 显示导出进度
+      console.log('Starting PDF export...');
+
+      // 使用html2canvas捕获内容
+      const canvas = await html2canvas.default(previewElement, {
+        scale: 2, // 提高质量
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: previewElement.scrollWidth,
+        height: previewElement.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false, // 减少控制台输出
+        removeContainer: true
+      });
+
+      console.log('Content captured, generating PDF...');
+
+      // 创建PDF
+      const pdf = new jsPDF.default('p', 'mm', 'a4');
+      const imgWidth = 210; // A4宽度
+      const pageHeight = 295; // A4高度
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // 添加第一页
+      pdf.addImage(canvas, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // 如果内容超过一页，添加更多页
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(canvas, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // 生成文件名
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `${reportType}_${timestamp}.pdf`;
+
+      // 下载PDF
+      pdf.save(filename);
+
+      console.log('PDF exported successfully');
+      
+      // 显示成功消息
+      setTimeout(() => {
+        alert('PDF exported successfully!');
+      }, 100);
+      
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      let errorMessage = 'Export failed: ';
+      
+      if (err.message.includes('html2canvas')) {
+        errorMessage += 'Failed to capture content. Please try again.';
+      } else if (err.message.includes('jspdf')) {
+        errorMessage += 'Failed to generate PDF. Please try again.';
+      } else {
+        errorMessage += err.message;
+      }
+      
+      setError(errorMessage);
+      alert(errorMessage);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
 
@@ -767,6 +857,31 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                       📄 Report Preview (Scroll to view full content)
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      {/* Export Preview Button */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleExport}
+                        disabled={isExporting}
+                        startIcon={<DownloadIcon />}
+                        sx={{
+                          backgroundColor: '#667eea',
+                          color: 'white',
+                          px: 2,
+                          py: 1,
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            backgroundColor: '#5c6bc0'
+                          },
+                          '&:disabled': {
+                            backgroundColor: '#ccc'
+                          }
+                        }}
+                      >
+                        {isExporting ? 'Exporting...' : 'Export Preview'}
+                      </Button>
                       {false && totalPages > 1 && (
                         <Typography variant="body2" color="text.secondary" sx={{
                           backgroundColor: '#667eea',
@@ -2114,20 +2229,20 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                     variant="contained"
                     size="large"
                     onClick={handleExport}
-                    disabled={isExporting || dataLoading}
+                    disabled={isExporting || dataLoading || !showPreview}
                     startIcon={<DownloadIcon />}
                     sx={{
                       py: 1.5,
                       fontWeight: 600,
                       fontSize: '0.95rem',
                       borderRadius: 1.5,
-                      backgroundColor: '#667eea',
+                      backgroundColor: showPreview ? '#667eea' : '#ccc',
                       '&:hover': {
-                        backgroundColor: '#5c6bc0'
+                        backgroundColor: showPreview ? '#5c6bc0' : '#ccc'
                       }
                     }}
                   >
-                    {isExporting ? 'Exporting...' : 'Export PDF'}
+                    {isExporting ? 'Exporting...' : showPreview ? 'Export PDF' : 'Preview First'}
                   </Button>
                 </Grid>
               </Grid>
@@ -2144,6 +2259,13 @@ const ReportGenerator = ({ onGenerateReport, companyInfo }) => {
                 <Box sx={{ mt: 2, textAlign: 'center' }}>
                   <Typography variant="body2" color="error">
                     {error}
+                  </Typography>
+                </Box>
+              )}
+              {!showPreview && !dataLoading && !error && (
+                <Box sx={{ mt: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    💡 Tip: Click "Preview Report" first, then use "Export PDF" to download the report
                   </Typography>
                 </Box>
               )}
