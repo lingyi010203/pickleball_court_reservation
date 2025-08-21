@@ -91,6 +91,7 @@ const AdminDashboard = () => {
   const [courtUtilizationLoading, setCourtUtilizationLoading] = useState(false);
   const [courtUtilizationPeriod, setCourtUtilizationPeriod] = useState('7d');
   const [courtUtilizationError, setCourtUtilizationError] = useState('');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null); // 选中的时段，用于显示详细信息
   
   // Activity type statistics
   const activityStats = useMemo(() => {
@@ -2278,40 +2279,156 @@ const AdminDashboard = () => {
                         <Grid container spacing={1}>
                           {Object.entries(courtUtilization.timeSlotUtilizations || {})
                             .sort(([,a], [,b]) => a - b) // 按利用率从低到高排序
-                            .map(([timeSlot, utilization]) => (
-                              <Grid item xs={6} sm={4} md={3} lg={2} key={timeSlot}>
-                                <Box sx={{ 
-                                  p: 1.5, 
-                                  border: '1px solid',
-                                  borderColor: utilization < 30 ? alpha('#f44336', 0.3) : 
-                                             utilization < 50 ? alpha('#ff9800', 0.3) : alpha('#4caf50', 0.3),
-                                  borderRadius: 2,
-                                  backgroundColor: utilization < 30 ? alpha('#f44336', 0.1) : 
-                                                 utilization < 50 ? alpha('#ff9800', 0.1) : alpha('#4caf50', 0.1),
-                                  textAlign: 'center'
-                                }}>
-                                  <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>
-                                    {timeSlot}
-                                  </Typography>
-                                  <Typography variant="h6" sx={{ 
-                                    fontWeight: 700, 
-                                    color: utilization < 30 ? '#f44336' : 
-                                           utilization < 50 ? '#ff9800' : '#4caf50',
-                                    mb: 0.5
-                                  }}>
-                                    {utilization}%
-                                  </Typography>
-                                  <Typography variant="caption" sx={{ 
-                                    color: 'text.secondary',
-                                    fontSize: '0.7rem'
-                                  }}>
-                                    {utilization < 30 ? 'High potential' : 
-                                     utilization < 50 ? 'Moderate potential' : 'Low potential'}
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                            ))}
+                            .map(([timeSlot, utilization]) => {
+                              const detailData = courtUtilization.timeSlotDetails?.[timeSlot];
+                              return (
+                                <Grid item xs={6} sm={4} md={3} lg={2} key={timeSlot}>
+                                  <Box sx={{ 
+                                    p: 1.5, 
+                                    border: '1px solid',
+                                    borderColor: utilization < 30 ? alpha('#f44336', 0.3) : 
+                                               utilization < 50 ? alpha('#ff9800', 0.3) : alpha('#4caf50', 0.3),
+                                    borderRadius: 2,
+                                    backgroundColor: utilization < 30 ? alpha('#f44336', 0.1) : 
+                                                   utilization < 50 ? alpha('#ff9800', 0.1) : alpha('#4caf50', 0.1),
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                      transform: 'translateY(-2px)',
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    // Toggle detailed view for this time slot
+                                    setSelectedTimeSlot(selectedTimeSlot === timeSlot ? null : timeSlot);
+                                  }}
+                                  >
+                                    <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, display: 'block' }}>
+                                      {timeSlot}
+                                    </Typography>
+                                    <Typography variant="h6" sx={{ 
+                                      fontWeight: 700, 
+                                      color: utilization < 30 ? '#f44336' : 
+                                             utilization < 50 ? '#ff9800' : '#4caf50',
+                                      mb: 0.5
+                                    }}>
+                                      {utilization}%
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ 
+                                      color: 'text.secondary',
+                                      fontSize: '0.7rem'
+                                    }}>
+                                      {utilization < 30 ? 'High potential' : 
+                                       utilization < 50 ? 'Moderate potential' : 'Low potential'}
+                                    </Typography>
+                                    
+                                    {/* Detailed Information (shown when selected) */}
+                                    {selectedTimeSlot === timeSlot && detailData && (
+                                      <Box sx={{ 
+                                        mt: 2, 
+                                        pt: 2, 
+                                        borderTop: '1px solid', 
+                                        borderColor: alpha('#000', 0.1),
+                                        textAlign: 'left'
+                                      }}>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
+                                          📊 Detailed Statistics:
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                          • Total Bookings: {detailData.totalBookings || 0}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                          • Total Revenue: RM {detailData.totalRevenue?.toFixed(2) || '0.00'}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                          • Available Slots: {detailData.availableSlots || 0}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                          • Booked Slots: {detailData.bookedSlots || 0}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                          • Total Slots: {detailData.totalSlots || 0}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ 
+                                          display: 'block', 
+                                          fontWeight: 600,
+                                          color: detailData.promotionPotential === 'HIGH' ? '#f44336' :
+                                                 detailData.promotionPotential === 'MODERATE' ? '#ff9800' : '#4caf50'
+                                        }}>
+                                          🎯 Promotion: {detailData.promotionPotential}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                </Grid>
+                              );
+                            })}
                         </Grid>
+                        
+                        {/* Summary Statistics */}
+                        {courtUtilization.timeSlotDetails && (
+                          <Box sx={{ mt: 3, p: 2, backgroundColor: alpha('#4caf50', 0.1), borderRadius: 2 }}>
+                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#4caf50' }}>
+                              📈 Overall Time Slot Summary
+                            </Typography>
+                            <Grid container spacing={2}>
+                              {(() => {
+                                const details = Object.values(courtUtilization.timeSlotDetails || {});
+                                const totalBookings = details.reduce((sum, detail) => sum + (detail.totalBookings || 0), 0);
+                                const totalRevenue = details.reduce((sum, detail) => sum + (detail.totalRevenue || 0), 0);
+                                const highPotentialSlots = details.filter(detail => detail.promotionPotential === 'HIGH').length;
+                                const moderatePotentialSlots = details.filter(detail => detail.promotionPotential === 'MODERATE').length;
+                                const lowPotentialSlots = details.filter(detail => detail.promotionPotential === 'LOW').length;
+                                
+                                return (
+                                  <>
+                                    <Grid item xs={6} sm={3}>
+                                      <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>
+                                          {totalBookings}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                          Total Bookings
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>
+                                          RM {totalRevenue.toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                          Total Revenue
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f44336' }}>
+                                          {highPotentialSlots}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                          High Potential Slots
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#ff9800' }}>
+                                          {moderatePotentialSlots}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                          Moderate Potential Slots
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                  </>
+                                );
+                              })()}
+                            </Grid>
+                          </Box>
+                        )}
                       </Box>
                     </Box>
                   )}

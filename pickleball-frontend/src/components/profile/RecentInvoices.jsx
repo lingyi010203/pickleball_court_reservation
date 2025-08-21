@@ -8,7 +8,8 @@ import {
   Chip,
   alpha,
   Avatar,
-  Divider
+  Divider,
+  IconButton
 } from '@mui/material';
 import { 
   Receipt,
@@ -19,10 +20,12 @@ import {
   Schedule,
   Error,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../../service/api';
+import { downloadReceipt, prepareReceiptData } from '../../utils/receiptUtils';
 
 const RecentInvoices = () => {
   const theme = useTheme();
@@ -31,6 +34,7 @@ const RecentInvoices = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [totalSpent, setTotalSpent] = useState(0);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(null);
 
   useEffect(() => {
     fetchPaymentHistory();
@@ -169,6 +173,51 @@ const RecentInvoices = () => {
 
   const handleBookNow = () => {
     navigate('/courts');
+  };
+
+  const handleDownloadReceipt = async (payment) => {
+    setDownloadingReceipt(payment.id);
+    try {
+      if (payment.type === 'BOOKING') {
+        // For booking payments, we need to fetch the booking details first
+        const bookingResponse = await api.get(`/member/bookings/${payment.referenceId}`);
+        const booking = bookingResponse.data;
+        
+        const receiptData = prepareReceiptData(booking, null, null);
+        await downloadReceipt(receiptData);
+      } else {
+        // For top-up payments, create a simple receipt
+        const receiptData = {
+          bookingId: payment.id,
+          bookingType: 'WALLET_TOPUP',
+          courtName: 'Wallet Top-up',
+          location: 'Online',
+          date: new Date().toISOString().split('T')[0],
+          startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          endTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          duration: 0,
+          numberOfPlayers: 0,
+          numPaddles: 0,
+          buyBallSet: false,
+          originalAmount: payment.amount,
+          discountAmount: 0,
+          totalAmount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.status,
+          voucherCode: '',
+          pointsEarned: 0,
+          bookingDate: payment.date
+        };
+        await downloadReceipt(receiptData);
+      }
+      
+      alert('Receipt downloaded successfully!');
+    } catch (error) {
+      console.error('Failed to download receipt:', error);
+      alert('Failed to download receipt: ' + error.message);
+    } finally {
+      setDownloadingReceipt(null);
+    }
   };
 
   return (
@@ -336,7 +385,7 @@ const RecentInvoices = () => {
                       {formatDate(payment.date)}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {payment.type === 'TOP_UP' ? (
                       <TrendingUp sx={{ 
                         fontSize: 14, 
@@ -357,6 +406,25 @@ const RecentInvoices = () => {
                     }}>
                       {payment.type === 'TOP_UP' ? '+' : '-'}{formatAmount(payment.amount)}
                     </Typography>
+                    
+                    {/* Download Receipt Button */}
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDownloadReceipt(payment)}
+                      disabled={downloadingReceipt === payment.id}
+                      sx={{
+                        p: 0.5,
+                        color: theme.palette.primary.main,
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                        },
+                        '&:disabled': {
+                          color: theme.palette.grey[400]
+                        }
+                      }}
+                    >
+                      <DownloadIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
                   </Box>
                 </Box>
               </Box>

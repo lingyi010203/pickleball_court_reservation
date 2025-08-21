@@ -173,4 +173,19 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     
     // Add missing method for finding bookings by member ID and purpose
     List<Booking> findByMember_IdAndPurpose(Integer memberId, String purpose);
+    
+    // Find bookings by date range and time slot
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "JOIN b.bookingSlots bs " +
+           "JOIN bs.slot s " +
+           "WHERE b.bookingDate >= :startDate " +
+           "AND b.bookingDate <= :endDate " +
+           "AND s.startTime >= :startTime " +
+           "AND s.endTime <= :endTime " +
+           "AND b.status IN ('CONFIRMED', 'COMPLETED')")
+    List<Booking> findBookingsByDateRangeAndTimeSlot(
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime);
 }

@@ -35,12 +35,14 @@ import {
   ArrowBack as BackIcon,
   FilterList as FilterIcon,
   Visibility as ViewIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled, useTheme } from '@mui/material/styles';
 import api from '../../api/axiosConfig';
 import ModernBookingDetailsDialog from '../admin/ModernBookingDetailsDialog';
+import { downloadReceipt, prepareReceiptData } from '../../utils/receiptUtils';
 
 // Modern color palette
 const COLORS = {
@@ -262,6 +264,7 @@ const BookingHistory = () => {
   });
   const [cancellationDetails, setCancellationDetails] = useState(null);
   const [cancellationDetailsOpen, setCancellationDetailsOpen] = useState(false);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(null);
 
   const fetchBookingHistory = async () => {
     try {
@@ -473,6 +476,28 @@ const BookingHistory = () => {
   const handleCloseDetails = () => {
     setDetailsDialogOpen(false);
     setSelectedBooking(null);
+  };
+
+  const handleDownloadReceipt = async (booking) => {
+    setDownloadingReceipt(booking.id);
+    try {
+      const receiptData = prepareReceiptData(booking, null, null);
+      await downloadReceipt(receiptData);
+      setSnackbar({
+        open: true,
+        message: 'Receipt downloaded successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to download receipt:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to download receipt: ' + error.message,
+        severity: 'error'
+      });
+    } finally {
+      setDownloadingReceipt(null);
+    }
   };
 
   // 日期格式化函数
@@ -842,6 +867,17 @@ const BookingHistory = () => {
                         onClick={() => handleViewDetails(booking)}
                       >
                         Details
+                      </ModernButton>
+
+                      <ModernButton
+                        variant="outlined"
+                        color="success"
+                        size="small"
+                        startIcon={<ReceiptIcon />}
+                        onClick={() => handleDownloadReceipt(booking)}
+                        disabled={downloadingReceipt === booking.id}
+                      >
+                        {downloadingReceipt === booking.id ? 'Downloading...' : 'Receipt'}
                       </ModernButton>
 
                     {booking.status === 'CONFIRMED' && booking.bookingType !== 'EVENT' && (

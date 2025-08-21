@@ -24,8 +24,10 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ShareIcon from '@mui/icons-material/Share';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import ClassSessionService from '../../service/ClassSessionService';
 import api from '../../api/axiosConfig';
+import { downloadReceipt, prepareReceiptData } from '../../utils/receiptUtils';
 
 const PADDLE_PRICE = 5; // 每个 paddle 租金
 const BALL_SET_PRICE = 12; // 一组 ball set 售价
@@ -47,6 +49,7 @@ const BookingConfirmationPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
 
   // 添加调试日志
   console.log('=== BookingConfirmationPage Debug ===');
@@ -270,6 +273,73 @@ Let's play! 🏓`;
       alert('Failed to send message: ' + (error.response?.data || error.message));
     } finally {
       setIsSharing(false);
+    }
+  };
+
+  // 處理收據下載
+  const handleDownloadReceipt = async () => {
+    setIsDownloadingReceipt(true);
+    try {
+      let receiptData;
+      
+      if (isFriendlyMatch) {
+        // For friendly matches
+        receiptData = {
+          bookingId: data?.id?.toString() || '',
+          bookingType: 'FRIENDLY_MATCH',
+          courtName: data?.courtName || 'Pickleball Court',
+          location: data?.venueName || data?.location || 'Location',
+          date: data?.date || '',
+          startTime: data?.startTime || '',
+          endTime: data?.endTime || '',
+          duration: duration,
+          numberOfPlayers: data?.maxPlayers || 4,
+          numPaddles: data?.numPaddles || 0,
+          buyBallSet: data?.buyBallSet || false,
+          originalAmount: data?.originalPrice || data?.totalPrice || 0,
+          discountAmount: data?.discountAmount || 0,
+          totalAmount: data?.totalPrice || data?.price || 0,
+          paymentMethod: 'WALLET',
+          paymentStatus: 'COMPLETED',
+          voucherCode: data?.voucherCode || '',
+          pointsEarned: data?.pointsEarned || 0,
+          bookingDate: data?.bookingDate || new Date().toISOString()
+        };
+      } else if (isEventRegistration) {
+        // For event registrations
+        receiptData = {
+          bookingId: data?.id?.toString() || '',
+          bookingType: 'EVENT_REGISTRATION',
+          courtName: data?.title || 'Event',
+          location: data?.location || data?.venueLocation || 'Location',
+          date: data?.startTime ? new Date(data.startTime).toISOString().split('T')[0] : '',
+          startTime: data?.startTime ? new Date(data.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          endTime: data?.endTime ? new Date(data.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          duration: 1,
+          numberOfPlayers: data?.currentParticipants || 1,
+          numPaddles: 0,
+          buyBallSet: false,
+          originalAmount: data?.feeAmount || 0,
+          discountAmount: 0,
+          totalAmount: location.state?.totalAmount || data?.feeAmount || 0,
+          paymentMethod: 'WALLET',
+          paymentStatus: 'COMPLETED',
+          voucherCode: '',
+          pointsEarned: 0,
+          bookingDate: new Date().toISOString()
+        };
+      } else {
+        // For regular court bookings
+        receiptData = prepareReceiptData(booking, null, null);
+      }
+      
+      await downloadReceipt(receiptData);
+      alert('Receipt downloaded successfully!');
+    } catch (error) {
+      console.error('Failed to download receipt:', error);
+      alert('Failed to download receipt: ' + error.message);
+    } finally {
+      setIsDownloadingReceipt(false);
     }
   };
 
@@ -593,21 +663,41 @@ Let's play! 🏓`;
           {isFriendlyMatch ? (
             // Friendly Match 的按鈕
             <>
-              <Tooltip title="Share confirmation with friends">
-                <IconButton
-                  onClick={handleShare}
-                  sx={{
-                    backgroundColor: '#2196f3',
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: '#1976d2'
-                    },
-                    mb: 2
-                  }}
-                >
-                  <ShareIcon />
-                </IconButton>
-              </Tooltip>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'center' }}>
+                <Tooltip title="Share confirmation with friends">
+                  <IconButton
+                    onClick={handleShare}
+                    sx={{
+                      backgroundColor: '#2196f3',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#1976d2'
+                      }
+                    }}
+                  >
+                    <ShareIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Download receipt">
+                  <IconButton
+                    onClick={handleDownloadReceipt}
+                    disabled={isDownloadingReceipt}
+                    sx={{
+                      backgroundColor: '#4caf50',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#2e7d32'
+                      },
+                      '&:disabled': {
+                        backgroundColor: '#ccc'
+                      }
+                    }}
+                  >
+                    <ReceiptIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               
               <Button 
                 variant="outlined" 
@@ -644,21 +734,41 @@ Let's play! 🏓`;
           ) : isEventRegistration ? (
             // Event Registration 的按鈕
             <>
-              <Tooltip title="Share confirmation with friends">
-                <IconButton
-                  onClick={handleShare}
-                  sx={{
-                    backgroundColor: '#2196f3',
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: '#1976d2'
-                    },
-                    mb: 2
-                  }}
-                >
-                  <ShareIcon />
-                </IconButton>
-              </Tooltip>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'center' }}>
+                <Tooltip title="Share confirmation with friends">
+                  <IconButton
+                    onClick={handleShare}
+                    sx={{
+                      backgroundColor: '#2196f3',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#1976d2'
+                      }
+                    }}
+                  >
+                    <ShareIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Download receipt">
+                  <IconButton
+                    onClick={handleDownloadReceipt}
+                    disabled={isDownloadingReceipt}
+                    sx={{
+                      backgroundColor: '#4caf50',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#2e7d32'
+                      },
+                      '&:disabled': {
+                        backgroundColor: '#ccc'
+                      }
+                    }}
+                  >
+                    <ReceiptIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               
               <Button 
                 variant="outlined" 
@@ -695,21 +805,41 @@ Let's play! 🏓`;
           ) : (booking && booking.type === 'class-session') ? (
             // Class Session 預訂的按鈕
             <>
-              <Tooltip title="Share confirmation with friends">
-                <IconButton
-                  onClick={handleShare}
-                  sx={{
-                    backgroundColor: '#2196f3',
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: '#1976d2'
-                    },
-                    mb: 2
-                  }}
-                >
-                  <ShareIcon />
-                </IconButton>
-              </Tooltip>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'center' }}>
+                <Tooltip title="Share confirmation with friends">
+                  <IconButton
+                    onClick={handleShare}
+                    sx={{
+                      backgroundColor: '#2196f3',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#1976d2'
+                      }
+                    }}
+                  >
+                    <ShareIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Download receipt">
+                  <IconButton
+                    onClick={handleDownloadReceipt}
+                    disabled={isDownloadingReceipt}
+                    sx={{
+                      backgroundColor: '#4caf50',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#2e7d32'
+                      },
+                      '&:disabled': {
+                        backgroundColor: '#ccc'
+                      }
+                    }}
+                  >
+                    <ReceiptIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               
               <Button 
                 variant="outlined" 
@@ -746,21 +876,41 @@ Let's play! 🏓`;
           ) : (
             // 一般球場預訂的按鈕（保持原樣）
             <>
-              <Tooltip title="Share confirmation with friends">
-                <IconButton
-                  onClick={handleShare}
-                  sx={{
-                    backgroundColor: '#2196f3',
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: '#1976d2'
-                    },
-                    mb: 2
-                  }}
-                >
-                  <ShareIcon />
-                </IconButton>
-              </Tooltip>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'center' }}>
+                <Tooltip title="Share confirmation with friends">
+                  <IconButton
+                    onClick={handleShare}
+                    sx={{
+                      backgroundColor: '#2196f3',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#1976d2'
+                      }
+                    }}
+                  >
+                    <ShareIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Download receipt">
+                  <IconButton
+                    onClick={handleDownloadReceipt}
+                    disabled={isDownloadingReceipt}
+                    sx={{
+                      backgroundColor: '#4caf50',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: '#2e7d32'
+                      },
+                      '&:disabled': {
+                        backgroundColor: '#ccc'
+                      }
+                    }}
+                  >
+                    <ReceiptIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               
           <Button
             variant="outlined"
